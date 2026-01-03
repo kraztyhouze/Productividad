@@ -11,12 +11,12 @@ const Login = () => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
         setLoading(true);
 
-        const result = login(username, password);
+        const result = await login(username, password);
 
         if (result.success) {
             if (result.role === 'Puesto Compras') {

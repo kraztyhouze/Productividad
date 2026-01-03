@@ -115,34 +115,34 @@ const Dashboard = () => {
     return (
         <div className="space-y-8 pb-10">
             {/* HERO SECTION */}
-            <div className="relative overflow-hidden rounded-[3rem] bg-gradient-to-r from-blue-900 to-slate-900 p-10 text-white shadow-2xl border border-blue-800/50">
-                <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
-                <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl translate-y-1/3 -translate-x-1/3 pointer-events-none"></div>
+            <div className="relative overflow-hidden rounded-[3rem] bg-gradient-to-br from-pink-900 via-rose-900 to-slate-900 p-10 text-white shadow-2xl border border-pink-800/30">
+                <div className="absolute top-0 right-0 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-rose-500/10 rounded-full blur-3xl translate-y-1/3 -translate-x-1/3 pointer-events-none"></div>
 
                 <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-10">
                     <div>
                         <h1 className="text-4xl lg:text-5xl font-extrabold tracking-tight mb-2">
-                            Hola, <span className="text-blue-400">{user?.name?.split(' ')[0]}</span>
+                            Hola, <span className="text-pink-400">{user?.name?.split(' ')[0]}</span>
                         </h1>
-                        <p className="text-xl text-blue-200/80 font-medium">Bienvenido a tu panel de control.</p>
+                        <p className="text-xl text-pink-200/80 font-medium">Bienvenido a tu panel TikTak.</p>
 
                         <div className="flex items-center gap-6 mt-8">
-                            <div className="bg-white/10 backdrop-blur-md px-6 py-3 rounded-2xl flex items-center gap-4 border border-white/10">
-                                <Calendar className="text-blue-300" size={24} />
+                            <div className="bg-white/10 backdrop-blur-md px-6 py-3 rounded-2xl flex items-center gap-4 border border-white/10 hover:bg-white/15 transition-colors">
+                                <Calendar className="text-pink-300" size={24} />
                                 <div>
-                                    <p className="text-xs text-blue-200 uppercase font-bold tracking-wider">Fecha</p>
+                                    <p className="text-xs text-pink-200 uppercase font-bold tracking-wider">Fecha</p>
                                     <p className="text-lg font-bold">{currentTime.toLocaleDateString()}</p>
                                 </div>
                             </div>
-                            <div className="bg-white/10 backdrop-blur-md px-6 py-3 rounded-2xl flex items-center gap-4 border border-white/10">
+                            <div className="bg-white/10 backdrop-blur-md px-6 py-3 rounded-2xl flex items-center gap-4 border border-white/10 hover:bg-white/15 transition-colors">
                                 <Sun className="text-amber-400" size={24} />
                                 <div>
-                                    <p className="text-xs text-blue-200 uppercase font-bold tracking-wider">Sevilla</p>
+                                    <p className="text-xs text-pink-200 uppercase font-bold tracking-wider">Sevilla</p>
                                     <p className="text-lg font-bold">{weather.temp}°C {weather.condition}</p>
                                 </div>
                             </div>
                             <div className="hidden lg:block">
-                                <p className="text-5xl font-mono font-bold text-white/90">{currentTime.toLocaleTimeString()}</p>
+                                <p className="text-5xl font-mono font-bold text-white/90 drop-shadow-lg">{currentTime.toLocaleTimeString()}</p>
                             </div>
                         </div>
                     </div>

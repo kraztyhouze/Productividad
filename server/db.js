@@ -1,59 +1,60 @@
-import sqlite3 from 'sqlite3';
-import { open } from 'sqlite';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import pg from 'pg';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const { Pool } = pg;
 
-// Database persistence file
-// Points to project root: server/../database.sqlite
-const DB_PATH = path.join(__dirname, '../database.sqlite');
+// Use DATABASE_URL from environment (Railway provides this)
+// Fallback to a local connection string if needed (for dev)
+const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/productivity';
 
-let db;
+const pool = new Pool({
+  connectionString,
+  // SSL is required for Railway deployments, but we need to disable it for local dev if not set up
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+});
 
-export async function getDb() {
-  if (db) return db;
+export const query = (text, params) => pool.query(text, params);
 
-  db = await open({
-    filename: DB_PATH,
-    driver: sqlite3.Database
-  });
+export async function initDb() {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+        CREATE TABLE IF NOT EXISTS active_sessions (
+            employee_id TEXT PRIMARY KEY,
+            employee_name TEXT,
+            start_time TEXT
+        );
 
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS active_sessions (
-      employee_id TEXT PRIMARY KEY,
-      employee_name TEXT,
-      start_time TEXT
-    );
+        CREATE TABLE IF NOT EXISTS daily_records (
+            id BIGINT PRIMARY KEY,
+            employee_id TEXT,
+            employee_name TEXT,
+            start_time TEXT,
+            end_time TEXT,
+            duration_seconds REAL,
+            date TEXT,
+            groups_count INTEGER DEFAULT 0
+        );
 
-    CREATE TABLE IF NOT EXISTS daily_records (
-      id REAL PRIMARY KEY,
-      employee_id TEXT,
-      employee_name TEXT,
-      start_time TEXT,
-      end_time TEXT,
-      duration_seconds REAL,
-      date TEXT,
-      groups_count INTEGER DEFAULT 0
-    );
+        CREATE TABLE IF NOT EXISTS daily_groups (
+            key TEXT PRIMARY KEY,
+            standard INTEGER DEFAULT 0,
+            jewelry INTEGER DEFAULT 0,
+            recoverable INTEGER DEFAULT 0
+        );
 
-    CREATE TABLE IF NOT EXISTS daily_groups (
-      key TEXT PRIMARY KEY, -- format: "employeeId-date"
-      standard INTEGER DEFAULT 0,
-      jewelry INTEGER DEFAULT 0,
-      recoverable INTEGER DEFAULT 0
-    );
+        CREATE TABLE IF NOT EXISTS closed_days (
+            date TEXT PRIMARY KEY
+        );
 
-    CREATE TABLE IF NOT EXISTS closed_days (
-      date TEXT PRIMARY KEY
-    );
-
-    CREATE TABLE IF NOT EXISTS day_incidents (
-      date TEXT PRIMARY KEY,
-      text TEXT
-    );
-  `);
-
-  return db;
+        CREATE TABLE IF NOT EXISTS day_incidents (
+            date TEXT PRIMARY KEY,
+            text TEXT
+        );
+    `);
+    console.log("Database tables initialized (PostgreSQL)");
+  } catch (err) {
+    console.error("Error initializing DB:", err);
+  } finally {
+    client.release();
+  }
 }

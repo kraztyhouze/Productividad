@@ -21,7 +21,7 @@ const DashboardLayout = () => {
                 <div className="h-24 flex items-center justify-center lg:justify-start lg:px-6 border-b border-slate-800/50 relative overflow-hidden group">
                     <div className="absolute inset-0 bg-pink-600/10 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
                     {/* Logo Image */}
-                    <img src="/logo_tiktak.jpg" alt="TikTak" className="w-10 h-10 rounded-full object-cover shadow-lg shadow-pink-500/20 shrink-0" />
+                    <img src="/logo_tiktak.jpg" alt="TikTak" className="h-10 w-auto object-contain shadow-lg shadow-pink-500/20 shrink-0" />
                     <span className="hidden lg:block ml-3 font-extrabold text-2xl tracking-tight text-white" style={{ fontFamily: '"Varela Round", sans-serif' }}>
                         TikTak
                     </span>

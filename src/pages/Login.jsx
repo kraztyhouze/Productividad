@@ -31,79 +31,85 @@ const Login = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
-            {/* Ambient Background */}
-            <div className="absolute top-[-10%] left-[-10%] w-[40rem] h-[40rem] bg-pink-600/20 rounded-full blur-[100px] pointer-events-none opacity-50"></div>
-            <div className="absolute bottom-[-10%] right-[-10%] w-[40rem] h-[40rem] bg-purple-600/20 rounded-full blur-[100px] pointer-events-none opacity-50"></div>
+        <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4 relative overflow-hidden font-sans">
+            {/* Ambient Background - Enhanced Glare */}
+            <div className="absolute top-[-20%] left-[-10%] w-[50rem] h-[50rem] bg-pink-600/30 rounded-full blur-[120px] pointer-events-none opacity-60 mix-blend-screen"></div>
+            <div className="absolute bottom-[-20%] right-[-10%] w-[50rem] h-[50rem] bg-purple-600/30 rounded-full blur-[120px] pointer-events-none opacity-60 mix-blend-screen"></div>
 
-            <div className="max-w-md w-full bg-slate-900/50 backdrop-blur-xl rounded-3xl shadow-2xl overflow-hidden border border-slate-800/50 z-10">
-                <div className="p-8 pb-6 text-center">
-                    <div className="w-24 h-24 mx-auto mb-6 p-2 rounded-full bg-slate-900/50 shadow-lg border border-slate-800/50 flex items-center justify-center">
-                        <img src="/logo_tiktak.jpg" alt="TikTak Logo" className="w-full h-full object-cover rounded-full" />
+            {/* Geometric Accents */}
+            <div className="absolute top-1/2 left-1/4 w-96 h-1 bg-gradient-to-r from-transparent via-pink-500/50 to-transparent -rotate-45 blur-sm opacity-50"></div>
+            <div className="absolute top-1/3 right-1/4 w-96 h-1 bg-gradient-to-r from-transparent via-purple-500/50 to-transparent rotate-45 blur-sm opacity-50"></div>
+
+            <div className="max-w-[26rem] w-full relative z-10 group">
+                {/* Glowing Border Effect */}
+                <div className="absolute -inset-0.5 bg-gradient-to-b from-pink-500/50 to-purple-600/50 rounded-[2rem] blur opacity-75 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
+
+                <div className="relative bg-slate-900/40 backdrop-blur-2xl rounded-[2rem] border border-white/10 shadow-2xl overflow-hidden p-8 px-10">
+
+                    <div className="flex flex-col items-center justify-center mb-8">
+                        {/* Logo - Natural Aspect Ratio */}
+                        <div className="mb-4">
+                            <img src="/logo_tiktak.jpg" alt="TikTak" className="h-20 w-auto object-contain drop-shadow-[0_0_15px_rgba(236,72,153,0.5)] rounded-2xl" />
+                        </div>
+
+                        <h1 className="text-3xl font-bold text-white tracking-tight text-center" style={{ fontFamily: '"Varela Round", sans-serif' }}>
+                            Bienvenido a TikTak
+                        </h1>
                     </div>
 
-                    <h1 className="text-3xl font-bold text-slate-50" style={{ fontFamily: '"Varela Round", sans-serif' }}>
-                        Bienvenido a TikTak
-                    </h1>
-                    <p className="text-slate-400 mt-2 text-sm">Productivity Suite</p>
+                    <form onSubmit={handleSubmit} className="space-y-5">
+                        {error && (
+                            <div className="bg-red-500/10 border border-red-500/50 text-red-200 px-4 py-3 rounded-xl flex items-center gap-2 text-sm animate-in fade-in slide-in-from-top-2 backdrop-blur-md">
+                                <AlertCircle size={18} />
+                                {error}
+                            </div>
+                        )}
+
+                        <div className="space-y-2">
+                            <div className="relative group/input">
+                                <User size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-pink-400/70 group-focus-within/input:text-pink-400 transition-colors" />
+                                <input
+                                    type="text"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    required
+                                    placeholder="Usuario"
+                                    className="w-full pl-12 pr-4 py-4 rounded-xl border border-pink-500/30 bg-slate-950/50 text-white placeholder:text-slate-400 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 transition-all font-medium"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <div className="relative group/input">
+                                <Lock size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-pink-400/70 group-focus-within/input:text-pink-400 transition-colors" />
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    required
+                                    placeholder="Contraseña"
+                                    className="w-full pl-12 pr-4 py-4 rounded-xl border border-pink-500/30 bg-slate-950/50 text-white placeholder:text-slate-400 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 transition-all font-medium"
+                                />
+                            </div>
+                        </div>
+
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full py-4 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white rounded-xl font-bold text-lg shadow-[0_0_20px_-5px_rgba(236,72,153,0.5)] transition-all hover:scale-[1.02] active:scale-[0.98] mt-6 disabled:opacity-70 disabled:cursor-not-allowed"
+                        >
+                            {loading ? 'Entrando...' : 'Iniciar Sesión'}
+                        </button>
+
+                        <div className="flex flex-col items-center gap-2 text-sm text-slate-400 pt-2">
+                            <button type="button" className="hover:text-pink-400 transition-colors underline decoration-pink-500/30 underline-offset-4">Olvidé mi contraseña</button>
+                            <button type="button" className="hover:text-pink-400 transition-colors underline decoration-pink-500/30 underline-offset-4">Crear cuenta</button>
+                        </div>
+                    </form>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 pt-0 space-y-5">
-                    {error && (
-                        <div className="bg-red-950/30 border border-red-900/50 text-red-300 px-4 py-3 rounded-xl flex items-center gap-2 text-sm animate-in fade-in slide-in-from-top-2">
-                            <AlertCircle size={18} />
-                            {error}
-                        </div>
-                    )}
-
-                    <div className="space-y-2">
-                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Usuario</label>
-                        <div className="relative group">
-                            <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-pink-500 transition-colors" />
-                            <input
-                                type="text"
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
-                                required
-                                placeholder="Introduce tu usuario"
-                                className="w-full pl-10 pr-4 py-3.5 rounded-xl border border-slate-700 bg-slate-800/50 text-slate-100 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 transition-all placeholder:text-slate-600"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Contraseña</label>
-                        <div className="relative group">
-                            <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-pink-500 transition-colors" />
-                            <input
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                                placeholder="Introduce tu contraseña"
-                                className="w-full pl-10 pr-4 py-3.5 rounded-xl border border-slate-700 bg-slate-800/50 text-slate-100 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 transition-all placeholder:text-slate-600"
-                            />
-                        </div>
-                    </div>
-
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full py-3.5 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold transition-all shadow-lg shadow-pink-600/20 mt-4 active:scale-[0.98]"
-                    >
-                        {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
-                    </button>
-
-                    <div className="flex justify-between text-xs text-slate-500 pt-2 px-1">
-                        <button type="button" className="hover:text-pink-400 transition-colors">Olvidé mi contraseña</button>
-                        <button type="button" className="hover:text-pink-400 transition-colors">Crear cuenta</button>
-                    </div>
-                </form>
-
-                <div className="px-6 py-4 bg-slate-900/30 text-center border-t border-slate-800/50">
-                    <p className="text-[10px] text-slate-600 font-medium tracking-wide">
-                        TEST CREDS: <span className="text-slate-400">admin / admin</span> • <span className="text-slate-400">juanma / admin123</span>
-                    </p>
+                <div className="text-center mt-6 text-[10px] text-slate-500 font-mono opacity-50">
+                    TEST CREDS: admin / admin • juanma / admin123
                 </div>
             </div>
         </div>

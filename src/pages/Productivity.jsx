@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useProductivity } from '../context/ProductivityContext';
 import { useTeam } from '../context/TeamContext';
 import { useAuth, ROLES } from '../context/AuthContext';
-import { Users, ShoppingBag, Clock, UserCheck, AlertCircle, Archive, Lock, RefreshCw, Plus, X, Trash2 } from 'lucide-react';
+import { Users, ShoppingBag, Clock, UserCheck, AlertCircle, Lock, RefreshCw, Plus, Trash2 } from 'lucide-react';
+import InfoPanel from '../components/Productivity/InfoPanel';
+import ManualEntryModal from '../components/Productivity/ManualEntryModal';
+import CloseDayModal from '../components/Productivity/CloseDayModal';
 
 const Productivity = () => {
     const {
@@ -20,17 +23,8 @@ const Productivity = () => {
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [showCloseModal, setShowCloseModal] = useState(false);
     const [showManualModal, setShowManualModal] = useState(false);
-    const [incidentText, setIncidentText] = useState('');
 
-    // Manual Entry State
-    const [manualEntry, setManualEntry] = useState({
-        empId: '',
-        hours: '',
-        minutes: '',
-        standardGroups: '',
-        jewelryGroups: '',
-        recoverableGroups: ''
-    });
+    // Removed local form states (manualEntry, incidentText) as they are now handled by modals
 
     const isManagerial = user?.role === ROLES.MANAGER;
 
@@ -182,8 +176,8 @@ const Productivity = () => {
         updateDailyGroups(empId, selectedDate, { [field]: parseInt(value) || 0 });
     };
 
-    const handleCloseDay = () => {
-        updateDayIncident(selectedDate, incidentText);
+    const handleCloseDay = (text) => {
+        updateDayIncident(selectedDate, text);
         closeDay(selectedDate);
         setShowCloseModal(false);
     };
@@ -215,17 +209,13 @@ const Productivity = () => {
         }
     };
 
-    const handleSaveManualRecord = () => {
-        if (!manualEntry.empId) return alert('Selecciona un empleado');
+    const handleSaveManualRecord = (entryData) => {
+        const emp = employees.find(e => e.id === parseInt(entryData.empId));
+        const totalSeconds = (parseInt(entryData.hours || 0) * 3600) + (parseInt(entryData.minutes || 0) * 60);
 
-        const emp = employees.find(e => e.id === parseInt(manualEntry.empId));
-        const totalSeconds = (parseInt(manualEntry.hours || 0) * 3600) + (parseInt(manualEntry.minutes || 0) * 60);
+        const hasGroups = entryData.standardGroups || entryData.jewelryGroups || entryData.recoverableGroups;
 
-        const hasGroups = manualEntry.standardGroups || manualEntry.jewelryGroups || manualEntry.recoverableGroups;
-
-        if (totalSeconds === 0 && !hasGroups) return alert('Introduce tiempo o grupos');
-
-        // Add Time Record
+        // Validation is done in modal, but double check doesn't hurt or just trust modal
         if (totalSeconds > 0) {
             addManualRecord({
                 id: Date.now(),
@@ -240,18 +230,16 @@ const Productivity = () => {
             });
         }
 
-        // Add Groups Record (Additive)
         if (hasGroups) {
             const current = getGroupCounts(emp.id, selectedDate);
             updateDailyGroups(emp.id, selectedDate, {
-                standard: (current.standard || 0) + (parseInt(manualEntry.standardGroups) || 0),
-                jewelry: (current.jewelry || 0) + (parseInt(manualEntry.jewelryGroups) || 0),
-                recoverable: (current.recoverable || 0) + (parseInt(manualEntry.recoverableGroups) || 0)
+                standard: (current.standard || 0) + (parseInt(entryData.standardGroups) || 0),
+                jewelry: (current.jewelry || 0) + (parseInt(entryData.jewelryGroups) || 0),
+                recoverable: (current.recoverable || 0) + (parseInt(entryData.recoverableGroups) || 0)
             });
         }
 
         setShowManualModal(false);
-        setManualEntry({ empId: '', hours: '', minutes: '', standardGroups: '', jewelryGroups: '', recoverableGroups: '' });
     };
 
     // --- PRODUCT FAMILY LOGIC ---
@@ -407,13 +395,10 @@ const Productivity = () => {
                                         <Plus size={14} />
                                     </button>
                                     <button
-                                        onClick={() => {
-                                            setIncidentText(dayIncidents[selectedDate] || '');
-                                            setShowCloseModal(true);
-                                        }}
+                                        onClick={() => setShowCloseModal(true)}
                                         className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold rounded transition-colors"
                                     >
-                                        <Archive size={12} /> Cerrar
+                                        <Trash2 size={12} className="rotate-180" /> Cerrar {/* Archive icon replaced or repurposed */}
                                     </button>
                                 </div>
                             )}
@@ -492,245 +477,52 @@ const Productivity = () => {
             </div>
 
             {/* BOTTOM SECTION: INFO WINDOW (NECESIDAD / SOBRESTOCK) */}
+            {/* BOTTOM SECTION: INFO WINDOW (NECESIDAD / SOBRESTOCK) */}
             <div className="flex-[1] flex gap-6 min-h-0 max-h-[250px]">
-                {/* NECESIDAD - GREEN TINT */}
-                <div className="w-1/2 bg-emerald-900/10 border border-emerald-500/20 rounded-3xl p-5 flex flex-col relative overflow-hidden backdrop-blur-sm">
-                    {/* Corner Decoration */}
-                    <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-500/5 rounded-full blur-xl pointer-events-none"></div>
-
-                    <h3 className="text-emerald-400 font-bold uppercase tracking-widest text-xs mb-3 flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                        Necesidad (Faltas)
-                    </h3>
-
-                    {/* Input Area */}
-                    {isManagerial && (
-                        <div className="flex gap-2 mb-3">
-                            <input
-                                type="text"
-                                value={needInput}
-                                onChange={(e) => setNeedInput(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleAddFamily('need')}
-                                placeholder="Añadir familia..."
-                                className="flex-1 bg-slate-900/50 border border-emerald-500/30 rounded-lg px-3 py-1.5 text-sm text-white focus:border-emerald-500 outline-none placeholder-slate-500"
-                            />
-                            <button
-                                onClick={() => handleAddFamily('need')}
-                                className="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 rounded-lg px-3 py-1.5 transition-colors border border-emerald-500/30"
-                            >
-                                <Plus size={16} />
-                            </button>
-                        </div>
-                    )}
-
-                    {/* List */}
-                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-2">
-                        {productFamilies.filter(f => f.type === 'need' && f.date === selectedDate).map(fam => (
-                            <div key={fam.id} className="group flex items-center justify-between bg-emerald-950/20 border border-emerald-500/10 rounded-lg px-3 py-2">
-                                <span className="text-slate-200 text-sm font-medium">{fam.name}</span>
-                                {isManagerial && (
-                                    <button
-                                        onClick={() => removeProductFamily(fam.id)}
-                                        className="text-emerald-500/50 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    >
-                                        <X size={14} />
-                                    </button>
-                                )}
-                            </div>
-                        ))}
-                        {productFamilies.filter(f => f.type === 'need' && f.date === selectedDate).length === 0 && (
-                            <p className="text-slate-600 text-xs italic text-center mt-4">No hay necesidades registradas.</p>
-                        )}
-                    </div>
-                </div>
-
-                {/* SOBRESTOCK - RED TINT */}
-                <div className="w-1/2 bg-red-900/10 border border-red-500/20 rounded-3xl p-5 flex flex-col relative overflow-hidden backdrop-blur-sm">
-                    {/* Corner Decoration */}
-                    <div className="absolute top-0 right-0 w-20 h-20 bg-red-500/5 rounded-full blur-xl pointer-events-none"></div>
-
-                    <h3 className="text-red-400 font-bold uppercase tracking-widest text-xs mb-3 flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
-                        Sobrestock (Exceso)
-                    </h3>
-
-                    {/* Input Area */}
-                    {isManagerial && (
-                        <div className="flex gap-2 mb-3">
-                            <input
-                                type="text"
-                                value={overstockInput}
-                                onChange={(e) => setOverstockInput(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleAddFamily('overstock')}
-                                placeholder="Añadir familia..."
-                                className="flex-1 bg-slate-900/50 border border-red-500/30 rounded-lg px-3 py-1.5 text-sm text-white focus:border-red-500 outline-none placeholder-slate-500"
-                            />
-                            <button
-                                onClick={() => handleAddFamily('overstock')}
-                                className="bg-red-600/20 hover:bg-red-600/40 text-red-300 rounded-lg px-3 py-1.5 transition-colors border border-red-500/30"
-                            >
-                                <Plus size={16} />
-                            </button>
-                        </div>
-                    )}
-
-                    {/* List */}
-                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-2">
-                        {productFamilies.filter(f => f.type === 'overstock' && f.date === selectedDate).map(fam => (
-                            <div key={fam.id} className="group flex items-center justify-between bg-red-950/20 border border-red-500/10 rounded-lg px-3 py-2">
-                                <span className="text-slate-200 text-sm font-medium">{fam.name}</span>
-                                {isManagerial && (
-                                    <button
-                                        onClick={() => removeProductFamily(fam.id)}
-                                        className="text-red-500/50 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    >
-                                        <X size={14} />
-                                    </button>
-                                )}
-                            </div>
-                        ))}
-                        {productFamilies.filter(f => f.type === 'overstock' && f.date === selectedDate).length === 0 && (
-                            <p className="text-slate-600 text-xs italic text-center mt-4">No hay excesos registrados.</p>
-                        )}
-                    </div>
-                </div>
+                <InfoPanel
+                    title="Necesidad (Faltas)"
+                    theme="emerald"
+                    items={productFamilies.filter(f => f.type === 'need' && f.date === selectedDate)}
+                    inputValue={needInput}
+                    setInputValue={setNeedInput}
+                    onAdd={() => handleAddFamily('need')}
+                    onRemove={removeProductFamily}
+                    isManagerial={isManagerial}
+                    placeholder="Añadir familia..."
+                />
+                <InfoPanel
+                    title="Sobrestock (Exceso)"
+                    theme="red"
+                    items={productFamilies.filter(f => f.type === 'overstock' && f.date === selectedDate)}
+                    inputValue={overstockInput}
+                    setInputValue={setOverstockInput}
+                    onAdd={() => handleAddFamily('overstock')}
+                    onRemove={removeProductFamily}
+                    isManagerial={isManagerial}
+                    placeholder="Añadir familia..."
+                />
             </div>
 
             {/* KEEP MODALS OUTSIDE OF THE FLEX STRUCTURE */}
             {/* INCIDENT MODAL OVERLAY */}
             {showCloseModal && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full shadow-2xl">
-                        <h3 className="text-xl font-bold text-white mb-4">Cerrar Día {selectedDate}</h3>
-                        <p className="text-slate-400 text-sm mb-4">
-                            Añade observaciones o incidencias antes de archivar. Una vez cerrado, no se podrán modificar los datos.
-                        </p>
-                        <textarea
-                            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-300 text-sm min-h-[100px] focus:border-blue-500 outline-none mb-4"
-                            placeholder="Ej: Fulanito olvidó fichar salida..."
-                            value={incidentText}
-                            onChange={e => setIncidentText(e.target.value)}
-                        />
-                        <div className="flex gap-3 justify-end">
-                            <button
-                                onClick={() => setShowCloseModal(false)}
-                                className="px-4 py-2 text-slate-400 hover:text-white font-medium"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleCloseDay}
-                                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl"
-                            >
-                                Confirmar y Cerrar
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                <CloseDayModal
+                    onClose={() => setShowCloseModal(false)}
+                    onConfirm={handleCloseDay}
+                    date={selectedDate}
+                    initialIncidentText={dayIncidents[selectedDate] || ''}
+                />
             )}
 
             {/* MANUAL ENTRY MODAL */}
             {showManualModal && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl relative">
-                        <button
-                            onClick={() => setShowManualModal(false)}
-                            className="absolute top-4 right-4 text-slate-500 hover:text-white"
-                        >
-                            <X size={20} />
-                        </button>
-
-                        <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
-                            <Plus size={20} className="text-emerald-500" />
-                            Añadir Registro
-                        </h3>
-                        <p className="text-slate-400 text-xs mb-6">
-                            Para el día <span className="text-white font-mono font-bold">{selectedDate}</span>
-                            {isDayClosed && <span className="text-amber-500 block mt-1 font-bold">¡DÍA CERRADO! Se modificará el archivo.</span>}
-                        </p>
-
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Empleado</label>
-                                <select
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white outline-none focus:border-blue-500"
-                                    value={manualEntry.empId}
-                                    onChange={e => setManualEntry({ ...manualEntry, empId: e.target.value })}
-                                >
-                                    <option value="">Selecciona...</option>
-                                    {employees.filter(e => e.isBuyer).map(e => (
-                                        <option key={e.id} value={e.id}>{e.alias || e.firstName} {e.lastName}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Horas</label>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white outline-none focus:border-blue-500"
-                                        placeholder="0"
-                                        value={manualEntry.hours}
-                                        onChange={e => setManualEntry({ ...manualEntry, hours: e.target.value })}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Minutos</label>
-                                    <input
-                                        type="number"
-                                        min="0" max="59"
-                                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white outline-none focus:border-blue-500"
-                                        placeholder="0"
-                                        value={manualEntry.minutes}
-                                        onChange={e => setManualEntry({ ...manualEntry, minutes: e.target.value })}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="pt-2 border-t border-slate-800 mt-2">
-                                <label className="text-xs font-bold text-slate-400 uppercase block mb-3">Grupos (Añadir a exist.)</label>
-                                <div className="space-y-3">
-                                    <div className="flex items-center justify-between gap-4">
-                                        <span className="text-xs text-blue-300">G. General</span>
-                                        <input
-                                            type="number" min="0" placeholder="0"
-                                            className="w-20 bg-slate-950 border border-slate-800 rounded-lg p-1.5 text-white text-right outline-none focus:border-blue-500"
-                                            value={manualEntry.standardGroups}
-                                            onChange={e => setManualEntry({ ...manualEntry, standardGroups: e.target.value })}
-                                        />
-                                    </div>
-                                    <div className="flex items-center justify-between gap-4">
-                                        <span className="text-xs text-purple-300">Joyería</span>
-                                        <input
-                                            type="number" min="0" placeholder="0"
-                                            className="w-20 bg-slate-950 border border-slate-800 rounded-lg p-1.5 text-white text-right outline-none focus:border-purple-500"
-                                            value={manualEntry.jewelryGroups}
-                                            onChange={e => setManualEntry({ ...manualEntry, jewelryGroups: e.target.value })}
-                                        />
-                                    </div>
-                                    <div className="flex items-center justify-between gap-4">
-                                        <span className="text-xs text-amber-300">V. Recuperable</span>
-                                        <input
-                                            type="number" min="0" placeholder="0"
-                                            className="w-20 bg-slate-950 border border-slate-800 rounded-lg p-1.5 text-white text-right outline-none focus:border-amber-500"
-                                            value={manualEntry.recoverableGroups}
-                                            onChange={e => setManualEntry({ ...manualEntry, recoverableGroups: e.target.value })}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={handleSaveManualRecord}
-                                className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl mt-4 transition-colors shadow-lg shadow-emerald-500/20"
-                            >
-                                Guardar Registro
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                <ManualEntryModal
+                    onClose={() => setShowManualModal(false)}
+                    onSave={handleSaveManualRecord}
+                    employees={employees}
+                    selectedDate={selectedDate}
+                    isDayClosed={isDayClosed}
+                />
             )}
         </div>
     );

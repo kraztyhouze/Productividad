@@ -6,8 +6,9 @@ WORKDIR /app
 # Copy package files
 COPY package.json package-lock.json ./
 
-# Install dependencies
-RUN npm ci
+# Install dependencies (including devDependencies for building)
+# Using npm install instead of ci to be more forgiving with lockfile
+RUN npm install
 
 # Copy source code
 COPY . .
@@ -15,8 +16,8 @@ COPY . .
 # Build frontend
 RUN npm run build
 
-# Expose port
+# Expose port (Render sets PORT env var provided map is set, but this documents intent)
 EXPOSE 3000
 
 # Start server
-CMD ["node", "server/index.js"]
+CMD ["npm", "start"]

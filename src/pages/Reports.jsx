@@ -77,7 +77,7 @@ const Reports = () => {
             <header className="flex justify-between items-end">
                 <div>
                     <h1 className="text-3xl font-extrabold text-slate-50 tracking-tight flex items-center gap-3">
-                        <FileText className="text-blue-500" size={32} />
+                        <FileText className="text-fuchsia-500" size={32} />
                         Informes y Estadísticas
                     </h1>
                     <p className="text-slate-400 font-medium ml-1 mt-1">Analiza el rendimiento del equipo por rangos de fecha.</p>
@@ -91,7 +91,7 @@ const Reports = () => {
                             type="date"
                             value={startDate}
                             onChange={(e) => setStartDate(e.target.value)}
-                            className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1 text-sm text-white focus:border-blue-500 outline-none"
+                            className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1 text-sm text-white focus:border-fuchsia-500 outline-none"
                         />
                     </div>
                     <div className="w-px h-8 bg-slate-800"></div>
@@ -101,10 +101,10 @@ const Reports = () => {
                             type="date"
                             value={endDate}
                             onChange={(e) => setEndDate(e.target.value)}
-                            className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1 text-sm text-white focus:border-blue-500 outline-none"
+                            className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1 text-sm text-white focus:border-fuchsia-500 outline-none"
                         />
                     </div>
-                    <button className="bg-blue-600 hover:bg-blue-500 text-white p-2 rounded-lg transition-colors">
+                    <button className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white p-2 rounded-lg transition-colors">
                         <Filter size={18} />
                     </button>
                 </div>
@@ -114,7 +114,7 @@ const Reports = () => {
             <div className="bg-slate-950/50 backdrop-blur-xl rounded-[2.5rem] border border-slate-800/50 p-8 shadow-xl">
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-xl font-bold text-slate-200 flex items-center gap-2">
-                        <BarChart size={24} className="text-emerald-500" />
+                        <BarChart size={24} className="text-pink-500" />
                         Resultados del Periodo
                         <span className="text-sm font-normal text-slate-500 ml-2">({startDate} al {endDate})</span>
                     </h2>
@@ -149,7 +149,7 @@ const Reports = () => {
                                     <tr key={empId} className="group hover:bg-white/5 transition-colors">
                                         <td className="py-4 pl-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center font-bold text-slate-400 border border-slate-700 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center font-bold text-slate-400 border border-slate-700 group-hover:bg-fuchsia-600 group-hover:text-white transition-colors">
                                                     {emp?.alias || '?'}
                                                 </div>
                                                 <div>

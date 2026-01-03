@@ -118,7 +118,7 @@ const Team = () => {
                         <button onClick={() => setIsRoleModalOpen(true)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium text-sm flex items-center gap-2 border border-slate-700 transition-all">
                             <Settings size={16} /> Roles
                         </button>
-                        <button onClick={() => { setEditingEmployee(null); setIsModalOpen(true); }} className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-blue-500/20 flex items-center gap-2 transition-all">
+                        <button onClick={() => { setEditingEmployee(null); setIsModalOpen(true); }} className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-rose-500/20 flex items-center gap-2 transition-all">
                             <Plus size={18} /> Nuevo
                         </button>
                     </div>
@@ -129,7 +129,7 @@ const Team = () => {
             <div className="flex flex-col md:flex-row gap-4 items-center bg-slate-900/30 p-2 rounded-2xl border border-slate-800/50">
                 <div className="relative w-full md:w-64 shrink-0">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
-                    <input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-sm outline-none focus:border-blue-500" />
+                    <input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-sm outline-none focus:border-rose-500" />
                 </div>
 
                 <div className="flex gap-1 overflow-x-auto w-full pb-1 md:pb-0 custom-scrollbar">
@@ -137,7 +137,7 @@ const Team = () => {
                         <button
                             key={filter.id}
                             onClick={() => setActiveFilter(filter.id)}
-                            className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${activeFilter === filter.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${activeFilter === filter.id ? 'bg-rose-600 text-white shadow-lg shadow-rose-500/25' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
                         >
                             {filter.label}
                         </button>

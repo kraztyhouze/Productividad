@@ -56,7 +56,7 @@ const Planning = () => {
                     <h1 className="text-2xl font-bold text-slate-50">Planificación y Tareas</h1>
                     <p className="text-slate-400 text-sm">Gestiona la agenda y asigna prioridades.</p>
                 </div>
-                <button onClick={() => setIsTaskModalOpen(true)} className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 flex items-center gap-2 transition-all">
+                <button onClick={() => setIsTaskModalOpen(true)} className="px-5 py-2.5 bg-pink-600 hover:bg-pink-500 text-white rounded-xl font-bold shadow-lg shadow-pink-500/20 flex items-center gap-2 transition-all">
                     <Plus size={18} /> Nueva Tarea
                 </button>
             </div>
@@ -66,7 +66,7 @@ const Planning = () => {
                 <button onClick={handlePrevDay} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400"><ChevronLeft /></button>
                 <div className="flex flex-col items-center">
                     <h2 className="text-xl font-bold text-slate-100 capitalize">{selectedDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</h2>
-                    {isToday(selectedDate) && <span className="text-xs font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded uppercase">Hoy</span>}
+                    {isToday(selectedDate) && <span className="text-xs font-bold text-pink-400 bg-pink-500/10 px-2 py-0.5 rounded uppercase">Hoy</span>}
                 </div>
                 <button onClick={handleNextDay} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400"><ChevronRight /></button>
             </div>

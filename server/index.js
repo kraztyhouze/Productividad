@@ -14,7 +14,12 @@ app.use(cors());
 app.use(express.json());
 
 // Initialize DB on start
-initDb();
+console.log("Starting server initialization...");
+initDb().then(() => {
+    console.log("DB Initialization finished successfully.");
+}).catch(err => {
+    console.error("CRITICAL: DB Initialization failed!", err);
+});
 
 // --- Active Sessions ---
 app.get('/api/active-sessions', async (req, res) => {

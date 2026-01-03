@@ -198,6 +198,71 @@ app.get('/health', (req, res) => {
     res.status(200).send('OK');
 });
 
+// --- Employees ---
+app.get('/api/employees', async (req, res) => {
+    try {
+        // Ordenar por el campo "order"
+        const { rows } = await query('SELECT * FROM employees ORDER BY "order" ASC');
+        const mapped = rows.map(e => ({
+            id: e.id,
+            firstName: e.first_name,
+            lastName: e.last_name,
+            alias: e.alias,
+            email: e.email,
+            role: e.role,
+            contractHours: e.contract_hours,
+            contractType: e.contract_type,
+            username: e.username,
+            password: e.password,
+            isBuyer: e.is_buyer,
+            phone: e.phone,
+            address: e.address,
+            order: e.order
+        }));
+        res.json(mapped);
+    } catch (err) { res.status(500).json({ error: err.message }) }
+});
+
+app.post('/api/employees', async (req, res) => {
+    const e = req.body;
+    try {
+        const { rows } = await query(
+            `INSERT INTO employees 
+            (first_name, last_name, alias, email, role, contract_hours, contract_type, username, password, is_buyer, phone, address, "order") 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            RETURNING id`,
+            [e.firstName, e.lastName, e.alias, e.email, e.role, e.contractHours, e.contractType, e.username, e.password, e.isBuyer, e.phone, e.address, e.order || 0]
+        );
+        res.json({ success: true, id: rows[0].id });
+    } catch (err) {
+        if (err.code === '23505') res.status(400).json({ error: 'Username already exists' });
+        else res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/employees/:id', async (req, res) => {
+    const e = req.body;
+    try {
+        await query(
+            `UPDATE employees SET
+            first_name = $1, last_name = $2, alias = $3, email = $4, role = $5, 
+            contract_hours = $6, contract_type = $7, username = $8, password = $9, 
+            is_buyer = $10, phone = $11, address = $12, "order" = $13
+            WHERE id = $14`,
+            [e.firstName, e.lastName, e.alias, e.email, e.role, e.contractHours, e.contractType, e.username, e.password, e.isBuyer, e.phone, e.address, e.order, req.params.id]
+        );
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }) }
+});
+
+app.delete('/api/employees/:id', async (req, res) => {
+    try {
+        await query('DELETE FROM employees WHERE id = $1', [req.params.id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }) }
+});
+
+
 // --- Serve Frontend (Production/Docker) ---
 app.use(express.static(path.join(__dirname, '../dist')));
 

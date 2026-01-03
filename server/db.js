@@ -50,6 +50,23 @@ export async function initDb() {
             date TEXT PRIMARY KEY,
             text TEXT
         );
+
+        CREATE TABLE IF NOT EXISTS employees (
+            id SERIAL PRIMARY KEY,
+            first_name TEXT,
+            last_name TEXT,
+            alias TEXT,
+            email TEXT,
+            role TEXT,
+            contract_hours REAL,
+            contract_type TEXT,
+            username TEXT UNIQUE,
+            password TEXT,
+            is_buyer BOOLEAN DEFAULT FALSE,
+            phone TEXT,
+            address TEXT,
+            "order" INTEGER DEFAULT 0
+        );
     `);
     console.log("Database tables initialized (PostgreSQL)");
   } catch (err) {

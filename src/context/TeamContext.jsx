@@ -287,57 +287,61 @@ export const TeamProvider = ({ children }) => {
     const [roles, setRoles] = useState([]);
     const [loading, setLoading] = useState(true);
 
+
+    // --- LOAD EMPLOYEES ---
+    const fetchEmployees = async () => {
+        try {
+            const res = await fetch('/api/employees');
+            if (res.ok) {
+                const data = await res.json();
+
+                // --- SEED INITIAL DATA IF EMPTY ---
+                if (data.length === 0) {
+                    console.log("DB empty. Seeding initial employees...");
+                    // We seed sequentially to preserve order/logic
+                    const seeded = [];
+                    for (const emp of INITIAL_EMPLOYEES) {
+                        try {
+                            const seedRes = await fetch('/api/employees', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(emp)
+                            });
+                            if (seedRes.ok) {
+                                const newEmp = await seedRes.json();
+                                seeded.push({ ...emp, id: newEmp.id });
+                            }
+                        } catch (err) {
+                            console.error("Error seeding employee:", emp.firstName, err);
+                        }
+                    }
+                    setEmployees(seeded);
+                } else {
+                    setEmployees(data);
+                }
+            }
+        } catch (error) {
+            console.error("Error fetching employees:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        // --- LOAD EMPLOYEES ---
-        const stored = localStorage.getItem('is_team');
-        let parsed = stored ? JSON.parse(stored) : null;
+        fetchEmployees();
 
-        // FORCE RELOAD INTIAL DATA if we detect the mock data (e.g. if Juanma is not "Juan Manuel")
-        // or if employee count is too low compared to our new initial list
-        const needsRefill = !parsed || parsed.length < 5 || (parsed.find(e => e.id === 1)?.firstName === 'Juanma');
-
-        if (needsRefill) {
-            console.log("Reloading Initial Data from Excel Import...");
-            parsed = INITIAL_EMPLOYEES;
-            localStorage.setItem('is_team', JSON.stringify(parsed));
-        }
-
-        // Ensure Kiosk User always exists even if loaded from old data
-        if (parsed && !parsed.some(e => e.role === 'Puesto Compras')) {
-            const kioskTemplate = INITIAL_EMPLOYEES.find(e => e.role === 'Puesto Compras');
-            if (kioskTemplate) parsed.push(kioskTemplate);
-        }
-
-        // Ensure all loaded employees have valid structure
-        const patched = parsed.map((e, index) => ({
-            ...e,
-            order: e.order !== undefined ? e.order : index,
-            isBuyer: e.isBuyer !== undefined ? e.isBuyer : true, // Default to true for now
-            alias: e.alias !== undefined ? e.alias : (e.firstName.substring(0, 3).toUpperCase())
-        }));
-
-        setEmployees(patched);
-
-        // --- LOAD ROLES ---
+        // --- LOAD ROLES (Keep LocalStorage for now) ---
         const storedRoles = localStorage.getItem('is_roles');
         let parsedRoles = storedRoles ? JSON.parse(storedRoles) : null;
 
-        // If roles missing 'Supervisor' (new), force reload defaults
         if (!parsedRoles || !parsedRoles.includes('Supervisor') || !parsedRoles.includes('Prof Com/venta')) {
             parsedRoles = PREDEFINED_ROLES;
             localStorage.setItem('is_roles', JSON.stringify(parsedRoles));
         }
-
         setRoles(parsedRoles);
-        setLoading(false);
     }, []);
 
-    // Persist Employees
-    useEffect(() => {
-        if (!loading) {
-            localStorage.setItem('is_team', JSON.stringify(employees));
-        }
-    }, [employees, loading]);
+    // Persist Employees - REMOVED (Now handled by API)
 
     // Persist Roles
     useEffect(() => {
@@ -352,33 +356,63 @@ export const TeamProvider = ({ children }) => {
     };
 
     const deleteRole = (role) => {
-        // Protect critical system roles
         if (role === 'Gerente' || role === 'Puesto Compras') return;
         setRoles(prev => prev.filter(r => r !== role));
     };
 
     // --- Employee Management ---
-    const addEmployee = (employeeData) => {
+    const addEmployee = async (employeeData) => {
+        // Optimistic UI
+        const tempId = Date.now();
         const newEmployee = {
             ...employeeData,
-            id: Date.now(),
-            vacations: employeeData.vacations || [],
-            leaves: employeeData.leaves || [],
-            hoursBalance: employeeData.hoursBalance || 0,
-            managerNotes: employeeData.managerNotes || '',
-            isBuyer: employeeData.isBuyer || false,
-            alias: employeeData.alias || '',
+            id: tempId,
+            vacations: [], leaves: [], hoursBalance: 0,
             order: employees.length > 0 ? Math.max(...employees.map(e => e.order || 0)) + 1 : 0
         };
         setEmployees(prev => [...prev, newEmployee]);
+
+        try {
+            const res = await fetch('/api/employees', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newEmployee)
+            });
+            if (res.ok) {
+                const { id } = await res.json();
+                // Update temp ID with real DB ID
+                setEmployees(prev => prev.map(e => e.id === tempId ? { ...e, id } : e));
+            }
+        } catch (err) {
+            console.error("Error adding employee:", err);
+            // Revert state if needed
+        }
     };
 
-    const updateEmployee = (id, updatedData) => {
+    const updateEmployee = async (id, updatedData) => {
+        // Optimistic UI
         setEmployees(prev => prev.map(emp => emp.id === id ? { ...emp, ...updatedData } : emp));
+
+        try {
+            await fetch(`/api/employees/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedData)
+            });
+        } catch (err) {
+            console.error("Error updating employee:", err);
+        }
     };
 
-    const deleteEmployee = (id) => {
+    const deleteEmployee = async (id) => {
+        // Optimistic UI
         setEmployees(prev => prev.filter(emp => emp.id !== id));
+
+        try {
+            await fetch(`/api/employees/${id}`, { method: 'DELETE' });
+        } catch (err) {
+            console.error("Error deleting employee:", err);
+        }
     };
 
     // Helper to get consistent display name

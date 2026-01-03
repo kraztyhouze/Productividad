@@ -21,55 +21,46 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
     }, []);
 
-    // Real login with username/password
-    const login = (username, password) => {
-        // First check if it's the master user
-        const storedMaster = localStorage.getItem('is_master');
-        if (storedMaster) {
-            const masterCredentials = JSON.parse(storedMaster);
-            if (username === masterCredentials.username && password === masterCredentials.password) {
-                const masterSession = {
-                    id: 'master',
-                    name: masterCredentials.name,
-                    role: masterCredentials.role,
-                    avatar: 'MA',
-                    username: masterCredentials.username,
-                    email: 'master@empresa.com',
-                    isMaster: true
-                };
-                setUser(masterSession);
-                localStorage.setItem('is_user', JSON.stringify(masterSession));
-                return { success: true };
+    // Real login with username/password (Async against DB)
+    const login = async (username, password) => {
+        try {
+            // Fetch employees from API to check credentials
+            const res = await fetch('/api/employees');
+            if (!res.ok) throw new Error("Error connecting to server");
+
+            const employees = await res.json();
+
+            if (!employees || employees.length === 0) {
+                return { success: false, message: 'No hay empleados registrados en el sistema.' };
             }
+
+            const employee = employees.find(emp => emp.username === username && emp.password === password);
+
+            if (!employee) {
+                return { success: false, message: 'Usuario o contraseña incorrectos' };
+            }
+
+            // Create user session
+            const userSession = {
+                id: employee.id,
+                name: `${employee.firstName} ${employee.lastName}`,
+                role: employee.role,
+                // Use alias as avatar initial or fallback
+                avatar: employee.alias || `${employee.firstName[0]}${employee.lastName[0]}`,
+                username: employee.username,
+                email: employee.email,
+                isMaster: false,
+                isBuyer: employee.isBuyer // Useful for permissions
+            };
+
+            setUser(userSession);
+            localStorage.setItem('is_user', JSON.stringify(userSession));
+            return { success: true, role: userSession.role };
+
+        } catch (error) {
+            console.error("Login Error:", error);
+            return { success: false, message: 'Error de conexión. Inténtalo de nuevo.' };
         }
-
-        // Then check regular employees
-        const storedEmployees = localStorage.getItem('is_team');
-        if (!storedEmployees) {
-            return { success: false, message: 'No hay empleados registrados' };
-        }
-
-        const employees = JSON.parse(storedEmployees);
-        const employee = employees.find(emp => emp.username === username && emp.password === password);
-
-        if (!employee) {
-            return { success: false, message: 'Usuario o contraseña incorrectos' };
-        }
-
-        // Create user session
-        const userSession = {
-            id: employee.id,
-            name: `${employee.firstName} ${employee.lastName}`,
-            role: employee.role,
-            avatar: `${employee.firstName[0]}${employee.lastName[0]}`,
-            username: employee.username,
-            email: employee.email,
-            isMaster: false
-        };
-
-        setUser(userSession);
-        localStorage.setItem('is_user', JSON.stringify(userSession));
-        return { success: true, role: userSession.role };
     };
 
     const logout = () => {

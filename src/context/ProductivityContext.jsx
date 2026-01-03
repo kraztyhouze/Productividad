@@ -9,16 +9,18 @@ export const ProductivityProvider = ({ children }) => {
     const [dailyGroups, setDailyGroups] = useState({});
     const [closedDays, setClosedDays] = useState([]);
     const [dayIncidents, setDayIncidents] = useState({});
+    const [productFamilies, setProductFamilies] = useState([]);
 
     // --- LOAD DATA ---
     const fetchData = async () => {
         try {
-            const [sessionsRes, recordsRes, groupsRes, closedRes, incidentsRes] = await Promise.all([
+            const [sessionsRes, recordsRes, groupsRes, closedRes, incidentsRes, familiesRes] = await Promise.all([
                 fetch('/api/active-sessions'),
                 fetch('/api/daily-records'),
                 fetch('/api/daily-groups'),
                 fetch('/api/closed-days'),
-                fetch('/api/day-incidents')
+                fetch('/api/day-incidents'),
+                fetch('/api/product-families')
             ]);
 
             if (sessionsRes.ok) setActiveSessions(await sessionsRes.json());
@@ -26,15 +28,17 @@ export const ProductivityProvider = ({ children }) => {
             if (groupsRes.ok) setDailyGroups(await groupsRes.json());
             if (closedRes.ok) setClosedDays(await closedRes.json());
             if (incidentsRes.ok) setDayIncidents(await incidentsRes.json());
+            if (familiesRes.ok) setProductFamilies(await familiesRes.json());
         } catch (error) {
             console.error("Error loading data:", error);
         }
     };
 
+
     useEffect(() => {
         fetchData();
-        // Optional: Polling every 1 minute to keep in sync with other users
-        const interval = setInterval(fetchData, 60000);
+        // Polling every 3 seconds to keep in sync with other users (Near Real-time)
+        const interval = setInterval(fetchData, 3000);
         return () => clearInterval(interval);
     }, []);
 
@@ -229,6 +233,30 @@ export const ProductivityProvider = ({ children }) => {
         return allDates.filter(d => d < today && !closedDays.includes(d)).sort();
     };
 
+    const addProductFamily = async (name, type, date) => {
+        // Optimistic
+        const tempId = Date.now();
+        const newFam = { id: tempId, name, type, date };
+        setProductFamilies(prev => [...prev, newFam]);
+
+        try {
+            const res = await fetch('/api/product-families', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, type, date })
+            });
+            if (res.ok) {
+                const realFam = await res.json();
+                setProductFamilies(prev => prev.map(f => f.id === tempId ? realFam : f));
+            }
+        } catch (err) { console.error(err); }
+    };
+
+    const removeProductFamily = async (id) => {
+        setProductFamilies(prev => prev.filter(f => f.id !== id));
+        await fetch(`/api/product-families/${id}`, { method: 'DELETE' });
+    };
+
     return (
         <ProductivityContext.Provider value={{
             activeSessions,
@@ -246,7 +274,10 @@ export const ProductivityProvider = ({ children }) => {
             deleteRecord,
             addManualRecord,
             getUnclosedPastDays,
-            deleteEmployeeDayData
+            deleteEmployeeDayData,
+            productFamilies,
+            addProductFamily,
+            removeProductFamily
         }}>
             {children}
         </ProductivityContext.Provider>

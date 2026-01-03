@@ -9,7 +9,8 @@ const Productivity = () => {
         activeSessions, dailyRecords, startSession, endSession,
         dailyGroups, updateDailyGroups, closedDays, closeDay, reopenDay,
         getUnclosedPastDays, dayIncidents, updateDayIncident,
-        updateRecord, addManualRecord, deleteEmployeeDayData
+        updateRecord, addManualRecord, deleteEmployeeDayData,
+        productFamilies, addProductFamily, removeProductFamily
     } = useProductivity();
 
     const { employees } = useTeam();
@@ -31,7 +32,12 @@ const Productivity = () => {
         recoverableGroups: ''
     });
 
-    const isManagerial = user?.role === ROLES.MANAGER || user?.role === ROLES.RESPONSIBLE;
+    const isManagerial = user?.role === ROLES.MANAGER;
+
+    // We remove the specific 'canManageSessions' variable and just use isManagerial 
+    // or we can keep it as an alias if we want to be semantic, but logic is same now.
+    // The user mentioned "Usuario de kiosco de compras", we assume they have Manager role or we'd need a specific username check.
+
     const isToday = selectedDate === new Date().toISOString().split('T')[0];
     const isDayClosed = closedDays.includes(selectedDate);
     const unclosedDays = getUnclosedPastDays();
@@ -101,12 +107,66 @@ const Productivity = () => {
 
     const dailyStats = getDailyStats();
 
-    // Global active time
-    const globalActiveTime = activeSessions.reduce((acc, s) => acc + (currentTime - new Date(s.startTime)), 0);
+    // Calculate Global Active Time (Time with at least 1 person buying)
+    const calculateShopActiveTime = () => {
+        if (!isToday && selectedDate !== new Date().toISOString().split('T')[0]) {
+            // For past days, we could calculate it but let's focus on today/selected as requested
+            // Actually logic works for any date if we filter records correctly
+        }
+
+        // 1. Get all intervals [start, end]
+        const intervals = [];
+
+        // Completed records
+        dailyRecords
+            .filter(r => r.date === selectedDate)
+            .forEach(r => {
+                intervals.push({ start: new Date(r.startTime).getTime(), end: new Date(r.endTime).getTime() });
+            });
+
+        // Active sessions (only if today)
+        if (isToday) {
+            activeSessions.forEach(s => {
+                intervals.push({ start: new Date(s.startTime).getTime(), end: currentTime.getTime() });
+            });
+        }
+
+        if (intervals.length === 0) return 0;
+
+        // 2. Sort by start time
+        intervals.sort((a, b) => a.start - b.start);
+
+        // 3. Merge overlaps
+        const merged = [];
+        let current = intervals[0];
+
+        for (let i = 1; i < intervals.length; i++) {
+            const next = intervals[i];
+            if (next.start < current.end) {
+                // Warning: intervals might overlap entirely or partially
+                // We take the max end time
+                current.end = Math.max(current.end, next.end);
+            } else {
+                merged.push(current);
+                current = next;
+            }
+        }
+        merged.push(current);
+
+        // 4. Sum up
+        return merged.reduce((acc, interval) => acc + (interval.end - interval.start), 0);
+    };
+
+    const globalActiveTime = calculateShopActiveTime();
 
     const handleUserClick = (emp) => {
-        if (!isToday && !isManagerial) return;
         if (!isToday) return;
+
+        // Strict permission check
+        if (!isManagerial) {
+            alert("Solo gerencia o el puesto de compras pueden realizar acciones.");
+            return;
+        }
 
         const isActive = activeSessions.find(s => s.employeeId === emp.id);
         if (isActive) {
@@ -194,291 +254,349 @@ const Productivity = () => {
         setManualEntry({ empId: '', hours: '', minutes: '', standardGroups: '', jewelryGroups: '', recoverableGroups: '' });
     };
 
+    // --- PRODUCT FAMILY LOGIC ---
+    const [needInput, setNeedInput] = useState('');
+    const [overstockInput, setOverstockInput] = useState('');
+
+    const handleAddFamily = (type) => {
+        const input = type === 'need' ? needInput : overstockInput;
+        const setInput = type === 'need' ? setNeedInput : setOverstockInput;
+
+        if (!input.trim()) return;
+
+        addProductFamily(input, type, selectedDate);
+        setInput('');
+    };
+
     return (
-        <div className="h-[calc(100vh-140px)] flex gap-6">
+        <div className="h-[calc(100vh-140px)] flex flex-col gap-4">
 
-            {/* LEFT: EMPLOYEE SELECTOR */}
-            <div className="w-2/3 bg-slate-900/50 backdrop-blur-xl rounded-[2.5rem] p-8 border border-slate-800/50 flex flex-col shadow-2xl">
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <h1 className="text-3xl font-extrabold text-slate-50 tracking-tight flex items-center gap-3">
-                            <ShoppingBag className="text-emerald-500" size={32} />
-                            Productividad
-                        </h1>
-                        <p className="text-slate-400 font-medium ml-1">
-                            {isToday ? "Selecciona tu usuario para fichar actividad." : `Viendo registros del día ${selectedDate}`}
-                        </p>
-                    </div>
-                    <div className="text-right">
-                        <div className="flex items-center gap-4 justify-end">
-                            {isManagerial && (
-                                <input
-                                    type="date"
-                                    value={selectedDate}
-                                    onChange={(e) => setSelectedDate(e.target.value)}
-                                    className="bg-slate-800 text-white border border-slate-700 rounded-lg px-3 py-1 font-mono text-sm"
-                                />
-                            )}
-                            <div>
-                                <p className="text-4xl font-mono font-bold text-slate-200">{currentTime.toLocaleTimeString()}</p>
-                                <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">{currentTime.toLocaleDateString()}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            {/* TOP SECTION: LIVE & TEAM (Flex 2 to take more space) */}
+            <div className="flex-[2] flex gap-6 min-h-0">
+                {/* LEFT: EMPLOYEE SELECTOR */}
+                <div className="w-2/3 bg-slate-900/50 backdrop-blur-xl rounded-[2.5rem] p-6 border border-slate-800/50 flex flex-col shadow-2xl relative">
 
-                {isManagerial && unclosedDays.length > 0 && (
-                    <div className="mb-4 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex items-center justify-between animate-pulse">
-                        <div className="flex items-center gap-2 text-amber-200">
-                            <AlertCircle size={20} />
-                            <span className="font-bold">¡Atención! Hay días anteriores sin cerrar:</span>
-                            <div className="flex gap-2">
-                                {unclosedDays.map(d => (
-                                    <button
-                                        key={d}
-                                        onClick={() => setSelectedDate(d)}
-                                        className="underline hover:text-white"
-                                    >
-                                        {d}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                <div className="grid grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto custom-scrollbar flex-1 content-start pr-2">
-                    {employees.filter(e => e.isBuyer).map(emp => {
-                        const session = activeSessions.find(s => s.employeeId === emp.id);
-                        const displayName = emp.alias || emp.firstName;
-                        const isSessionActive = !!session;
-
-                        return (
-                            <button
-                                key={emp.id}
-                                onClick={() => handleUserClick(emp)}
-                                disabled={!isToday}
-                                className={`relative aspect-square rounded-3xl p-4 flex flex-col items-center justify-center gap-3 transition-all duration-300 border-2 ${isSessionActive
-                                    ? 'bg-emerald-600 border-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.4)] scale-105 z-10'
-                                    : isToday
-                                        ? 'bg-red-900/80 border-red-800 hover:bg-red-800 hover:border-red-500 hover:scale-[1.02]'
-                                        : 'bg-slate-800 border-slate-700 opacity-50 cursor-not-allowed'
-                                    }`}
-                            >
-                                <div className={`w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold border-2 ${isSessionActive ? 'bg-white text-emerald-700 border-emerald-200' : 'bg-red-950 text-red-200 border-red-800'
-                                    }`}>
-                                    {emp.alias || emp.firstName.substring(0, 3).toUpperCase()}
-                                </div>
-                                <div className="text-center w-full overflow-hidden">
-                                    <p className={`font-bold text-lg truncate w-full ${isSessionActive ? 'text-white' : 'text-red-100'}`}>{emp.firstName}</p>
-                                </div>
-                                {isSessionActive && (
-                                    <div className="mt-2 bg-black/20 px-3 py-1 rounded-full font-mono text-sm font-bold text-white animate-pulse">
-                                        {formatDuration(currentTime - new Date(session.startTime))}
-                                    </div>
-                                )}
-                                {isSessionActive && <span className="absolute top-3 right-3 w-3 h-3 bg-white rounded-full animate-ping"></span>}
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
-
-            {/* RIGHT: LIVE STATUS & STATS */}
-            <div className="w-1/3 flex flex-col gap-6">
-
-                {/* GLOBAL LIVE WIDGET */}
-                {isToday && (
-                    <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-[2.5rem] p-6 border border-indigo-500/30 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
-                        <h2 className="text-sm font-bold text-indigo-300 uppercase tracking-widest mb-4 flex items-center gap-2">
-                            <Clock size={16} /> Tiempo Activo Total
-                        </h2>
-                        <div className="flex items-baseline gap-2 mb-2">
-                            <span className="text-5xl font-mono font-bold text-white tracking-tight">
-                                {formatDuration(globalActiveTime)}
+                    {/* Visual Only Mode Banner */}
+                    {!isManagerial && (
+                        <div className="absolute top-0 left-0 w-full bg-yellow-500/20 backdrop-blur-md rounded-t-[2.5rem] py-1 px-6 border-b border-yellow-500/30 flex items-center justify-center gap-2 z-20">
+                            <Lock size={12} className="text-yellow-200" />
+                            <span className="text-[10px] font-bold text-yellow-100 uppercase tracking-wider">
+                                Modo Visualización - Solo Puesto de Compras / Gerencia pueden editar
                             </span>
                         </div>
-                        <div className="flex items-center gap-2 mt-4 text-sm text-indigo-200 filter backdrop-blur-md bg-white/5 p-3 rounded-xl border border-white/10">
-                            <Users size={16} />
-                            <span className="font-bold">{activeSessions.length}</span> empleados comprando ahora
+                    )}
+
+                    <div className={`flex justify-between items-center mb-4 ${!isManagerial ? 'mt-4' : ''}`}>
+                        <div>
+                            <h1 className="text-2xl font-extrabold text-slate-50 tracking-tight flex items-center gap-2">
+                                <ShoppingBag className="text-emerald-500" size={24} />
+                                Productividad
+                            </h1>
+                            <p className="text-slate-400 font-medium ml-1 text-xs">
+                                {isToday ? "Selecciona tu usuario para fichar." : `Viendo registros del día ${selectedDate}`}
+                            </p>
+                        </div>
+                        <div className="text-right">
+                            <div className="flex items-center gap-4 justify-end">
+                                {isManagerial && (
+                                    <input
+                                        type="date"
+                                        value={selectedDate}
+                                        onChange={(e) => setSelectedDate(e.target.value)}
+                                        className="bg-slate-800 text-white border border-slate-700 rounded-lg px-2 py-1 font-mono text-xs"
+                                    />
+                                )}
+                                <div>
+                                    <p className="text-3xl font-mono font-bold text-slate-200">{currentTime.toLocaleTimeString()}</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                )}
 
-                {/* SUMMARY TABLE */}
-                <div className="flex-1 bg-slate-950/50 rounded-[2.5rem] border border-slate-800/50 p-6 flex flex-col overflow-hidden">
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-lg font-bold text-slate-200 flex items-center gap-2">
-                            <UserCheck size={20} className="text-emerald-500" />
-                            Resumen {isToday ? 'Hoy' : selectedDate}
-                        </h2>
-                        {isManagerial && !isDayClosed && (
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => setShowManualModal(true)}
-                                    className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition-colors border border-slate-700"
-                                    title="Añadir registro manual"
-                                >
-                                    <Plus size={16} />
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setIncidentText(dayIncidents[selectedDate] || '');
-                                        setShowCloseModal(true);
-                                    }}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-colors"
-                                >
-                                    <Archive size={14} /> Cerrar Día
-                                </button>
+                    {isManagerial && unclosedDays.length > 0 && (
+                        <div className="mb-2 bg-amber-500/10 border border-amber-500/20 rounded-xl p-2 flex items-center justify-between animate-pulse">
+                            <div className="flex items-center gap-2 text-amber-200 text-xs">
+                                <AlertCircle size={16} />
+                                <span className="font-bold">¡Días sin cerrar!:</span>
+                                <div className="flex gap-2">
+                                    {unclosedDays.map(d => (
+                                        <button key={d} onClick={() => setSelectedDate(d)} className="underline hover:text-white">{d}</button>
+                                    ))}
+                                </div>
                             </div>
-                        )}
-                        {isDayClosed && (
-                            <div className="flex items-center gap-4">
-                                {dayIncidents[selectedDate] && (
-                                    <span className="text-xs text-slate-400 italic max-w-[200px] truncate" title={dayIncidents[selectedDate]}>
-                                        Nota: {dayIncidents[selectedDate]}
-                                    </span>
-                                )}
-                                <span className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 text-red-400 text-xs font-bold rounded-lg border border-red-500/20">
-                                    <Lock size={14} /> Archivado
-                                </span>
-                                {isManagerial && (
-                                    <>
-                                        <button
-                                            onClick={() => setShowManualModal(true)}
-                                            className="p-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-200 rounded-lg transition-colors border border-amber-500/30"
-                                            title="Añadir registro manual (Día cerrado)"
-                                        >
-                                            <Plus size={14} />
-                                        </button>
+                        </div>
+                    )}
 
-                                        <button
-                                            onClick={() => {
-                                                if (confirm('¿Seguro que quieres reabrir este día?')) {
-                                                    reopenDay(selectedDate);
-                                                }
-                                            }}
-                                            className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg transition-colors"
-                                            title="Reabrir día"
-                                        >
-                                            <RefreshCw size={14} />
-                                        </button>
-                                    </>
-                                )}
-                            </div>
-                        )}
-                    </div>
+                    <div className="grid grid-cols-4 xl:grid-cols-5 gap-2 overflow-y-auto custom-scrollbar flex-1 content-start pr-1">
+                        {employees.filter(e => e.isBuyer).map(emp => {
+                            const session = activeSessions.find(s => s.employeeId === emp.id);
+                            const displayName = emp.alias || emp.firstName;
+                            const isSessionActive = !!session;
 
-                    <div className="overflow-y-auto custom-scrollbar -mr-2 pr-2">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="text-[10px] font-bold text-slate-500 uppercase border-b border-slate-800">
-                                    <th className="pb-2 pl-2">Empleado</th>
-                                    <th className="pb-2">Tiempo</th>
-                                    <th className="pb-2 text-center text-blue-400" title="Grupos Generales">G.Gen</th>
-                                    <th className="pb-2 text-center text-purple-400" title="Joyería">Joy.</th>
-                                    <th className="pb-2 text-center text-amber-400" title="Venta Recuperable">V.Rec</th>
-                                    <th className="pb-2 text-right text-emerald-400" title="Total Grupos">Tot</th>
-                                    <th className="pb-2 text-right">G/H</th>
-                                    {isManagerial && !isDayClosed && <th className="pb-2 w-8"></th>}
-                                </tr>
-                            </thead>
-                            <tbody className="text-sm divide-y divide-slate-800/50">
-                                {Object.keys(dailyStats).map(empId => {
-                                    const stat = dailyStats[empId];
-                                    const groupCounts = getGroupCounts(empId, selectedDate);
-                                    const hours = stat.totalSeconds / 3600;
-                                    const gph = hours > 0 ? (groupCounts.total / hours).toFixed(1) : '0.0';
-                                    const isActive = isToday && activeSessions.some(s => s.employeeId === parseInt(empId));
-                                    const employeeData = employees.find(e => e.id === parseInt(empId));
-                                    const displayName = employeeData ? (employeeData.alias || employeeData.firstName) : stat.name;
-
-                                    return (
-                                        <tr key={empId} className="group hover:bg-slate-800/30 transition-colors">
-                                            <td className="py-3 pl-2 max-w-[100px]">
-                                                <div className="font-bold text-slate-300 truncate">{displayName}</div>
-                                                {isActive && <div className="text-[10px] text-emerald-400 font-bold animate-pulse">Comprando...</div>}
-                                            </td>
-                                            <td
-                                                className={`py-3 font-mono text-slate-400 text-xs ${!isDayClosed && isManagerial ? 'cursor-pointer hover:text-white hover:bg-slate-700/50 rounded px-1' : ''}`}
-                                                title={!isDayClosed && isManagerial ? "Clic para editar tiempo" : ""}
-                                                onClick={() => handleTimeEdit(empId, stat.totalSeconds, displayName)}
-                                            >
-                                                {formatDuration(stat.totalSeconds * 1000)}
-                                            </td>
-
-                                            {/* Inputs for Groups */}
-                                            <td className="py-3 text-center">
-                                                <input
-                                                    type="number"
-                                                    disabled={!isManagerial || isDayClosed}
-                                                    value={groupCounts.standard || ''}
-                                                    onChange={(e) => handleGroupsUpdate(empId, 'standard', e.target.value)}
-                                                    placeholder="-"
-                                                    className={`w-10 bg-slate-900 border border-slate-700 rounded text-center text-slate-200 text-xs py-1 focus:border-blue-500 outline-none ${(!isManagerial || isDayClosed) ? 'opacity-50 cursor-not-allowed hidden-arrows' : ''}`}
-                                                />
-                                            </td>
-                                            <td className="py-3 text-center">
-                                                <input
-                                                    type="number"
-                                                    disabled={!isManagerial || isDayClosed}
-                                                    value={groupCounts.jewelry || ''}
-                                                    onChange={(e) => handleGroupsUpdate(empId, 'jewelry', e.target.value)}
-                                                    placeholder="-"
-                                                    className={`w-10 bg-slate-900 border border-slate-700 rounded text-center text-slate-200 text-xs py-1 focus:border-purple-500 outline-none ${(!isManagerial || isDayClosed) ? 'opacity-50 cursor-not-allowed hidden-arrows' : ''}`}
-                                                />
-                                            </td>
-                                            <td className="py-3 text-center">
-                                                <input
-                                                    type="number"
-                                                    disabled={!isManagerial || isDayClosed}
-                                                    value={groupCounts.recoverable || ''}
-                                                    onChange={(e) => handleGroupsUpdate(empId, 'recoverable', e.target.value)}
-                                                    placeholder="-"
-                                                    className={`w-10 bg-slate-900 border border-slate-700 rounded text-center text-slate-200 text-xs py-1 focus:border-amber-500 outline-none ${(!isManagerial || isDayClosed) ? 'opacity-50 cursor-not-allowed hidden-arrows' : ''}`}
-                                                />
-                                            </td>
-
-                                            <td className="py-3 text-right font-bold text-emerald-400 text-xs">
-                                                {groupCounts.total}
-                                            </td>
-                                            <td className="py-3 text-right font-bold text-slate-300 text-xs">
-                                                {gph}
-                                            </td>
-                                            {isManagerial && !isDayClosed && (
-                                                <td className="py-3 pr-2 text-right">
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            if (confirm(`¿ELIMINAR todos los datos de hoy para ${displayName}? Esta acción no se puede deshacer.`)) {
-                                                                deleteEmployeeDayData(parseInt(empId), selectedDate);
-                                                            }
-                                                        }}
-                                                        className="p-1 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
-                                                        title="Eliminar datos de hoy"
-                                                    >
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                </td>
-                                            )}
-                                        </tr>
-                                    );
-                                })}
-                                {Object.keys(dailyStats).length === 0 && (
-                                    <tr>
-                                        <td colSpan="7" className="py-8 text-center text-slate-500 italic">
-                                            Sin registros
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
+                            return (
+                                <button
+                                    key={emp.id}
+                                    onClick={() => handleUserClick(emp)}
+                                    // disabled={!isToday} // We handle disabled visually/alert, kept button active to catch click
+                                    className={`relative rounded-xl p-2 flex flex-col items-center justify-center gap-1 transition-all duration-300 border-2 h-24 ${isSessionActive
+                                        ? 'bg-emerald-600 border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)] scale-105 z-10'
+                                        : isToday
+                                            ? isManagerial
+                                                ? 'bg-red-900/80 border-red-800 hover:bg-red-800 hover:border-red-500 hover:scale-[1.02] cursor-pointer'
+                                                : 'bg-red-900/80 border-red-800 opacity-80 cursor-not-allowed hidden-hover'
+                                            : 'bg-slate-800 border-slate-700 opacity-50 cursor-not-allowed'
+                                        }`}
+                                >
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 ${isSessionActive ? 'bg-white text-emerald-700 border-emerald-200' : 'bg-red-950 text-red-200 border-red-800'
+                                        }`}>
+                                        {emp.alias || emp.firstName.substring(0, 3).toUpperCase()}
+                                    </div>
+                                    <div className="text-center w-full overflow-hidden">
+                                        <p className={`font-bold text-xs truncate w-full ${isSessionActive ? 'text-white' : 'text-red-100'}`}>{emp.firstName}</p>
+                                    </div>
+                                    {isSessionActive && (
+                                        <div className="absolute top-1 right-1 w-2 h-2 bg-white rounded-full animate-ping"></div>
+                                    )}
+                                    {isSessionActive && (
+                                        <div className="bg-black/20 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold text-white">
+                                            {formatDuration(currentTime - new Date(session.startTime))}
+                                        </div>
+                                    )}
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 
+                {/* RIGHT: LIVE STATUS & STATS */}
+                <div className="w-1/3 flex flex-col gap-4">
+
+                    {/* GLOBAL LIVE WIDGET */}
+                    {isToday && (
+                        <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-[2.5rem] p-5 border border-indigo-500/30 relative overflow-hidden shrink-0">
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/20 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+                            <h2 className="text-xs font-bold text-indigo-300 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                <Clock size={14} /> Tiempo Activo Total
+                            </h2>
+                            <div className="flex items-baseline gap-2 mb-1">
+                                <span className="text-4xl font-mono font-bold text-white tracking-tight">
+                                    {formatDuration(globalActiveTime)}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2 mt-2 text-xs text-indigo-200 filter backdrop-blur-md bg-white/5 p-2 rounded-xl border border-white/10">
+                                <Users size={14} />
+                                <span className="font-bold">{activeSessions.length}</span> empleados comprando
+                            </div>
+                        </div>
+                    )}
+
+                    {/* SUMMARY TABLE */}
+                    <div className="flex-1 bg-slate-950/50 rounded-[2.5rem] border border-slate-800/50 p-5 flex flex-col overflow-hidden min-h-0">
+                        <div className="flex justify-between items-center mb-3">
+                            <h2 className="text-sm font-bold text-slate-200 flex items-center gap-2">
+                                <UserCheck size={16} className="text-emerald-500" />
+                                Resumen
+                            </h2>
+                            {isManagerial && !isDayClosed && (
+                                <div className="flex gap-1">
+                                    <button
+                                        onClick={() => setShowManualModal(true)}
+                                        className="p-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded transition-colors border border-slate-700"
+                                        title="Añadir registro manual"
+                                    >
+                                        <Plus size={14} />
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setIncidentText(dayIncidents[selectedDate] || '');
+                                            setShowCloseModal(true);
+                                        }}
+                                        className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold rounded transition-colors"
+                                    >
+                                        <Archive size={12} /> Cerrar
+                                    </button>
+                                </div>
+                            )}
+                            {isDayClosed && (
+                                <div className="flex items-center gap-2">
+                                    <span className="flex items-center gap-1 px-2 py-1 bg-red-500/10 text-red-400 text-[10px] font-bold rounded border border-red-500/20">
+                                        <Lock size={10} /> Archivado
+                                    </span>
+                                    {isManagerial && (
+                                        <button onClick={() => { if (confirm('¿Reabrir?')) reopenDay(selectedDate); }} className="p-1 bg-slate-800 text-slate-400 rounded"><RefreshCw size={12} /></button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="overflow-y-auto custom-scrollbar -mr-2 pr-2">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="text-[9px] font-bold text-slate-500 uppercase border-b border-slate-800">
+                                        <th className="pb-1 pl-1">Emp</th>
+                                        <th className="pb-1">T</th>
+                                        <th className="pb-1 text-center text-blue-400">Gen</th>
+                                        <th className="pb-1 text-center text-purple-400">Joy</th>
+                                        <th className="pb-1 text-center text-amber-400">Rec</th>
+                                        <th className="pb-1 text-right text-emerald-400">Tot</th>
+                                        <th className="pb-1 text-right">G/H</th>
+                                        {isManagerial && !isDayClosed && <th className="w-6"></th>}
+                                    </tr>
+                                </thead>
+                                <tbody className="text-xs divide-y divide-slate-800/50">
+                                    {Object.keys(dailyStats).map(empId => {
+                                        const stat = dailyStats[empId];
+                                        const groupCounts = getGroupCounts(empId, selectedDate);
+                                        const hours = stat.totalSeconds / 3600;
+                                        const gph = hours > 0 ? (groupCounts.total / hours).toFixed(1) : '0.0';
+                                        const isActive = isToday && activeSessions.some(s => s.employeeId === parseInt(empId));
+                                        const employeeData = employees.find(e => e.id === parseInt(empId));
+                                        const displayName = employeeData ? (employeeData.alias || employeeData.firstName) : stat.name;
+
+                                        return (
+                                            <tr key={empId} className="group hover:bg-slate-800/30 transition-colors">
+                                                <td className="py-2 pl-1 max-w-[80px] truncate font-bold text-slate-300">
+                                                    {displayName}
+                                                    {isActive && <span className="block text-[8px] text-emerald-400 animate-pulse">On</span>}
+                                                </td>
+                                                <td
+                                                    className={`py-2 font-mono text-slate-400 text-[10px] ${!isDayClosed && isManagerial ? 'cursor-pointer hover:text-white' : ''}`}
+                                                    onClick={() => handleTimeEdit(empId, stat.totalSeconds, displayName)}
+                                                >
+                                                    {formatDuration(stat.totalSeconds * 1000)}
+                                                </td>
+                                                <td className="py-2 text-center">
+                                                    <input type="number" disabled={!isManagerial || isDayClosed} value={groupCounts.standard || ''} onChange={(e) => handleGroupsUpdate(empId, 'standard', e.target.value)} className="w-8 bg-transparent text-center text-slate-200 outline-none focus:text-blue-400 placeholder-slate-700" placeholder="-" />
+                                                </td>
+                                                <td className="py-2 text-center">
+                                                    <input type="number" disabled={!isManagerial || isDayClosed} value={groupCounts.jewelry || ''} onChange={(e) => handleGroupsUpdate(empId, 'jewelry', e.target.value)} className="w-8 bg-transparent text-center text-slate-200 outline-none focus:text-purple-400 placeholder-slate-700" placeholder="-" />
+                                                </td>
+                                                <td className="py-2 text-center">
+                                                    <input type="number" disabled={!isManagerial || isDayClosed} value={groupCounts.recoverable || ''} onChange={(e) => handleGroupsUpdate(empId, 'recoverable', e.target.value)} className="w-8 bg-transparent text-center text-slate-200 outline-none focus:text-amber-400 placeholder-slate-700" placeholder="-" />
+                                                </td>
+                                                <td className="py-2 text-right font-bold text-emerald-400">{groupCounts.total}</td>
+                                                <td className="py-2 text-right text-slate-400">{gph}</td>
+                                                {isManagerial && !isDayClosed && (
+                                                    <td className="py-2 text-right pr-1">
+                                                        <button onClick={(e) => { e.stopPropagation(); if (confirm(`¿Borrar todo de ${displayName}?`)) deleteEmployeeDayData(parseInt(empId), selectedDate); }} className="text-slate-600 hover:text-red-400"><Trash2 size={12} /></button>
+                                                    </td>
+                                                )}
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
 
+            {/* BOTTOM SECTION: INFO WINDOW (NECESIDAD / SOBRESTOCK) */}
+            <div className="flex-[1] flex gap-6 min-h-0 max-h-[250px]">
+                {/* NECESIDAD - GREEN TINT */}
+                <div className="w-1/2 bg-emerald-900/10 border border-emerald-500/20 rounded-3xl p-5 flex flex-col relative overflow-hidden backdrop-blur-sm">
+                    {/* Corner Decoration */}
+                    <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-500/5 rounded-full blur-xl pointer-events-none"></div>
+
+                    <h3 className="text-emerald-400 font-bold uppercase tracking-widest text-xs mb-3 flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                        Necesidad (Faltas)
+                    </h3>
+
+                    {/* Input Area */}
+                    {isManagerial && (
+                        <div className="flex gap-2 mb-3">
+                            <input
+                                type="text"
+                                value={needInput}
+                                onChange={(e) => setNeedInput(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleAddFamily('need')}
+                                placeholder="Añadir familia..."
+                                className="flex-1 bg-slate-900/50 border border-emerald-500/30 rounded-lg px-3 py-1.5 text-sm text-white focus:border-emerald-500 outline-none placeholder-slate-500"
+                            />
+                            <button
+                                onClick={() => handleAddFamily('need')}
+                                className="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 rounded-lg px-3 py-1.5 transition-colors border border-emerald-500/30"
+                            >
+                                <Plus size={16} />
+                            </button>
+                        </div>
+                    )}
+
+                    {/* List */}
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-2">
+                        {productFamilies.filter(f => f.type === 'need' && f.date === selectedDate).map(fam => (
+                            <div key={fam.id} className="group flex items-center justify-between bg-emerald-950/20 border border-emerald-500/10 rounded-lg px-3 py-2">
+                                <span className="text-slate-200 text-sm font-medium">{fam.name}</span>
+                                {isManagerial && (
+                                    <button
+                                        onClick={() => removeProductFamily(fam.id)}
+                                        className="text-emerald-500/50 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                        {productFamilies.filter(f => f.type === 'need' && f.date === selectedDate).length === 0 && (
+                            <p className="text-slate-600 text-xs italic text-center mt-4">No hay necesidades registradas.</p>
+                        )}
+                    </div>
+                </div>
+
+                {/* SOBRESTOCK - RED TINT */}
+                <div className="w-1/2 bg-red-900/10 border border-red-500/20 rounded-3xl p-5 flex flex-col relative overflow-hidden backdrop-blur-sm">
+                    {/* Corner Decoration */}
+                    <div className="absolute top-0 right-0 w-20 h-20 bg-red-500/5 rounded-full blur-xl pointer-events-none"></div>
+
+                    <h3 className="text-red-400 font-bold uppercase tracking-widest text-xs mb-3 flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                        Sobrestock (Exceso)
+                    </h3>
+
+                    {/* Input Area */}
+                    {isManagerial && (
+                        <div className="flex gap-2 mb-3">
+                            <input
+                                type="text"
+                                value={overstockInput}
+                                onChange={(e) => setOverstockInput(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleAddFamily('overstock')}
+                                placeholder="Añadir familia..."
+                                className="flex-1 bg-slate-900/50 border border-red-500/30 rounded-lg px-3 py-1.5 text-sm text-white focus:border-red-500 outline-none placeholder-slate-500"
+                            />
+                            <button
+                                onClick={() => handleAddFamily('overstock')}
+                                className="bg-red-600/20 hover:bg-red-600/40 text-red-300 rounded-lg px-3 py-1.5 transition-colors border border-red-500/30"
+                            >
+                                <Plus size={16} />
+                            </button>
+                        </div>
+                    )}
+
+                    {/* List */}
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-2">
+                        {productFamilies.filter(f => f.type === 'overstock' && f.date === selectedDate).map(fam => (
+                            <div key={fam.id} className="group flex items-center justify-between bg-red-950/20 border border-red-500/10 rounded-lg px-3 py-2">
+                                <span className="text-slate-200 text-sm font-medium">{fam.name}</span>
+                                {isManagerial && (
+                                    <button
+                                        onClick={() => removeProductFamily(fam.id)}
+                                        className="text-red-500/50 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                        {productFamilies.filter(f => f.type === 'overstock' && f.date === selectedDate).length === 0 && (
+                            <p className="text-slate-600 text-xs italic text-center mt-4">No hay excesos registrados.</p>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* KEEP MODALS OUTSIDE OF THE FLEX STRUCTURE */}
             {/* INCIDENT MODAL OVERLAY */}
             {showCloseModal && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">

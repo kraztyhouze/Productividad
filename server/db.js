@@ -66,6 +66,11 @@ export async function initDb() {
             phone TEXT,
             address TEXT,
             "order" INTEGER DEFAULT 0
+        CREATE TABLE IF NOT EXISTS product_families (
+            id SERIAL PRIMARY KEY,
+            name TEXT,
+            type TEXT, -- 'need' or 'overstock'
+            date TEXT
         );
     `);
     console.log("Database tables initialized (PostgreSQL)");

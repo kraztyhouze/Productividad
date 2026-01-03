@@ -205,6 +205,33 @@ app.post('/api/day-incidents', async (req, res) => {
 });
 
 
+// --- Product Families (Need/Overstock) ---
+app.get('/api/product-families', async (req, res) => {
+    try {
+        const { rows } = await query('SELECT * FROM product_families');
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }) }
+});
+
+app.post('/api/product-families', async (req, res) => {
+    const { name, type, date } = req.body;
+    try {
+        const { rows } = await query(
+            'INSERT INTO product_families (name, type, date) VALUES ($1, $2, $3) RETURNING *',
+            [name, type, date]
+        );
+        res.json(rows[0]);
+    } catch (err) { res.status(500).json({ error: err.message }) }
+});
+
+app.delete('/api/product-families/:id', async (req, res) => {
+    try {
+        await query('DELETE FROM product_families WHERE id = $1', [req.params.id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }) }
+});
+
+
 // --- Health Check (para Railway/Docker) ---
 app.get('/health', (req, res) => {
     res.status(200).send('OK');

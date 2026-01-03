@@ -26,7 +26,7 @@ app.get('/api/active-sessions', async (req, res) => {
     try {
         const { rows } = await query('SELECT * FROM active_sessions');
         const mapped = rows.map(s => ({
-            employeeId: s.employee_id,
+            employeeId: Number(s.employee_id),
             employeeName: s.employee_name,
             startTime: s.start_time
         }));
@@ -68,7 +68,7 @@ app.get('/api/daily-records', async (req, res) => {
         const { rows } = await query('SELECT * FROM daily_records ORDER BY start_time DESC');
         const mapped = rows.map(r => ({
             id: Number(r.id), // BIGINT comes as string in PG client sometimes, safe cast to number for JS
-            employeeId: r.employee_id,
+            employeeId: Number(r.employee_id),
             employeeName: r.employee_name,
             startTime: r.start_time,
             endTime: r.end_time,
@@ -140,6 +140,13 @@ app.post('/api/daily-groups', async (req, res) => {
                 recoverable = excluded.recoverable`,
             [key, data.standard || 0, data.jewelry || 0, data.recoverable || 0]
         );
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }) }
+});
+
+app.delete('/api/daily-groups/:key', async (req, res) => {
+    try {
+        await query('DELETE FROM daily_groups WHERE key = $1', [req.params.key]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }) }
 });

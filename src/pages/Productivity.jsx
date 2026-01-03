@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useProductivity } from '../context/ProductivityContext';
 import { useTeam } from '../context/TeamContext';
 import { useAuth, ROLES } from '../context/AuthContext';
-import { Users, ShoppingBag, Clock, UserCheck, AlertCircle, Archive, Lock, RefreshCw, Plus, X } from 'lucide-react';
+import { Users, ShoppingBag, Clock, UserCheck, AlertCircle, Archive, Lock, RefreshCw, Plus, X, Trash2 } from 'lucide-react';
 
 const Productivity = () => {
     const {
         activeSessions, dailyRecords, startSession, endSession,
         dailyGroups, updateDailyGroups, closedDays, closeDay, reopenDay,
         getUnclosedPastDays, dayIncidents, updateDayIncident,
-        updateRecord, addManualRecord
+        updateRecord, addManualRecord, deleteEmployeeDayData
     } = useProductivity();
 
     const { employees } = useTeam();
@@ -381,6 +381,7 @@ const Productivity = () => {
                                     <th className="pb-2 text-center text-amber-400" title="Venta Recuperable">V.Rec</th>
                                     <th className="pb-2 text-right text-emerald-400" title="Total Grupos">Tot</th>
                                     <th className="pb-2 text-right">G/H</th>
+                                    {isManagerial && !isDayClosed && <th className="pb-2 w-8"></th>}
                                 </tr>
                             </thead>
                             <tbody className="text-sm divide-y divide-slate-800/50">
@@ -445,6 +446,22 @@ const Productivity = () => {
                                             <td className="py-3 text-right font-bold text-slate-300 text-xs">
                                                 {gph}
                                             </td>
+                                            {isManagerial && !isDayClosed && (
+                                                <td className="py-3 pr-2 text-right">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (confirm(`¿ELIMINAR todos los datos de hoy para ${displayName}? Esta acción no se puede deshacer.`)) {
+                                                                deleteEmployeeDayData(parseInt(empId), selectedDate);
+                                                            }
+                                                        }}
+                                                        className="p-1 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                                                        title="Eliminar datos de hoy"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </td>
+                                            )}
                                         </tr>
                                     );
                                 })}

@@ -187,6 +187,42 @@ export const ProductivityProvider = ({ children }) => {
         await fetch(`/api/closed-days/${date}`, { method: 'DELETE' });
     };
 
+    const deleteEmployeeDayData = async (employeeId, date) => {
+        // 1. Delete all records for this emp & date
+        const recordsToDelete = dailyRecords.filter(r => r.employeeId === employeeId && r.date === date);
+        const recordIds = recordsToDelete.map(r => r.id);
+
+        setDailyRecords(prev => prev.filter(r => !(r.employeeId === employeeId && r.date === date)));
+
+        // 2. Delete groups
+        const groupKey = `${employeeId}-${date}`;
+        const newGroups = { ...dailyGroups };
+        delete newGroups[groupKey];
+        setDailyGroups(newGroups);
+
+        // 3. Stop session if active/today
+        const isToday = new Date().toISOString().split('T')[0] === date;
+        if (isToday) {
+            const hasActive = activeSessions.find(s => s.employeeId === employeeId);
+            if (hasActive) {
+                setActiveSessions(prev => prev.filter(s => s.employeeId !== employeeId));
+                // API call to stop/delete session handled below
+                await fetch(`/api/active-sessions/${employeeId}`, { method: 'DELETE' });
+            }
+        }
+
+        // API calls for records and groups
+        try {
+            await Promise.all([
+                ...recordIds.map(id => fetch(`/api/daily-records/${id}`, { method: 'DELETE' })),
+                fetch(`/api/daily-groups/${groupKey}`, { method: 'DELETE' })
+            ]);
+        } catch (err) {
+            console.error("Error deleting employee day data", err);
+            // In a real app, we might revert state here on failure
+        }
+    };
+
     const getUnclosedPastDays = () => {
         const today = new Date().toISOString().split('T')[0];
         const allDates = [...new Set(dailyRecords.map(r => r.date))];
@@ -209,7 +245,8 @@ export const ProductivityProvider = ({ children }) => {
             updateRecord,
             deleteRecord,
             addManualRecord,
-            getUnclosedPastDays
+            getUnclosedPastDays,
+            deleteEmployeeDayData
         }}>
             {children}
         </ProductivityContext.Provider>

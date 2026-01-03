@@ -58,3 +58,16 @@ export const doesTaskOccurOnDate = (task, date) => {
 
     return false;
 };
+
+export const getPriorityColor = (type) => {
+    if (type === 'critical') return 'border-red-500 bg-red-500/10 text-red-200';
+    if (type === 'priority') return 'border-amber-500 bg-amber-500/10 text-amber-200';
+    return 'border-blue-500 bg-blue-500/10 text-blue-200';
+};
+
+export const isToday = (date) => {
+    const today = new Date();
+    return date.getDate() === today.getDate() &&
+        date.getMonth() === today.getMonth() &&
+        date.getFullYear() === today.getFullYear();
+};

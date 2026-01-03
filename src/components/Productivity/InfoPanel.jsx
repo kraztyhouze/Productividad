@@ -14,33 +14,33 @@ const InfoPanel = ({
 }) => {
     // Definir estilos basados en el tema
     const styles = theme === 'red' ? {
-        bg: 'bg-red-900/10',
-        border: 'border-red-500/20',
-        corner: 'bg-red-500/5',
+        bg: 'bg-[#1e293b]/60 shadow-[0_0_20px_-5px_rgba(239,68,68,0.1)]', // Red Tint Shadow
+        border: 'border-white/5',
+        corner: 'bg-red-500/10',
         title: 'text-red-400',
         dot: 'bg-red-500',
-        inputBorder: 'border-red-500/30',
+        inputBorder: 'border-white/10',
         focusBorder: 'focus:border-red-500',
-        btnBg: 'bg-red-600/20',
-        btnHover: 'hover:bg-red-600/40',
+        btnBg: 'bg-red-500/10',
+        btnHover: 'hover:bg-red-500/20',
         btnText: 'text-red-300',
-        itemBg: 'bg-red-950/20',
-        itemBorder: 'border-red-500/10',
+        itemBg: 'bg-slate-900/40',
+        itemBorder: 'border-white/5',
         iconHover: 'hover:text-red-400'
     } : {
-        bg: 'bg-emerald-900/10',
-        border: 'border-emerald-500/20',
-        corner: 'bg-emerald-500/5',
+        bg: 'bg-[#1e293b]/60 shadow-[0_0_20px_-5px_rgba(16,185,129,0.1)]', // Emerald Tint Shadow
+        border: 'border-white/5',
+        corner: 'bg-emerald-500/10',
         title: 'text-emerald-400',
         dot: 'bg-emerald-500',
-        inputBorder: 'border-emerald-500/30',
+        inputBorder: 'border-white/10',
         focusBorder: 'focus:border-emerald-500',
-        btnBg: 'bg-emerald-600/20',
-        btnHover: 'hover:bg-emerald-600/40',
+        btnBg: 'bg-emerald-500/10',
+        btnHover: 'hover:bg-emerald-500/20',
         btnText: 'text-emerald-300',
-        itemBg: 'bg-emerald-950/20',
-        itemBorder: 'border-emerald-500/10',
-        iconHover: 'hover:text-red-400' // Delete icon generally turns red on hover
+        itemBg: 'bg-slate-900/40',
+        itemBorder: 'border-white/5',
+        iconHover: 'hover:text-red-400'
     };
 
     return (

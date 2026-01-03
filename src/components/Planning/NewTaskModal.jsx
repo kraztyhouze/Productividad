@@ -54,21 +54,21 @@ const NewTaskModal = ({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-            <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg border border-slate-800 flex flex-col max-h-[90vh]">
-                <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 transition-all">
+            <div className="bg-[#1e293b]/90 rounded-2xl shadow-2xl w-full max-w-lg border border-white/10 flex flex-col max-h-[90vh] backdrop-blur-xl">
+                <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/5 rounded-t-2xl">
                     <h2 className="text-xl font-bold text-white">Nueva Tarea</h2>
-                    <button onClick={onClose} className="text-slate-500 hover:text-white"><X /></button>
+                    <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors"><X /></button>
                 </div>
                 <div className="p-6 overflow-y-auto custom-scrollbar space-y-4">
                     <form id="newTaskForm" onSubmit={handleSubmit} className="space-y-4">
-                        <input required value={newTask.title} onChange={e => setNewTask({ ...newTask, title: e.target.value })} placeholder="Título de la tarea" className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white outline-none focus:border-blue-500" />
-                        <textarea resize="none" rows="3" value={newTask.description} onChange={e => setNewTask({ ...newTask, description: e.target.value })} placeholder="Descripción (opcional)" className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white outline-none focus:border-blue-500" />
+                        <input required value={newTask.title} onChange={e => setNewTask({ ...newTask, title: e.target.value })} placeholder="Título de la tarea" className="w-full bg-[#0f172a]/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-pink-500 transition-colors" />
+                        <textarea resize="none" rows="3" value={newTask.description} onChange={e => setNewTask({ ...newTask, description: e.target.value })} placeholder="Descripción (opcional)" className="w-full bg-[#0f172a]/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-pink-500 transition-colors" />
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Prioridad</label>
-                                <select value={newTask.type} onChange={e => setNewTask({ ...newTask, type: e.target.value })} className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm">
+                                <select value={newTask.type} onChange={e => setNewTask({ ...newTask, type: e.target.value })} className="w-full bg-[#0f172a]/50 border border-white/10 rounded-xl px-3 py-2 text-white text-sm outline-none focus:border-pink-500 transition-colors">
                                     <option value="normal">Normal</option>
                                     <option value="priority">Prioritaria</option>
                                     <option value="critical">Crítica</option>
@@ -76,7 +76,7 @@ const NewTaskModal = ({
                             </div>
                             <div>
                                 <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Asignar a</label>
-                                <div className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 h-[42px] overflow-hidden relative group">
+                                <div className="bg-[#0f172a]/50 border border-white/10 rounded-xl px-3 py-2 h-[42px] overflow-hidden relative group">
                                     <p className="text-xs text-slate-300 pt-1 leading-tight">{newTask.assignedTo.join(', ') || 'Seleccionar...'}</p>
                                     <select
                                         multiple
@@ -94,9 +94,9 @@ const NewTaskModal = ({
                             </div>
                         </div>
 
-                        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-800">
+                        <div className="bg-slate-900/30 rounded-xl p-4 border border-white/5">
                             <label className="flex items-center gap-3 cursor-pointer">
-                                <input type="checkbox" checked={recurrenceSettings.enabled} onChange={e => setRecurrenceSettings({ ...recurrenceSettings, enabled: e.target.checked })} className="w-4 h-4 accent-blue-500" />
+                                <input type="checkbox" checked={recurrenceSettings.enabled} onChange={e => setRecurrenceSettings({ ...recurrenceSettings, enabled: e.target.checked })} className="w-4 h-4 accent-pink-500" />
                                 <span className="text-sm font-bold text-slate-300">Repetir periódicamente</span>
                             </label>
 
@@ -108,21 +108,21 @@ const NewTaskModal = ({
                                                 type="button"
                                                 key={d}
                                                 onClick={() => toggleWeekDay(i + 1)} // 1=Mon
-                                                className={`w-8 h-8 rounded-lg text-xs font-bold flex items-center justify-center transition-all ${recurrenceSettings.weekDays.includes(i + 1) ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-500 hover:bg-slate-700'}`}
+                                                className={`w-8 h-8 rounded-lg text-xs font-bold flex items-center justify-center transition-all ${recurrenceSettings.weekDays.includes(i + 1) ? 'bg-pink-600 text-white shadow-lg shadow-pink-600/20' : 'bg-[#0f172a]/50 text-slate-500 hover:bg-slate-800'}`}
                                             >
                                                 {d}
                                             </button>
                                         ))}
                                     </div>
-                                    <input type="date" value={recurrenceSettings.endDate} onChange={e => setRecurrenceSettings({ ...recurrenceSettings, endDate: e.target.value })} className="bg-slate-800 text-xs text-white p-2 rounded-lg border border-slate-700 w-full" placeholder="Fecha fin (opcional)" />
+                                    <input type="date" value={recurrenceSettings.endDate} onChange={e => setRecurrenceSettings({ ...recurrenceSettings, endDate: e.target.value })} className="bg-[#0f172a]/50 text-xs text-white p-2 rounded-lg border border-white/10 w-full outline-none focus:border-pink-500" placeholder="Fecha fin (opcional)" />
                                 </div>
                             )}
                         </div>
                     </form>
                 </div>
-                <div className="p-6 border-t border-slate-800 flex justify-end gap-3">
-                    <button onClick={onClose} className="px-6 py-2 rounded-xl text-slate-400 font-bold hover:bg-slate-800">Cancelar</button>
-                    <button type="submit" form="newTaskForm" className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-lg shadow-blue-500/20">Crear Tarea</button>
+                <div className="p-6 border-t border-white/5 bg-white/5 rounded-b-2xl flex justify-end gap-3">
+                    <button onClick={onClose} className="px-6 py-2 rounded-xl text-slate-400 font-bold hover:bg-white/5 hover:text-white transition-colors">Cancelar</button>
+                    <button type="submit" form="newTaskForm" className="px-6 py-2 bg-pink-600 hover:bg-pink-500 text-white rounded-xl font-bold shadow-lg shadow-pink-600/20 transition-all">Crear Tarea</button>
                 </div>
             </div>
         </div>

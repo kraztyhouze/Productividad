@@ -60,9 +60,9 @@ export const doesTaskOccurOnDate = (task, date) => {
 };
 
 export const getPriorityColor = (type) => {
-    if (type === 'critical') return 'border-red-500 bg-red-500/10 text-red-200';
-    if (type === 'priority') return 'border-amber-500 bg-amber-500/10 text-amber-200';
-    return 'border-blue-500 bg-blue-500/10 text-blue-200';
+    if (type === 'critical') return 'border-red-500/30 bg-red-500/10 text-red-100 shadow-[0_0_15px_-5px_rgba(239,68,68,0.2)]';
+    if (type === 'priority') return 'border-amber-500/30 bg-amber-500/10 text-amber-100 shadow-[0_0_15px_-5px_rgba(245,158,11,0.2)]';
+    return 'border-white/5 bg-[#1e293b]/60 text-slate-300 shadow-lg';
 };
 
 export const isToday = (date) => {

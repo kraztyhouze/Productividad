@@ -262,22 +262,22 @@ const Productivity = () => {
             {/* TOP SECTION: LIVE & TEAM (Flex 2 to take more space) */}
             <div className="flex-[2] flex gap-6 min-h-0">
                 {/* LEFT: EMPLOYEE SELECTOR */}
-                <div className="w-2/3 bg-slate-900/50 backdrop-blur-xl rounded-[2.5rem] p-6 border border-slate-800/50 flex flex-col shadow-2xl relative">
+                <div className="w-2/3 bg-[#1e293b]/60 backdrop-blur-xl rounded-[2.5rem] p-6 border border-white/5 flex flex-col shadow-2xl relative overflow-hidden">
 
                     {/* Visual Only Mode Banner */}
                     {!isManagerial && (
-                        <div className="absolute top-0 left-0 w-full bg-yellow-500/20 backdrop-blur-md rounded-t-[2.5rem] py-1 px-6 border-b border-yellow-500/30 flex items-center justify-center gap-2 z-20">
-                            <Lock size={12} className="text-yellow-200" />
-                            <span className="text-[10px] font-bold text-yellow-100 uppercase tracking-wider">
-                                Modo Visualización - Solo Puesto de Compras / Gerencia pueden editar
+                        <div className="absolute top-0 left-0 w-full bg-amber-500/10 backdrop-blur-md py-1 px-6 border-b border-amber-500/20 flex items-center justify-center gap-2 z-20">
+                            <Lock size={12} className="text-amber-500" />
+                            <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">
+                                Modo Visualización
                             </span>
                         </div>
                     )}
 
-                    <div className={`flex justify-between items-center mb-4 ${!isManagerial ? 'mt-4' : ''}`}>
+                    <div className={`flex justify-between items-center mb-6 ${!isManagerial ? 'mt-4' : ''}`}>
                         <div>
-                            <h1 className="text-2xl font-extrabold text-slate-50 tracking-tight flex items-center gap-2">
-                                <ShoppingBag className="text-emerald-500" size={24} />
+                            <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
+                                <ShoppingBag className="text-pink-500" size={24} />
                                 Productividad
                             </h1>
                             <p className="text-slate-400 font-medium ml-1 text-xs">
@@ -291,31 +291,31 @@ const Productivity = () => {
                                         type="date"
                                         value={selectedDate}
                                         onChange={(e) => setSelectedDate(e.target.value)}
-                                        className="bg-slate-800 text-white border border-slate-700 rounded-lg px-2 py-1 font-mono text-xs"
+                                        className="bg-slate-900 text-white border border-slate-800 rounded-lg px-2 py-1 font-mono text-xs focus:border-pink-500 outline-none"
                                     />
                                 )}
                                 <div>
-                                    <p className="text-3xl font-mono font-bold text-slate-200">{currentTime.toLocaleTimeString()}</p>
+                                    <p className="text-3xl font-mono font-bold text-slate-200 tracking-tighter">{currentTime.toLocaleTimeString()}</p>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     {isManagerial && unclosedDays.length > 0 && (
-                        <div className="mb-2 bg-amber-500/10 border border-amber-500/20 rounded-xl p-2 flex items-center justify-between animate-pulse">
-                            <div className="flex items-center gap-2 text-amber-200 text-xs">
-                                <AlertCircle size={16} />
+                        <div className="mb-4 bg-amber-500/5 border border-amber-500/10 rounded-xl p-2 flex items-center justify-between animate-pulse">
+                            <div className="flex items-center gap-2 text-amber-500 text-xs px-2">
+                                <AlertCircle size={14} />
                                 <span className="font-bold">¡Días sin cerrar!:</span>
                                 <div className="flex gap-2">
                                     {unclosedDays.map(d => (
-                                        <button key={d} onClick={() => setSelectedDate(d)} className="underline hover:text-white">{d}</button>
+                                        <button key={d} onClick={() => setSelectedDate(d)} className="underline hover:text-white font-mono">{d}</button>
                                     ))}
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    <div className="grid grid-cols-4 xl:grid-cols-5 gap-2 overflow-y-auto custom-scrollbar flex-1 content-start pr-1">
+                    <div className="grid grid-cols-4 xl:grid-cols-5 gap-3 overflow-y-auto custom-scrollbar flex-1 content-start pr-1 pb-2">
                         {employees.filter(e => e.isBuyer).map(emp => {
                             const session = activeSessions.find(s => s.employeeId === emp.id);
                             const displayName = emp.alias || emp.firstName;
@@ -326,27 +326,27 @@ const Productivity = () => {
                                     key={emp.id}
                                     onClick={() => handleUserClick(emp)}
                                     // disabled={!isToday} // We handle disabled visually/alert, kept button active to catch click
-                                    className={`relative rounded-xl p-2 flex flex-col items-center justify-center gap-1 transition-all duration-300 border-2 h-24 ${isSessionActive
-                                        ? 'bg-emerald-600 border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)] scale-105 z-10'
+                                    className={`relative rounded-2xl p-2 flex flex-col items-center justify-center gap-1.5 transition-all duration-300 border h-28 group ${isSessionActive
+                                        ? 'bg-pink-600 border-pink-500 shadow-[0_0_30px_-5px_rgba(236,72,153,0.3)] scale-[1.02] z-10'
                                         : isToday
                                             ? isManagerial
-                                                ? 'bg-red-900/80 border-red-800 hover:bg-red-800 hover:border-red-500 hover:scale-[1.02] cursor-pointer'
-                                                : 'bg-red-900/80 border-red-800 opacity-80 cursor-not-allowed hidden-hover'
-                                            : 'bg-slate-800 border-slate-700 opacity-50 cursor-not-allowed'
+                                                ? 'bg-slate-800/40 border-white/5 hover:bg-slate-800 hover:border-pink-500/50 hover:scale-[1.02] cursor-pointer'
+                                                : 'bg-slate-800/20 border-white/5 opacity-60 cursor-not-allowed hidden-hover'
+                                            : 'bg-slate-800/20 border-white/5 opacity-40 cursor-not-allowed'
                                         }`}
                                 >
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 ${isSessionActive ? 'bg-white text-emerald-700 border-emerald-200' : 'bg-red-950 text-red-200 border-red-800'
+                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold border ${isSessionActive ? 'bg-white text-pink-600 border-white' : 'bg-slate-900 text-slate-400 border-slate-700 group-hover:border-pink-500/50 group-hover:text-pink-400 transition-colors'
                                         }`}>
                                         {emp.alias || emp.firstName.substring(0, 3).toUpperCase()}
                                     </div>
-                                    <div className="text-center w-full overflow-hidden">
-                                        <p className={`font-bold text-xs truncate w-full ${isSessionActive ? 'text-white' : 'text-red-100'}`}>{emp.firstName}</p>
+                                    <div className="text-center w-full overflow-hidden px-1">
+                                        <p className={`font-bold text-xs truncate w-full ${isSessionActive ? 'text-white' : 'text-slate-300 group-hover:text-white'}`}>{emp.firstName}</p>
                                     </div>
                                     {isSessionActive && (
-                                        <div className="absolute top-1 right-1 w-2 h-2 bg-white rounded-full animate-ping"></div>
+                                        <div className="absolute top-2 right-2 w-2 h-2 bg-white rounded-full animate-ping"></div>
                                     )}
                                     {isSessionActive && (
-                                        <div className="bg-black/20 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold text-white">
+                                        <div className="bg-black/20 backdrop-blur-sm px-2 py-0.5 rounded-md text-[10px] font-mono font-bold text-white mt-1 border border-white/10">
                                             {formatDuration(currentTime - new Date(session.startTime))}
                                         </div>
                                     )}
@@ -361,54 +361,54 @@ const Productivity = () => {
 
                     {/* GLOBAL LIVE WIDGET */}
                     {isToday && (
-                        <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-[2.5rem] p-5 border border-indigo-500/30 relative overflow-hidden shrink-0">
-                            <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/20 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
-                            <h2 className="text-xs font-bold text-indigo-300 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                <Clock size={14} /> Tiempo Activo Total
+                        <div className="bg-gradient-to-br from-pink-900/80 to-slate-900 rounded-[2.5rem] p-6 border border-pink-500/20 relative overflow-hidden shrink-0 shadow-lg">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-pink-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+                            <h2 className="text-[10px] font-bold text-pink-300 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                <Clock size={12} /> Tiempo Activo Total
                             </h2>
-                            <div className="flex items-baseline gap-2 mb-1">
-                                <span className="text-4xl font-mono font-bold text-white tracking-tight">
+                            <div className="flex items-baseline gap-2 mb-2">
+                                <span className="text-5xl font-mono font-bold text-white tracking-tighter drop-shadow-lg">
                                     {formatDuration(globalActiveTime)}
                                 </span>
                             </div>
-                            <div className="flex items-center gap-2 mt-2 text-xs text-indigo-200 filter backdrop-blur-md bg-white/5 p-2 rounded-xl border border-white/10">
-                                <Users size={14} />
-                                <span className="font-bold">{activeSessions.length}</span> empleados comprando
+                            <div className="flex items-center gap-2 mt-auto text-xs text-pink-100/80 filter backdrop-blur-md bg-white/5 p-2 px-3 rounded-xl border border-white/10 w-fit">
+                                <Users size={14} className="text-pink-400" />
+                                <span className="font-bold text-white">{activeSessions.length}</span> empleados comprando
                             </div>
                         </div>
                     )}
 
                     {/* SUMMARY TABLE */}
-                    <div className="flex-1 bg-slate-950/50 rounded-[2.5rem] border border-slate-800/50 p-5 flex flex-col overflow-hidden min-h-0">
-                        <div className="flex justify-between items-center mb-3">
+                    <div className="flex-1 bg-[#1e293b]/60 backdrop-blur-xl rounded-[2.5rem] border border-white/5 p-6 flex flex-col overflow-hidden min-h-0 shadow-xl">
+                        <div className="flex justify-between items-center mb-4">
                             <h2 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-                                <UserCheck size={16} className="text-emerald-500" />
+                                <UserCheck size={16} className="text-pink-500" />
                                 Resumen
                             </h2>
                             {isManagerial && !isDayClosed && (
-                                <div className="flex gap-1">
+                                <div className="flex gap-2">
                                     <button
                                         onClick={() => setShowManualModal(true)}
-                                        className="p-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded transition-colors border border-slate-700"
+                                        className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition-colors border border-white/5"
                                         title="Añadir registro manual"
                                     >
                                         <Plus size={14} />
                                     </button>
                                     <button
                                         onClick={() => setShowCloseModal(true)}
-                                        className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold rounded transition-colors"
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-pink-600 hover:bg-pink-500 text-white text-[10px] font-bold rounded-lg transition-colors shadow-lg shadow-pink-600/20"
                                     >
-                                        <Trash2 size={12} className="rotate-180" /> Cerrar {/* Archive icon replaced or repurposed */}
+                                        <Trash2 size={12} className="rotate-180" /> Cerrar
                                     </button>
                                 </div>
                             )}
                             {isDayClosed && (
                                 <div className="flex items-center gap-2">
-                                    <span className="flex items-center gap-1 px-2 py-1 bg-red-500/10 text-red-400 text-[10px] font-bold rounded border border-red-500/20">
+                                    <span className="flex items-center gap-1 px-2 py-1 bg-slate-800 text-slate-400 text-[10px] font-bold rounded border border-white/5">
                                         <Lock size={10} /> Archivado
                                     </span>
                                     {isManagerial && (
-                                        <button onClick={() => { if (confirm('¿Reabrir?')) reopenDay(selectedDate); }} className="p-1 bg-slate-800 text-slate-400 rounded"><RefreshCw size={12} /></button>
+                                        <button onClick={() => { if (confirm('¿Reabrir?')) reopenDay(selectedDate); }} className="p-1 bg-slate-800 text-slate-400 rounded hover:text-white"><RefreshCw size={12} /></button>
                                     )}
                                 </div>
                             )}
@@ -417,18 +417,18 @@ const Productivity = () => {
                         <div className="overflow-y-auto custom-scrollbar -mr-2 pr-2">
                             <table className="w-full text-left border-collapse">
                                 <thead>
-                                    <tr className="text-[9px] font-bold text-slate-500 uppercase border-b border-slate-800">
-                                        <th className="pb-1 pl-1">Emp</th>
-                                        <th className="pb-1">T</th>
-                                        <th className="pb-1 text-center text-blue-400">Gen</th>
-                                        <th className="pb-1 text-center text-purple-400">Joy</th>
-                                        <th className="pb-1 text-center text-amber-400">Rec</th>
-                                        <th className="pb-1 text-right text-emerald-400">Tot</th>
-                                        <th className="pb-1 text-right">G/H</th>
+                                    <tr className="text-[9px] font-bold text-slate-500 uppercase border-b border-white/5">
+                                        <th className="pb-2 pl-2">Emp</th>
+                                        <th className="pb-2">T</th>
+                                        <th className="pb-2 text-center text-slate-400">Gen</th>
+                                        <th className="pb-2 text-center text-slate-400">Joy</th>
+                                        <th className="pb-2 text-center text-slate-400">Rec</th>
+                                        <th className="pb-2 text-right text-pink-500">Tot</th>
+                                        <th className="pb-2 text-right">G/H</th>
                                         {isManagerial && !isDayClosed && <th className="w-6"></th>}
                                     </tr>
                                 </thead>
-                                <tbody className="text-xs divide-y divide-slate-800/50">
+                                <tbody className="text-xs divide-y divide-white/5">
                                     {Object.keys(dailyStats).map(empId => {
                                         const stat = dailyStats[empId];
                                         const groupCounts = getGroupCounts(empId, selectedDate);
@@ -439,31 +439,31 @@ const Productivity = () => {
                                         const displayName = employeeData ? (employeeData.alias || employeeData.firstName) : stat.name;
 
                                         return (
-                                            <tr key={empId} className="group hover:bg-slate-800/30 transition-colors">
-                                                <td className="py-2 pl-1 max-w-[80px] truncate font-bold text-slate-300">
+                                            <tr key={empId} className="group hover:bg-pink-500/5 transition-colors">
+                                                <td className="py-2.5 pl-2 max-w-[80px] truncate font-bold text-slate-300 group-hover:text-pink-200 transition-colors">
                                                     {displayName}
-                                                    {isActive && <span className="block text-[8px] text-emerald-400 animate-pulse">On</span>}
+                                                    {isActive && <span className="block text-[8px] text-pink-500 animate-pulse font-mono">LIVE</span>}
                                                 </td>
                                                 <td
-                                                    className={`py-2 font-mono text-slate-400 text-[10px] ${!isDayClosed && isManagerial ? 'cursor-pointer hover:text-white' : ''}`}
+                                                    className={`py-2.5 font-mono text-slate-400 text-[10px] ${!isDayClosed && isManagerial ? 'cursor-pointer hover:text-white' : ''}`}
                                                     onClick={() => handleTimeEdit(empId, stat.totalSeconds, displayName)}
                                                 >
                                                     {formatDuration(stat.totalSeconds * 1000)}
                                                 </td>
-                                                <td className="py-2 text-center">
-                                                    <input type="number" disabled={!isManagerial || isDayClosed} value={groupCounts.standard || ''} onChange={(e) => handleGroupsUpdate(empId, 'standard', e.target.value)} className="w-8 bg-transparent text-center text-slate-200 outline-none focus:text-blue-400 placeholder-slate-700" placeholder="-" />
+                                                <td className="py-2.5 text-center">
+                                                    <input type="number" disabled={!isManagerial || isDayClosed} value={groupCounts.standard || ''} onChange={(e) => handleGroupsUpdate(empId, 'standard', e.target.value)} className="w-6 bg-transparent text-center text-slate-400 outline-none focus:text-pink-400 placeholder-slate-700 font-mono" placeholder="-" />
                                                 </td>
-                                                <td className="py-2 text-center">
-                                                    <input type="number" disabled={!isManagerial || isDayClosed} value={groupCounts.jewelry || ''} onChange={(e) => handleGroupsUpdate(empId, 'jewelry', e.target.value)} className="w-8 bg-transparent text-center text-slate-200 outline-none focus:text-purple-400 placeholder-slate-700" placeholder="-" />
+                                                <td className="py-2.5 text-center">
+                                                    <input type="number" disabled={!isManagerial || isDayClosed} value={groupCounts.jewelry || ''} onChange={(e) => handleGroupsUpdate(empId, 'jewelry', e.target.value)} className="w-6 bg-transparent text-center text-slate-400 outline-none focus:text-pink-400 placeholder-slate-700 font-mono" placeholder="-" />
                                                 </td>
-                                                <td className="py-2 text-center">
-                                                    <input type="number" disabled={!isManagerial || isDayClosed} value={groupCounts.recoverable || ''} onChange={(e) => handleGroupsUpdate(empId, 'recoverable', e.target.value)} className="w-8 bg-transparent text-center text-slate-200 outline-none focus:text-amber-400 placeholder-slate-700" placeholder="-" />
+                                                <td className="py-2.5 text-center">
+                                                    <input type="number" disabled={!isManagerial || isDayClosed} value={groupCounts.recoverable || ''} onChange={(e) => handleGroupsUpdate(empId, 'recoverable', e.target.value)} className="w-6 bg-transparent text-center text-slate-400 outline-none focus:text-pink-400 placeholder-slate-700 font-mono" placeholder="-" />
                                                 </td>
-                                                <td className="py-2 text-right font-bold text-emerald-400">{groupCounts.total}</td>
-                                                <td className="py-2 text-right text-slate-400">{gph}</td>
+                                                <td className="py-2.5 text-right font-bold text-pink-500 text-sm">{groupCounts.total}</td>
+                                                <td className="py-2.5 text-right text-slate-500 font-mono">{gph}</td>
                                                 {isManagerial && !isDayClosed && (
-                                                    <td className="py-2 text-right pr-1">
-                                                        <button onClick={(e) => { e.stopPropagation(); if (confirm(`¿Borrar todo de ${displayName}?`)) deleteEmployeeDayData(parseInt(empId), selectedDate); }} className="text-slate-600 hover:text-red-400"><Trash2 size={12} /></button>
+                                                    <td className="py-2.5 text-right pr-1">
+                                                        <button onClick={(e) => { e.stopPropagation(); if (confirm(`¿Borrar todo de ${displayName}?`)) deleteEmployeeDayData(parseInt(empId), selectedDate); }} className="text-slate-600 hover:text-red-400 transition-colors"><Trash2 size={12} /></button>
                                                     </td>
                                                 )}
                                             </tr>

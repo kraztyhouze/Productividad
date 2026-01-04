@@ -1,13 +1,14 @@
 import React from 'react';
-import { ShoppingBag, Edit2, Trash2 } from 'lucide-react';
+import { ShoppingBag, Edit2, Trash2, User } from 'lucide-react';
 
 const EmployeeCard = ({ emp, displayName, stats, onEdit, onDelete }) => {
     return (
         <div className="bg-[#1e293b]/60 backdrop-blur-xl rounded-2xl border border-white/5 p-4 hover:border-pink-500/30 transition-all group relative overflow-hidden flex flex-col justify-between h-full min-h-[140px] shadow-lg">
             {/* Header: Avatar + Alias + Role */}
             <div className="flex items-start gap-4 mb-3">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-600 to-rose-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-pink-600/20 shrink-0 border border-white/10">
-                    {displayName[0].toUpperCase()}
+                <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center shadow-[0_0_15px_-5px_rgba(236,72,153,0.3)] shrink-0 relative overflow-hidden group-hover:shadow-[0_0_20px_-5px_rgba(236,72,153,0.5)] transition-shadow">
+                    <div className="absolute inset-0 bg-gradient-to-br from-pink-500/10 to-transparent"></div>
+                    <User strokeWidth={1.5} className="text-pink-500 drop-shadow-[0_0_8px_rgba(236,72,153,0.6)] w-6 h-6" />
                 </div>
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">

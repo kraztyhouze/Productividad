@@ -7,25 +7,6 @@ const TeamContext = createContext(null);
 const INITIAL_EMPLOYEES = [
     {
         id: 1,
-        firstName: 'Juan Manuel',
-        lastName: 'Hidalgo Ramirez',
-        alias: 'JMH', // Gerente
-        email: 'juanmanuelhr87@gmail.com',
-        role: 'Gerente',
-        contractHours: 40,
-        contractType: 'Indefinido',
-        phone: '600 000 000',
-        username: 'juanma',
-        password: 'admin123', // Default admin pass
-        address: 'Sevilla',
-        vacations: [],
-        leaves: [],
-        hoursBalance: 0,
-        isBuyer: true,
-        order: 1
-    },
-    {
-        id: 2,
         firstName: 'Marco',
         lastName: 'Noguero Jimenez',
         alias: 'MNO',
@@ -33,9 +14,22 @@ const INITIAL_EMPLOYEES = [
         role: 'Supervisor',
         contractHours: 40,
         contractType: 'Indefinido',
-        username: 'marco',
-        password: '123',
-        vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 2
+        username: 'mno',
+        password: '1234',
+        address: '', phone: '', vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 1
+    },
+    {
+        id: 2,
+        firstName: 'Juan Manuel',
+        lastName: 'Hidalgo Ramirez',
+        alias: 'JMH',
+        email: 'juanmanuelhr87@gmail.com',
+        role: 'Gerente',
+        contractHours: 40,
+        contractType: 'Indefinido',
+        username: 'jmh',
+        password: '1234',
+        address: 'Sevilla', phone: '600 000 000', vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 2
     },
     {
         id: 3,
@@ -46,9 +40,9 @@ const INITIAL_EMPLOYEES = [
         role: 'Responsable',
         contractHours: 40,
         contractType: 'Indefinido',
-        username: 'francisco',
-        password: '123',
-        vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 3
+        username: 'fm',
+        password: '1234',
+        address: '', phone: '', vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 3
     },
     {
         id: 4,
@@ -59,9 +53,9 @@ const INITIAL_EMPLOYEES = [
         role: 'Responsable',
         contractHours: 40,
         contractType: 'Indefinido',
-        username: 'alberto',
-        password: '123',
-        vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 4
+        username: 'aoc',
+        password: '1234',
+        address: '', phone: '', vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 4
     },
     {
         id: 5,
@@ -72,9 +66,9 @@ const INITIAL_EMPLOYEES = [
         role: 'Responsable',
         contractHours: 40,
         contractType: 'Indefinido',
-        username: 'gonzalez',
-        password: '123',
-        vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 5
+        username: 'gg',
+        password: '1234',
+        address: '', phone: '', vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 5
     },
     {
         id: 6,
@@ -82,12 +76,12 @@ const INITIAL_EMPLOYEES = [
         lastName: 'Noguero Lobo',
         alias: 'RNL',
         email: 'rubennl1999@gmail.com',
-        role: 'Prof Com/venta',
+        role: 'Empleado',
         contractHours: 32,
         contractType: 'Indefinido',
-        username: 'ruben',
-        password: '123',
-        vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 6
+        username: 'rnl',
+        password: '1234',
+        address: '', phone: '', vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 6
     },
     {
         id: 7,
@@ -95,12 +89,12 @@ const INITIAL_EMPLOYEES = [
         lastName: 'Solier Vela',
         alias: 'MS',
         email: 'manuelsolier@hotmail.com',
-        role: 'Prof Com/venta',
+        role: 'Empleado',
         contractHours: 40,
         contractType: 'Indefinido',
-        username: 'manuel',
-        password: '123',
-        vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 7
+        username: 'ms',
+        password: '1234',
+        address: '', phone: '', vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 7
     },
     {
         id: 8,
@@ -108,12 +102,12 @@ const INITIAL_EMPLOYEES = [
         lastName: 'Barrientos',
         alias: 'JCB',
         email: 'barrienso@gmail.com',
-        role: 'Prof Com/venta',
+        role: 'Empleado',
         contractHours: 40,
         contractType: 'Indefinido',
-        username: 'josecarlos',
-        password: '123',
-        vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 8
+        username: 'jcb',
+        password: '1234',
+        address: '', phone: '', vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 8
     },
     {
         id: 9,
@@ -121,12 +115,12 @@ const INITIAL_EMPLOYEES = [
         lastName: 'Peñuela de Mula',
         alias: 'ALD',
         email: 'minto.chan@gmail.com',
-        role: 'Prof Com/venta',
+        role: 'Empleado',
         contractHours: 40,
         contractType: 'Interinidad',
-        username: 'alicia',
-        password: '123',
-        vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 9
+        username: 'ald',
+        password: '1234',
+        address: '', phone: '', vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 9
     },
     {
         id: 10,
@@ -134,12 +128,12 @@ const INITIAL_EMPLOYEES = [
         lastName: 'Mateos',
         alias: 'BMP',
         email: 'mp.belen.1987@gmail.com',
-        role: 'Prof Com/venta',
+        role: 'Empleado',
         contractHours: 26,
         contractType: 'Indefinido',
-        username: 'mariabelen',
-        password: '123',
-        vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 10
+        username: 'bmp',
+        password: '1234',
+        address: '', phone: '', vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 10
     },
     {
         id: 11,
@@ -147,12 +141,12 @@ const INITIAL_EMPLOYEES = [
         lastName: 'Moreno Lancha',
         alias: 'RML',
         email: 'rafamorlan@hotmail.com',
-        role: 'Prof Com/venta',
+        role: 'Empleado',
         contractHours: 24,
         contractType: 'Indefinido',
-        username: 'angelrafael',
-        password: '123',
-        vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 11
+        username: 'rml',
+        password: '1234',
+        address: '', phone: '', vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 11
     },
     {
         id: 12,
@@ -160,12 +154,12 @@ const INITIAL_EMPLOYEES = [
         lastName: 'Castro Mesa',
         alias: 'TC',
         email: 'tcastrm@gmail.com',
-        role: 'Prof Com/venta',
+        role: 'Empleado',
         contractHours: 40,
         contractType: 'Indefinido',
-        username: 'antonia',
-        password: '123',
-        vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 12
+        username: 'tc',
+        password: '1234',
+        address: '', phone: '', vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 12
     },
     {
         id: 13,
@@ -173,12 +167,12 @@ const INITIAL_EMPLOYEES = [
         lastName: 'Luna Perejon',
         alias: 'ALP',
         email: 'alunaperejon@gmail.com',
-        role: 'Prof Com/venta',
+        role: 'Empleado',
         contractHours: 24,
         contractType: 'Indefinido',
-        username: 'angelluna',
-        password: '123',
-        vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 13
+        username: 'alp',
+        password: '1234',
+        address: '', phone: '', vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 13
     },
     {
         id: 14,
@@ -186,12 +180,12 @@ const INITIAL_EMPLOYEES = [
         lastName: 'Jimenez Peralta',
         alias: 'EJP',
         email: 'evajperalta@gmail.com',
-        role: 'Prof Com/venta',
+        role: 'Empleado',
         contractHours: 20,
         contractType: 'Indefinido',
-        username: 'evamaria',
-        password: '123',
-        vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 14
+        username: 'ejp',
+        password: '1234',
+        address: '', phone: '', vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 14
     },
     {
         id: 15,
@@ -199,12 +193,12 @@ const INITIAL_EMPLOYEES = [
         lastName: 'Gomez Nieves',
         alias: 'MGN',
         email: 'monicalacolea2333@gmail.com',
-        role: 'Prof Com/venta',
+        role: 'Empleado',
         contractHours: 40,
         contractType: 'Indefinido',
-        username: 'monica',
-        password: '123',
-        vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 15
+        username: 'mgn',
+        password: '1234',
+        address: '', phone: '', vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 15
     },
     {
         id: 16,
@@ -212,12 +206,12 @@ const INITIAL_EMPLOYEES = [
         lastName: 'Guerra Rasero',
         alias: 'AGR',
         email: 'aleguerra.rasero.ag@gmail.com',
-        role: 'Prof Com/venta',
+        role: 'Empleado',
         contractHours: 24,
         contractType: 'Indefinido',
-        username: 'alejandro',
-        password: '123',
-        vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 16
+        username: 'agr',
+        password: '1234',
+        address: '', phone: '', vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 16
     },
     {
         id: 17,
@@ -225,12 +219,12 @@ const INITIAL_EMPLOYEES = [
         lastName: 'Sandoval',
         alias: 'EDI',
         email: 'edixeilsandoval76@gmail.com',
-        role: 'Limpiadora',
+        role: 'Empleado',
         contractHours: 20,
         contractType: 'Indefinido',
-        username: 'edixeil',
-        password: '123',
-        vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 17
+        username: 'edi',
+        password: '1234',
+        address: '', phone: '', vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 17
     },
     {
         id: 18,
@@ -238,12 +232,12 @@ const INITIAL_EMPLOYEES = [
         lastName: 'Carrasco',
         alias: 'DAN',
         email: 'Danieelcarrasco48@gmail.com',
-        role: 'Ven Inicial',
+        role: 'Empleado',
         contractHours: 24,
         contractType: 'Temporal',
-        username: 'daniel',
-        password: '123',
-        vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 18
+        username: 'dan',
+        password: '1234',
+        address: '', phone: '', vacations: [], leaves: [], hoursBalance: 0, isBuyer: true, order: 18
     },
     // Dedicated Shared Account
     {
@@ -274,9 +268,7 @@ const PREDEFINED_ROLES = [
     'Gerente',
     'Supervisor',
     'Responsable',
-    'Prof Com/venta',
-    'Limpiadora',
-    'Ven Inicial',
+    'Empleado',
     'Puesto Compras'
 ];
 

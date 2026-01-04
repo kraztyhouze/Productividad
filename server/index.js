@@ -33,31 +33,59 @@ initDb().then(() => {
 // 1. Employees
 app.get('/api/employees', async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM employees ORDER BY id ASC');
+        const result = await pool.query(`
+            SELECT 
+                id, avatar, first_name as "firstName", last_name as "lastName", alias, email, 
+                role, contract_hours as "contractHours", contract_type as "contractType", 
+                username, password, is_buyer as "isBuyer", phone, address, "order"
+            FROM employees 
+            ORDER BY "order" ASC, id ASC
+        `);
         res.json(result.rows);
     } catch (err) { res.status(500).json({ error: err.message }) }
 });
 
 app.post('/api/employees', async (req, res) => {
-    const { name, role, avatar, username, password } = req.body;
+    const { firstName, lastName, alias, email, role, contractHours, contractType, username, password, isBuyer, phone, address, avatar } = req.body;
     try {
         const result = await pool.query(
-            'INSERT INTO employees (name, role, avatar, username, password) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-            [name, role, avatar, username, password] // Plain text password for now as per previous instructions
+            `INSERT INTO employees (
+                first_name, last_name, alias, email, role, contract_hours, contract_type, 
+                username, password, is_buyer, phone, address, avatar
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+            [firstName, lastName, alias, email, role, contractHours, contractType, username, password, isBuyer, phone, address, avatar]
         );
-        res.json(result.rows[0]);
+        // Map back to camelCase for response
+        const row = result.rows[0];
+        res.json({
+            id: row.id, firstName: row.first_name, lastName: row.last_name, alias: row.alias,
+            email: row.email, role: row.role, contractHours: row.contract_hours, contractType: row.contract_type,
+            username: row.username, password: row.password, isBuyer: row.is_buyer, phone: row.phone,
+            address: row.address, order: row.order, avatar: row.avatar
+        });
     } catch (err) { res.status(500).json({ error: err.message }) }
 });
 
 app.put('/api/employees/:id', async (req, res) => {
     const { id } = req.params;
-    const { name, role, avatar, username, password } = req.body;
+    const { firstName, lastName, alias, email, role, contractHours, contractType, username, password, isBuyer, phone, address, avatar, order } = req.body;
     try {
         const result = await pool.query(
-            'UPDATE employees SET name=$1, role=$2, avatar=$3, username=$4, password=$5 WHERE id=$6 RETURNING *',
-            [name, role, avatar, username, password, id]
+            `UPDATE employees SET 
+                first_name=$1, last_name=$2, alias=$3, email=$4, role=$5, contract_hours=$6, 
+                contract_type=$7, username=$8, password=$9, is_buyer=$10, phone=$11, address=$12, 
+                avatar=$13, "order"=$14 
+            WHERE id=$15 RETURNING *`,
+            [firstName, lastName, alias, email, role, contractHours, contractType, username, password, isBuyer, phone, address, avatar, order || 0, id]
         );
-        res.json(result.rows[0]);
+        // Map back
+        const row = result.rows[0];
+        res.json({
+            id: row.id, firstName: row.first_name, lastName: row.last_name, alias: row.alias,
+            email: row.email, role: row.role, contractHours: row.contract_hours, contractType: row.contract_type,
+            username: row.username, password: row.password, isBuyer: row.is_buyer, phone: row.phone,
+            address: row.address, order: row.order, avatar: row.avatar
+        });
     } catch (err) { res.status(500).json({ error: err.message }) }
 });
 
@@ -169,54 +197,139 @@ app.post('/api/closed-days', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }) }
 });
 
-// --- Market Scraper (Puppeteer) ---
+// 5. Product Families
+app.get('/api/product-families', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM product_families ORDER BY id ASC');
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ error: err.message }) }
+});
+
+app.post('/api/product-families', async (req, res) => {
+    const { name, type, date } = req.body;
+    try {
+        const result = await pool.query(
+            'INSERT INTO product_families (name, type, date) VALUES ($1, $2, $3) RETURNING *',
+            [name, type, date]
+        );
+        res.json(result.rows[0]);
+    } catch (err) { res.status(500).json({ error: err.message }) }
+});
+
+app.delete('/api/product-families/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.query('DELETE FROM product_families WHERE id = $1', [id]);
+        res.json({ message: 'Deleted' });
+    } catch (err) { res.status(500).json({ error: err.message }) }
+});
+
+// --- Market Scraper (Hybrid: Axios + Puppeteer) ---
 app.get('/api/market/search', async (req, res) => {
     const { q } = req.query;
     if (!q) return res.status(400).json({ error: 'Query required' });
 
-    console.log(`[Scraper] Starting search for: ${q}`);
+    console.log(`[Scraper] Starting hybrid search for: ${q}`);
     const results = [];
-    let browser = null;
+    const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36';
 
+    // --- 1. LIGHTWEIGHT REQUESTS (Axios/Cheerio) ---
+    // eBay, GAME, Wallapop (link only)
+    // Run concurrently as they are cheap.
+    const lightPromises = [];
+
+    // eBay
+    lightPromises.push(async () => {
+        const ebayUrl = `https://www.ebay.es/sch/i.html?_nkw=${encodeURIComponent(q)}&_sacat=0&LH_ItemCondition=3000`;
+        try {
+            const { data } = await axios.get(ebayUrl, { headers: { 'User-Agent': userAgent }, timeout: 10000 });
+            const $ = cheerio.load(data);
+            const priceText = $('.s-item__price').first().text().trim();
+            results.push({
+                id: 'ebay', store: 'eBay', storeCode: 'EB', color: 'blue',
+                price: priceText || 'Ver web',
+                condition: 'Segunda mano', url: ebayUrl, found: !!priceText
+            });
+        } catch (e) {
+            results.push({ id: 'ebay', store: 'eBay', storeCode: 'EB', color: 'blue', price: 'Ver web', url: ebayUrl, found: false });
+        }
+    });
+
+    // GAME
+    lightPromises.push(async () => {
+        const gameUrl = `https://www.game.es/buscar/${encodeURIComponent(q)}`;
+        try {
+            const { data } = await axios.get(gameUrl, { headers: { 'User-Agent': userAgent }, timeout: 10000 });
+            const $ = cheerio.load(data);
+            let priceText = $('.search-item .buy--price').first().text().trim();
+            if (priceText) {
+                priceText = priceText.replace(/\n/g, ',').replace(/\s+/g, '') + '€';
+            }
+            results.push({
+                id: 'game', store: 'GAME', storeCode: 'GM', color: 'purple',
+                price: priceText || 'Ver web',
+                condition: 'Seminuevo', url: gameUrl, found: !!priceText
+            });
+        } catch (e) {
+            results.push({ id: 'game', store: 'GAME', storeCode: 'GM', color: 'purple', price: 'Ver web', url: gameUrl, found: false });
+        }
+    });
+
+    // Wallapop (Static Link)
+    results.push({
+        id: 'w', store: 'Wallapop', storeCode: 'W', color: 'teal',
+        price: 'Ver web', url: `https://es.wallapop.com/app/search?keywords=${encodeURIComponent(q)}`,
+        condition: 'Segunda mano', found: false
+    });
+
+    // Execute light tasks
+    await Promise.all(lightPromises.map(p => p()));
+
+    // --- 2. HEAVYWEIGHT REQUESTS (Puppeteer) ---
+    // CeX, Cash Converters, Back Market, Chrono24
+    // Run SEQUENTIALLY to minimize RAM usage on server.
+    let browser = null;
     try {
         browser = await puppeteer.launch({
             headless: 'new',
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--single-process' // Helps reduce memory
+            ]
         });
 
-        const scrapePage = async (url, storeId, storeName, storeCode, color, condition, selectorFn) => {
+        const runPuppeteerTask = async (url, storeId, storeName, storeCode, color, condition, selectorFn) => {
             let page = null;
             try {
                 page = await browser.newPage();
-                await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36');
-                await page.setViewport({ width: 1366, height: 768 });
+                await page.setUserAgent(userAgent);
+                await page.setViewport({ width: 1280, height: 720 });
 
-                // Block images to speed up
+                // Block resources
                 await page.setRequestInterception(true);
                 page.on('request', (req) => {
-                    if (['image', 'font', 'stylesheet'].includes(req.resourceType())) {
+                    if (['image', 'font', 'stylesheet', 'media'].includes(req.resourceType())) {
                         req.abort();
                     } else {
                         req.continue();
                     }
                 });
 
-                await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+                await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 25000 });
 
-                // Try to close cookies/modals
+                // Quick Cookie Accept (Generic)
                 try {
                     await page.evaluate(() => {
-                        const buttons = Array.from(document.querySelectorAll('button, a, div[role="button"], #onetrust-accept-btn-handler'));
-                        const accept = buttons.find(b => {
-                            const t = b.innerText.toLowerCase();
-                            return t.includes('aceptar') || t.includes('accept') || t.includes('consent') || t.includes('entendido');
-                        });
+                        const buttons = Array.from(document.querySelectorAll('button, a, div[role="button"]'));
+                        const accept = buttons.find(b => /aceptar|accept|consent|entendido/i.test(b.innerText));
                         if (accept) accept.click();
                     });
                 } catch (e) { }
 
-                // Short wait to ensure hydration/interaction
-                await new Promise(r => setTimeout(r, 2000));
+                // Short wait
+                await new Promise(r => setTimeout(r, 1000));
 
                 const data = await page.evaluate(selectorFn);
 
@@ -225,165 +338,97 @@ app.get('/api/market/search', async (req, res) => {
 
                 if (data && data.price) {
                     price = data.price;
-                    // Ensure format is X,XX€ or X.XX€
                     if (!price.includes('€') && !price.includes('EUR')) price += '€';
                     found = true;
                 } else {
-                    // Try one more generic extraction if failed
+                    // Body text fallback (last resort)
                     const bodyPrice = await page.evaluate(() => {
-                        // Look for X,XX € pattern in body
                         const matches = document.body.innerText.match(/(\d{2,4}[.,]\d{2})\s?€/);
-                        return matches && matches.length > 0 ? matches[0] : null;
+                        return matches ? matches[0] : null;
                     });
-                    if (bodyPrice) {
-                        price = bodyPrice;
-                        found = true;
-                    } else {
-                        console.log(`[Scraper] Price not found for ${storeName}, taking screenshot...`);
-                        await page.screenshot({ path: `debug_${storeId}_notfound.png` });
-                    }
+                    if (bodyPrice) { price = bodyPrice; found = true; }
                 }
 
                 results.push({
                     id: storeId, store: storeName, storeCode, color,
                     price, condition, url, found
                 });
+
             } catch (err) {
-                console.error(`[Scraper] Error ${storeName}:`, err.message);
-                if (page) await page.screenshot({ path: `debug_${storeId}_error.png` });
+                console.error(`[Scraper] Puppeteer Error ${storeName}:`, err.message);
                 results.push({
                     id: storeId, store: storeName, storeCode, color,
                     price: 'Ver web', condition, url, found: false
                 });
             } finally {
-                if (page) await page.close();
+                if (page) await page.close(); // Close immediately to free RAM
             }
         };
 
-        const promises = [];
-
+        // Sequential Execution
         // 1. Cash Converters
-        promises.push(scrapePage(
+        await runPuppeteerTask(
             `https://www.cashconverters.es/es/es/search/?q=${encodeURIComponent(q)}`,
             'cc', 'Cash Converters', 'CC', 'green', 'Usado',
             () => {
-                // Try to find the specific product price inside a product card
-                const productPrice = document.querySelector('.product-item .price');
-                if (productPrice && productPrice.innerText.match(/\d/)) return { price: productPrice.innerText.trim() };
-
-                // Fallback: look for any price-like text in the main content area (avoiding sidebar)
-                const main = document.querySelector('.search-results') || document.body;
-                const matches = main.innerText.match(/(\d{2,4}[.,]\d{2})\s?€/);
-                if (matches) return { price: matches[0] };
-
-                return null;
+                const el = document.querySelector('.product-item .price') || document.querySelector('.price');
+                return el && /\d/.test(el.innerText) ? { price: el.innerText.trim() } : null;
             }
-        ));
+        );
 
         // 2. Back Market
-        promises.push(scrapePage(
+        await runPuppeteerTask(
             `https://www.backmarket.es/es-es/search?q=${encodeURIComponent(q)}`,
             'bm', 'Back Market', 'BM', 'slate', 'Reacondicionado',
             () => {
-                // Try data-test selector
-                let el = document.querySelector('[data-test="product-price"]');
-                if (el) return { price: el.innerText.trim() };
-
-                // Try looking for the price in the first product card
-                const productCard = document.querySelector('.productCard') || document.querySelector('a[href*="/es-es/p/"]');
-                if (productCard) {
-                    const txt = productCard.innerText;
-                    const match = txt.match(/(\d{2,4}[.,]\d{2})\s?€/);
-                    if (match) return { price: match[0] };
-                }
-
-                return null;
+                const el = document.querySelector('[data-test="product-price"]') || document.querySelector('.body-1-bold');
+                return el ? { price: el.innerText.trim() } : null;
             }
-        ));
+        );
 
         // 3. CeX
-        promises.push(scrapePage(
+        await runPuppeteerTask(
             `https://es.webuy.com/search?stext=${encodeURIComponent(q)}`,
             'cex', 'CeX', 'CeX', 'red', 'Usado',
             () => {
-                const el = document.querySelector('.price-txt') ||
-                    document.querySelector('.productPrice');
-
+                const el = document.querySelector('.price-txt') || document.querySelector('.productPrice');
                 if (!el) {
                     const match = document.body.innerText.match(/Vender\s*(\d+[.,]\d{2})\s*€\s*Comprar\s*(\d+[.,]\d{2})\s*€/);
                     if (match && match[2]) return { price: match[2] + '€' };
                 }
-
                 return el ? { price: el.innerText.trim() } : null;
             }
-        ));
+        );
 
-        // 4. eBay
-        promises.push(scrapePage(
-            `https://www.ebay.es/sch/i.html?_nkw=${encodeURIComponent(q)}&_sacat=0&LH_ItemCondition=3000`,
-            'ebay', 'eBay', 'EB', 'blue', 'Segunda mano',
-            () => {
-                const el = document.querySelector('.s-item__price');
-                return el ? { price: el.innerText.trim() } : null;
-            }
-        ));
-
-        // 5. GAME
-        promises.push(scrapePage(
-            `https://www.game.es/buscar/${encodeURIComponent(q)}`,
-            'game', 'GAME', 'GM', 'purple', 'Seminuevo',
-            () => {
-                // Try to grab price from first result
-                const el = document.querySelector('.search-item .buy--price');
-                if (el) {
-                    // GAME format: "123 'newline' 95" -> 123,95
-                    return { price: el.innerText.replace(/\n/g, ',').trim() + '€' };
-                }
-                return null;
-            }
-        ));
-
-        // 6. Chrono24
-        promises.push(scrapePage(
+        // 4. Chrono24
+        await runPuppeteerTask(
             `https://www.chrono24.es/search/index.htm?query=${encodeURIComponent(q)}`,
             'c24', 'Chrono24', '24', 'amber', 'Usado',
             () => {
                 const el = document.querySelector('.article-price strong') || document.querySelector('.article-price');
                 return el ? { price: el.innerText.trim() } : null;
             }
-        ));
-
-        await Promise.all(promises);
-
-        // 4. Wallapop (Link only)
-        results.push({
-            id: 'w', store: 'Wallapop', storeCode: 'W', color: 'teal',
-            price: 'Ver web', url: `https://es.wallapop.com/app/search?keywords=${encodeURIComponent(q)}`,
-            condition: 'Segunda mano', found: false
-        });
-
-        // Determine best price
-        const validPrices = results.filter(r => r.found && r.price.includes('€'));
-        if (validPrices.length > 0) {
-            validPrices.forEach(p => {
-                let clean = p.price.replace(/[^\d.,]/g, '').trim();
-                // European format handling: 1.234,56 -> 1234.56
-                if (clean.indexOf(',') > clean.indexOf('.')) { // 1.234,56 or 1234,56
-                    clean = clean.replace('.', '').replace(',', '.');
-                } else if (clean.includes(',')) {
-                    clean = clean.replace(',', '.');
-                }
-                p.val = parseFloat(clean);
-            });
-            validPrices.sort((a, b) => a.val - b.val);
-            const bestId = validPrices[0].id;
-            results.forEach(r => { if (r.id === bestId) r.isBestPrice = true; });
-        }
+        );
 
     } catch (e) {
-        console.error('[Scraper] Critical puppeteer error:', e);
+        console.error('[Scraper] Top-level Puppeteer error:', e);
     } finally {
         if (browser) await browser.close();
+    }
+
+    // Sort valid prices
+    const validPrices = results.filter(r => r.found);
+    validPrices.forEach(p => {
+        let clean = p.price.replace(/[^\d.,]/g, '').trim();
+        if (clean.indexOf(',') > -1 && clean.indexOf('.') > -1) {
+            if (clean.indexOf(',') > clean.indexOf('.')) clean = clean.replace('.', '').replace(',', '.');
+        } else if (clean.includes(',')) clean = clean.replace(',', '.');
+        p.val = parseFloat(clean);
+    });
+    validPrices.sort((a, b) => a.val - b.val);
+    if (validPrices.length > 0) {
+        const bestId = validPrices[0].id;
+        results.forEach(r => { if (r.id === bestId) r.isBestPrice = true; });
     }
 
     res.json(results);

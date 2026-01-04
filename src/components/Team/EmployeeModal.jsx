@@ -35,7 +35,7 @@ const EmployeeModal = ({
             } else {
                 setFormData({
                     firstName: '', lastName: '', alias: '', email: '', phone: '', address: '',
-                    role: roles[0] || 'Empleado', contractType: 'Indefinido', contractHours: 40,
+                    role: (roles.length > 0 ? roles[0].name : 'Empleado'), contractType: 'Indefinido', contractHours: 40,
                     username: '', password: '',
                     isBuyer: false
                 });
@@ -84,7 +84,7 @@ const EmployeeModal = ({
                             <div className="bg-slate-900/30 p-4 rounded-xl border border-white/5 space-y-4">
                                 <label className="text-xs font-bold text-slate-400 uppercase">Rol y Acceso</label>
                                 <select name="role" value={formData.role || ''} onChange={handleInputChange} className="w-full p-2.5 bg-[#0f172a]/50 border border-white/10 rounded-lg text-slate-200 text-sm outline-none focus:border-pink-500">
-                                    {roles.map(r => <option key={r} value={r}>{r}</option>)}
+                                    {roles.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
                                 </select>
                                 <div className="grid grid-cols-2 gap-4">
                                     <input required name="username" value={formData.username || ''} onChange={handleInputChange} className="w-full p-2 bg-[#0f172a]/50 border-white/10 rounded text-slate-200 text-sm outline-none focus:border-pink-500" placeholder="Usuario" />

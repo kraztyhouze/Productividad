@@ -37,12 +37,12 @@ const RoleManagerModal = ({
 
                 <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
                     {roles.map(role => (
-                        <div key={role} className="flex justify-between items-center p-3 bg-[#0f172a]/30 rounded-xl border border-white/5 group hover:bg-[#0f172a]/50 transition-colors">
-                            <span className="text-sm text-slate-200 font-medium">{role}</span>
-                            {role !== 'Gerente' && role !== 'Puesto Compras' && (
-                                <button onClick={() => onDeleteRole(role)} className="text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={16} /></button>
+                        <div key={role.id || role.name} className="flex justify-between items-center p-3 bg-[#0f172a]/30 rounded-xl border border-white/5 group hover:bg-[#0f172a]/50 transition-colors">
+                            <span className="text-sm text-slate-200 font-medium">{role.name}</span>
+                            {role.name !== 'Gerente' && role.name !== 'Puesto Compras' && (
+                                <button onClick={() => onDeleteRole(role.id)} className="text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={16} /></button>
                             )}
-                            {(role === 'Gerente' || role === 'Puesto Compras') && <Lock size={14} className="text-slate-600" />}
+                            {(role.name === 'Gerente' || role.name === 'Puesto Compras') && <Lock size={14} className="text-slate-600" />}
                         </div>
                     ))}
                 </div>

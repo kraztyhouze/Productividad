@@ -287,18 +287,41 @@ export const TeamProvider = ({ children }) => {
     const [roles, setRoles] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    const fetchRoles = async () => {
+        try {
+            const res = await fetch('/api/roles');
+            if (res.ok) {
+                const data = await res.json();
+                if (data.length === 0) {
+                    console.log("Seeding roles...");
+                    const seeded = [];
+                    for (const roleName of PREDEFINED_ROLES) {
+                        const newRole = { name: roleName, color: 'slate', permissions: 'basic' };
+                        const sRes = await fetch('/api/roles', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(newRole)
+                        });
+                        if (sRes.ok) seeded.push(await sRes.json());
+                    }
+                    setRoles(seeded);
+                } else {
+                    setRoles(data);
+                }
+            }
+        } catch (e) {
+            console.error("Error fetching roles:", e);
+        }
+    };
 
-    // --- LOAD EMPLOYEES ---
     const fetchEmployees = async () => {
         try {
             const res = await fetch('/api/employees');
             if (res.ok) {
                 const data = await res.json();
 
-                // --- SEED INITIAL DATA IF EMPTY ---
                 if (data.length === 0) {
                     console.log("DB empty. Seeding initial employees...");
-                    // We seed sequentially to preserve order/logic
                     const seeded = [];
                     for (const emp of INITIAL_EMPLOYEES) {
                         try {
@@ -322,47 +345,45 @@ export const TeamProvider = ({ children }) => {
             }
         } catch (error) {
             console.error("Error fetching employees:", error);
-        } finally {
-            setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchEmployees();
-
-        // --- LOAD ROLES (Keep LocalStorage for now) ---
-        const storedRoles = localStorage.getItem('is_roles');
-        let parsedRoles = storedRoles ? JSON.parse(storedRoles) : null;
-
-        if (!parsedRoles || !parsedRoles.includes('Supervisor') || !parsedRoles.includes('Prof Com/venta')) {
-            parsedRoles = PREDEFINED_ROLES;
-            localStorage.setItem('is_roles', JSON.stringify(parsedRoles));
-        }
-        setRoles(parsedRoles);
+        const load = async () => {
+            await Promise.all([fetchRoles(), fetchEmployees()]);
+            setLoading(false);
+        };
+        load();
     }, []);
 
-    // Persist Employees - REMOVED (Now handled by API)
-
-    // Persist Roles
-    useEffect(() => {
-        if (!loading && roles.length > 0) {
-            localStorage.setItem('is_roles', JSON.stringify(roles));
-        }
-    }, [roles, loading]);
-
     // --- Role Management ---
-    const addRole = (role) => {
-        if (!roles.includes(role)) setRoles(prev => [...prev, role]);
+    const addRole = async (roleName) => {
+        const tempId = Date.now();
+        const newRole = { id: tempId, name: roleName, color: 'slate', permissions: 'basic' };
+        setRoles(prev => [...prev, newRole]);
+
+        try {
+            const res = await fetch('/api/roles', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: roleName, color: 'slate', permissions: 'basic' })
+            });
+            if (res.ok) {
+                const saved = await res.json();
+                setRoles(prev => prev.map(r => r.id === tempId ? saved : r));
+            }
+        } catch (e) { console.error(e); }
     };
 
-    const deleteRole = (role) => {
-        if (role === 'Gerente' || role === 'Puesto Compras') return;
-        setRoles(prev => prev.filter(r => r !== role));
+    const deleteRole = async (id) => {
+        setRoles(prev => prev.filter(r => r.id !== id));
+        try {
+            await fetch(`/api/roles/${id}`, { method: 'DELETE' });
+        } catch (e) { console.error(e); }
     };
 
     // --- Employee Management ---
     const addEmployee = async (employeeData) => {
-        // Optimistic UI
         const tempId = Date.now();
         const newEmployee = {
             ...employeeData,
@@ -380,42 +401,29 @@ export const TeamProvider = ({ children }) => {
             });
             if (res.ok) {
                 const { id } = await res.json();
-                // Update temp ID with real DB ID
                 setEmployees(prev => prev.map(e => e.id === tempId ? { ...e, id } : e));
             }
-        } catch (err) {
-            console.error("Error adding employee:", err);
-            // Revert state if needed
-        }
+        } catch (err) { console.error("Error adding employee:", err); }
     };
 
     const updateEmployee = async (id, updatedData) => {
-        // Optimistic UI
         setEmployees(prev => prev.map(emp => emp.id === id ? { ...emp, ...updatedData } : emp));
-
         try {
             await fetch(`/api/employees/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updatedData)
             });
-        } catch (err) {
-            console.error("Error updating employee:", err);
-        }
+        } catch (err) { console.error("Error updating employee:", err); }
     };
 
     const deleteEmployee = async (id) => {
-        // Optimistic UI
         setEmployees(prev => prev.filter(emp => emp.id !== id));
-
         try {
             await fetch(`/api/employees/${id}`, { method: 'DELETE' });
-        } catch (err) {
-            console.error("Error deleting employee:", err);
-        }
+        } catch (err) { console.error("Error deleting employee:", err); }
     };
 
-    // Helper to get consistent display name
     const getDisplayName = (emp) => {
         if (!emp) return 'Usuario';
         return emp.alias ? emp.alias : emp.firstName;

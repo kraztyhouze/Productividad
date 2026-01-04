@@ -222,212 +222,58 @@ app.delete('/api/product-families/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }) }
 });
 
-// --- Market Scraper (Hybrid: Axios + Puppeteer) ---
-app.get('/api/market/search', async (req, res) => {
+// --- Market Link Aggregator (Instant) ---
+app.get('/api/market/search', (req, res) => {
     const { q } = req.query;
     if (!q) return res.status(400).json({ error: 'Query required' });
 
-    console.log(`[Scraper] Starting hybrid search for: ${q}`);
-    const results = [];
-    const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36';
+    console.log(`[Aggregator] Generating links for: ${q}`);
+    const encodedQ = encodeURIComponent(q);
 
-    // --- 1. LIGHTWEIGHT REQUESTS (Axios/Cheerio) ---
-    // eBay, GAME, Wallapop (link only)
-    // Run concurrently as they are cheap.
-    const lightPromises = [];
-
-    // eBay
-    lightPromises.push(async () => {
-        const ebayUrl = `https://www.ebay.es/sch/i.html?_nkw=${encodeURIComponent(q)}&_sacat=0&LH_ItemCondition=3000`;
-        try {
-            const { data } = await axios.get(ebayUrl, { headers: { 'User-Agent': userAgent }, timeout: 10000 });
-            const $ = cheerio.load(data);
-            const priceText = $('.s-item__price').first().text().trim();
-            results.push({
-                id: 'ebay', store: 'eBay', storeCode: 'EB', color: 'blue',
-                price: priceText || 'Ver web',
-                condition: 'Segunda mano', url: ebayUrl, found: !!priceText
-            });
-        } catch (e) {
-            results.push({ id: 'ebay', store: 'eBay', storeCode: 'EB', color: 'blue', price: 'Ver web', url: ebayUrl, found: false });
+    const results = [
+        {
+            id: 'ebay', store: 'eBay', storeCode: 'EB', color: 'blue',
+            price: 'Ver web', condition: 'Segunda mano',
+            url: `https://www.ebay.es/sch/i.html?_nkw=${encodedQ}&_sacat=0&LH_ItemCondition=3000`,
+            found: true
+        },
+        {
+            id: 'game', store: 'GAME', storeCode: 'GM', color: 'purple',
+            price: 'Ver web', condition: 'Seminuevo',
+            url: `https://www.game.es/buscar/${encodedQ}`,
+            found: true
+        },
+        {
+            id: 'w', store: 'Wallapop', storeCode: 'W', color: 'teal',
+            price: 'Ver web', condition: 'Segunda mano',
+            url: `https://es.wallapop.com/app/search?keywords=${encodedQ}`,
+            found: true
+        },
+        {
+            id: 'cc', store: 'Cash Converters', storeCode: 'CC', color: 'green',
+            price: 'Ver web', condition: 'Usado',
+            url: `https://www.cashconverters.es/es/es/search/?q=${encodedQ}`,
+            found: true
+        },
+        {
+            id: 'bm', store: 'Back Market', storeCode: 'BM', color: 'slate',
+            price: 'Ver web', condition: 'Reacondicionado',
+            url: `https://www.backmarket.es/es-es/search?q=${encodedQ}`,
+            found: true
+        },
+        {
+            id: 'cex', store: 'CeX', storeCode: 'CeX', color: 'red',
+            price: 'Ver web', condition: 'Usado',
+            url: `https://es.webuy.com/search?stext=${encodedQ}`,
+            found: true
+        },
+        {
+            id: 'c24', store: 'Chrono24', storeCode: '24', color: 'amber',
+            price: 'Ver web', condition: 'Usado',
+            url: `https://www.chrono24.es/search/index.htm?query=${encodedQ}`,
+            found: true
         }
-    });
-
-    // GAME
-    lightPromises.push(async () => {
-        const gameUrl = `https://www.game.es/buscar/${encodeURIComponent(q)}`;
-        try {
-            const { data } = await axios.get(gameUrl, { headers: { 'User-Agent': userAgent }, timeout: 10000 });
-            const $ = cheerio.load(data);
-            let priceText = $('.search-item .buy--price').first().text().trim();
-            if (priceText) {
-                priceText = priceText.replace(/\n/g, ',').replace(/\s+/g, '') + '€';
-            }
-            results.push({
-                id: 'game', store: 'GAME', storeCode: 'GM', color: 'purple',
-                price: priceText || 'Ver web',
-                condition: 'Seminuevo', url: gameUrl, found: !!priceText
-            });
-        } catch (e) {
-            results.push({ id: 'game', store: 'GAME', storeCode: 'GM', color: 'purple', price: 'Ver web', url: gameUrl, found: false });
-        }
-    });
-
-    // Wallapop (Static Link)
-    results.push({
-        id: 'w', store: 'Wallapop', storeCode: 'W', color: 'teal',
-        price: 'Ver web', url: `https://es.wallapop.com/app/search?keywords=${encodeURIComponent(q)}`,
-        condition: 'Segunda mano', found: false
-    });
-
-    // Execute light tasks
-    await Promise.all(lightPromises.map(p => p()));
-
-    // --- 2. HEAVYWEIGHT REQUESTS (Puppeteer) ---
-    // CeX, Cash Converters, Back Market, Chrono24
-    // Run SEQUENTIALLY to minimize RAM usage on server.
-    let browser = null;
-    try {
-        browser = await puppeteer.launch({
-            headless: 'new',
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--single-process' // Helps reduce memory
-            ]
-        });
-
-        const runPuppeteerTask = async (url, storeId, storeName, storeCode, color, condition, selectorFn) => {
-            let page = null;
-            try {
-                page = await browser.newPage();
-                await page.setUserAgent(userAgent);
-                await page.setViewport({ width: 1280, height: 720 });
-
-                // Block resources
-                await page.setRequestInterception(true);
-                page.on('request', (req) => {
-                    if (['image', 'font', 'stylesheet', 'media'].includes(req.resourceType())) {
-                        req.abort();
-                    } else {
-                        req.continue();
-                    }
-                });
-
-                await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 25000 });
-
-                // Quick Cookie Accept (Generic)
-                try {
-                    await page.evaluate(() => {
-                        const buttons = Array.from(document.querySelectorAll('button, a, div[role="button"]'));
-                        const accept = buttons.find(b => /aceptar|accept|consent|entendido/i.test(b.innerText));
-                        if (accept) accept.click();
-                    });
-                } catch (e) { }
-
-                // Short wait
-                await new Promise(r => setTimeout(r, 1000));
-
-                const data = await page.evaluate(selectorFn);
-
-                let found = false;
-                let price = 'Ver web';
-
-                if (data && data.price) {
-                    price = data.price;
-                    if (!price.includes('€') && !price.includes('EUR')) price += '€';
-                    found = true;
-                } else {
-                    // Body text fallback (last resort)
-                    const bodyPrice = await page.evaluate(() => {
-                        const matches = document.body.innerText.match(/(\d{2,4}[.,]\d{2})\s?€/);
-                        return matches ? matches[0] : null;
-                    });
-                    if (bodyPrice) { price = bodyPrice; found = true; }
-                }
-
-                results.push({
-                    id: storeId, store: storeName, storeCode, color,
-                    price, condition, url, found
-                });
-
-            } catch (err) {
-                console.error(`[Scraper] Puppeteer Error ${storeName}:`, err.message);
-                results.push({
-                    id: storeId, store: storeName, storeCode, color,
-                    price: 'Ver web', condition, url, found: false
-                });
-            } finally {
-                if (page) await page.close(); // Close immediately to free RAM
-            }
-        };
-
-        // Sequential Execution
-        // 1. Cash Converters
-        await runPuppeteerTask(
-            `https://www.cashconverters.es/es/es/search/?q=${encodeURIComponent(q)}`,
-            'cc', 'Cash Converters', 'CC', 'green', 'Usado',
-            () => {
-                const el = document.querySelector('.product-item .price') || document.querySelector('.price');
-                return el && /\d/.test(el.innerText) ? { price: el.innerText.trim() } : null;
-            }
-        );
-
-        // 2. Back Market
-        await runPuppeteerTask(
-            `https://www.backmarket.es/es-es/search?q=${encodeURIComponent(q)}`,
-            'bm', 'Back Market', 'BM', 'slate', 'Reacondicionado',
-            () => {
-                const el = document.querySelector('[data-test="product-price"]') || document.querySelector('.body-1-bold');
-                return el ? { price: el.innerText.trim() } : null;
-            }
-        );
-
-        // 3. CeX
-        await runPuppeteerTask(
-            `https://es.webuy.com/search?stext=${encodeURIComponent(q)}`,
-            'cex', 'CeX', 'CeX', 'red', 'Usado',
-            () => {
-                const el = document.querySelector('.price-txt') || document.querySelector('.productPrice');
-                if (!el) {
-                    const match = document.body.innerText.match(/Vender\s*(\d+[.,]\d{2})\s*€\s*Comprar\s*(\d+[.,]\d{2})\s*€/);
-                    if (match && match[2]) return { price: match[2] + '€' };
-                }
-                return el ? { price: el.innerText.trim() } : null;
-            }
-        );
-
-        // 4. Chrono24
-        await runPuppeteerTask(
-            `https://www.chrono24.es/search/index.htm?query=${encodeURIComponent(q)}`,
-            'c24', 'Chrono24', '24', 'amber', 'Usado',
-            () => {
-                const el = document.querySelector('.article-price strong') || document.querySelector('.article-price');
-                return el ? { price: el.innerText.trim() } : null;
-            }
-        );
-
-    } catch (e) {
-        console.error('[Scraper] Top-level Puppeteer error:', e);
-    } finally {
-        if (browser) await browser.close();
-    }
-
-    // Sort valid prices
-    const validPrices = results.filter(r => r.found);
-    validPrices.forEach(p => {
-        let clean = p.price.replace(/[^\d.,]/g, '').trim();
-        if (clean.indexOf(',') > -1 && clean.indexOf('.') > -1) {
-            if (clean.indexOf(',') > clean.indexOf('.')) clean = clean.replace('.', '').replace(',', '.');
-        } else if (clean.includes(',')) clean = clean.replace(',', '.');
-        p.val = parseFloat(clean);
-    });
-    validPrices.sort((a, b) => a.val - b.val);
-    if (validPrices.length > 0) {
-        const bestId = validPrices[0].id;
-        results.forEach(r => { if (r.id === bestId) r.isBestPrice = true; });
-    }
+    ];
 
     res.json(results);
 });

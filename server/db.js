@@ -81,6 +81,11 @@ export async function initDb() {
         );
     `);
 
+        // Migrations for existing tables (in case they were created before these columns were added)
+        await client.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS avatar TEXT;`);
+        await client.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS "order" INTEGER DEFAULT 0;`);
+        await client.query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS alias TEXT;`);
+
         await client.query(`
         CREATE TABLE IF NOT EXISTS product_families (
             id SERIAL PRIMARY KEY,

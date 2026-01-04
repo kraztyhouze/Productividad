@@ -122,3 +122,6 @@ Thumbs.db
 # Database (CRITICAL: Do not commit the local DB to git)
 database.sqlite
 database.sqlite-journal
+
+# Debug scraping files
+debug_*

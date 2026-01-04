@@ -6,7 +6,7 @@ const { Pool } = pg;
 // Fallback to a local connection string if needed (for dev)
 const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/productivity';
 
-const pool = new Pool({
+export const pool = new Pool({
   connectionString,
   // SSL is required for Railway deployments, but we need to disable it for local dev if not set up
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
@@ -66,6 +66,8 @@ export async function initDb() {
             phone TEXT,
             address TEXT,
             "order" INTEGER DEFAULT 0
+        );
+
         CREATE TABLE IF NOT EXISTS product_families (
             id SERIAL PRIMARY KEY,
             name TEXT,

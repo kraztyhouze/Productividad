@@ -110,6 +110,25 @@ const Login = () => {
 
                 <div className="text-center mt-6 text-[10px] text-slate-500 font-mono opacity-50">
                     TEST CREDS: admin / admin • juanma / admin123
+                    <br />
+                    <button
+                        onClick={() => {
+                            localStorage.setItem('is_user', JSON.stringify({
+                                id: 999,
+                                name: 'Invitado Gerente',
+                                role: 'Gerente',
+                                avatar: 'G',
+                                username: 'guest',
+                                email: 'guest@tiktak.com',
+                                isMaster: true,
+                                isBuyer: true
+                            }));
+                            window.location.href = '/market';
+                        }}
+                        className="mt-2 underline text-pink-500 hover:text-white cursor-pointer"
+                    >
+                        [DEV] Entrar como Invitado (Sin DB)
+                    </button>
                 </div>
             </div>
         </div>

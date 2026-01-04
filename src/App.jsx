@@ -11,6 +11,7 @@ import Team from './pages/Team';
 import Productivity from './pages/Productivity';
 import Dashboard from './pages/Dashboard';
 import Reports from './pages/Reports';
+import Market from './pages/Market';
 
 const ProtectedRoute = () => {
     const { user } = useAuth();
@@ -36,6 +37,7 @@ function App() {
 
                                     <Route path="productivity" element={<Productivity />} />
                                     <Route path="reports" element={<Reports />} />
+                                    <Route path="market" element={<Market />} />
                                 </Route>
                             </Route>
 

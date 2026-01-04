@@ -2,7 +2,7 @@ import React from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth, ROLES } from '../context/AuthContext';
 import { useTeam } from '../context/TeamContext';
-import { Users, ShoppingBag, LogOut, LayoutGrid, FileText } from 'lucide-react';
+import { Users, ShoppingBag, LogOut, LayoutGrid, FileText, Search } from 'lucide-react';
 
 const DashboardLayout = () => {
     const { user, logout } = useAuth();
@@ -66,6 +66,11 @@ const DashboardLayout = () => {
                     <NavLink to="/productivity" className={({ isActive }) => `flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 group ${isActive ? 'bg-emerald-600 shadow-lg shadow-emerald-500/20 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'} ${!expanded ? 'justify-center' : ''}`}>
                         <ShoppingBag size={20} className="shrink-0 group-hover:scale-110 transition-transform" />
                         <span className={`font-bold text-sm transition-opacity duration-300 ${expanded ? 'opacity-100' : 'opacity-0 hidden'}`}>Productividad</span>
+                    </NavLink>
+
+                    <NavLink to="/market" className={({ isActive }) => `flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 group ${isActive ? 'bg-amber-600 shadow-lg shadow-amber-500/20 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'} ${!expanded ? 'justify-center' : ''}`}>
+                        <Search size={20} className="shrink-0 group-hover:scale-110 transition-transform" />
+                        <span className={`font-bold text-sm transition-opacity duration-300 ${expanded ? 'opacity-100' : 'opacity-0 hidden'}`}>Mercado</span>
                     </NavLink>
                 </nav>
 

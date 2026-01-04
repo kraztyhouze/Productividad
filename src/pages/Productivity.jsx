@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useProductivity } from '../context/ProductivityContext';
 import { useTeam } from '../context/TeamContext';
 import { useAuth, ROLES } from '../context/AuthContext';
-import { Users, ShoppingBag, Clock, UserCheck, AlertCircle, Lock, RefreshCw, Plus, Trash2 } from 'lucide-react';
+import { Users, ShoppingBag, Clock, UserCheck, AlertCircle, Lock, RefreshCw, Plus, Trash2, Coins } from 'lucide-react';
 import InfoPanel from '../components/Productivity/InfoPanel';
 import ManualEntryModal from '../components/Productivity/ManualEntryModal';
 import CloseDayModal from '../components/Productivity/CloseDayModal';
@@ -23,6 +23,18 @@ const Productivity = () => {
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [showCloseModal, setShowCloseModal] = useState(false);
     const [showManualModal, setShowManualModal] = useState(false);
+
+    // Gold Price State
+    const [goldPrice, setGoldPrice] = useState(() => localStorage.getItem('goldPrice') || '77');
+
+    const handleGoldPriceUpdate = () => {
+        if (!isManagerial) return;
+        const newPrice = prompt("Introduce el nuevo precio del oro (€/gr):", goldPrice);
+        if (newPrice !== null && newPrice.trim() !== "") {
+            setGoldPrice(newPrice);
+            localStorage.setItem('goldPrice', newPrice);
+        }
+    };
 
     // Removed local form states (manualEntry, incidentText) as they are now handled by modals
 
@@ -361,20 +373,46 @@ const Productivity = () => {
 
                     {/* GLOBAL LIVE WIDGET */}
                     {isToday && (
-                        <div className="bg-gradient-to-br from-pink-900/80 to-slate-900 rounded-[2.5rem] p-6 border border-pink-500/20 relative overflow-hidden shrink-0 shadow-lg">
+                        <div className="bg-gradient-to-br from-pink-900/80 to-slate-900 rounded-[2.5rem] p-6 border border-pink-500/20 relative overflow-hidden shrink-0 shadow-lg flex justify-between items-center group/panel">
+                            {/* Background Effects */}
                             <div className="absolute top-0 right-0 w-32 h-32 bg-pink-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
-                            <h2 className="text-[10px] font-bold text-pink-300 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                <Clock size={12} /> Tiempo Activo Total
-                            </h2>
-                            <div className="flex items-baseline gap-2 mb-2">
-                                <span className="text-5xl font-mono font-bold text-white tracking-tighter drop-shadow-lg">
-                                    {formatDuration(globalActiveTime)}
-                                </span>
+
+                            {/* Active Time (Left) */}
+                            <div>
+                                <h2 className="text-[10px] font-bold text-pink-300 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                    <Clock size={12} /> Tiempo Activo Total
+                                </h2>
+                                <div className="flex items-baseline gap-2 mb-2">
+                                    <span className="text-5xl font-mono font-bold text-white tracking-tighter drop-shadow-lg">
+                                        {formatDuration(globalActiveTime)}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2 mt-auto text-xs text-pink-100/80 filter backdrop-blur-md bg-white/5 p-2 px-3 rounded-xl border border-white/10 w-fit">
+                                    <Users size={14} className="text-pink-400" />
+                                    <span className="font-bold text-white">{activeSessions.length}</span> empleados comprando
+                                </div>
                             </div>
-                            <div className="flex items-center gap-2 mt-auto text-xs text-pink-100/80 filter backdrop-blur-md bg-white/5 p-2 px-3 rounded-xl border border-white/10 w-fit">
-                                <Users size={14} className="text-pink-400" />
-                                <span className="font-bold text-white">{activeSessions.length}</span> empleados comprando
-                            </div>
+
+                            {/* Gold Price Widget (Right) */}
+                            <button
+                                onClick={handleGoldPriceUpdate}
+                                title={isManagerial ? "Click para editar precio del oro" : "Precio del oro actual"}
+                                className={`relative group/gold cursor-pointer overflow-hidden bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 p-2 rounded-2xl shadow-xl border border-yellow-200/50 flex flex-col items-center justify-center min-w-[140px] aspect-square transition-all duration-300 ${isManagerial ? 'hover:scale-105 hover:shadow-yellow-500/30' : ''}`}
+                            >
+                                {/* Metallic Shine Effect */}
+                                <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/40 to-transparent z-10 opacity-30 group-hover/gold:animate-[shine_3s_infinite] pointer-events-none" style={{ backgroundSize: '200% 200%' }}></div>
+                                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/brushed-alum.png')] opacity-20 mix-blend-overlay pointer-events-none"></div>
+
+                                <p className="text-[10px] font-black text-amber-900/60 uppercase tracking-[0.2em] mb-1 flex items-center gap-1 z-20">
+                                    Precio Oro
+                                </p>
+                                <div className="z-20 flex flex-col items-center -space-y-1">
+                                    <p className="text-6xl font-black text-slate-900 font-mono tracking-tighter leading-none drop-shadow-sm flex items-start justify-center">
+                                        {goldPrice}
+                                    </p>
+                                    <span className="text-sm font-extrabold text-amber-900/80">€/gr</span>
+                                </div>
+                            </button>
                         </div>
                     )}
 

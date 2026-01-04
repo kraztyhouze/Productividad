@@ -165,6 +165,41 @@ const Productivity = () => {
 
     const globalActiveTime = calculateShopActiveTime();
 
+    // Calculate Max Concurrent Buyers
+    const calculateMaxConcurrentBuyers = () => {
+        const events = [];
+
+        // Process completed records
+        dailyRecords
+            .filter(r => r.date === selectedDate)
+            .forEach(r => {
+                events.push({ t: new Date(r.startTime).getTime(), type: 1 });
+                events.push({ t: new Date(r.endTime).getTime(), type: -1 });
+            });
+
+        // Process active sessions if today
+        if (isToday) {
+            activeSessions.forEach(s => {
+                events.push({ t: new Date(s.startTime).getTime(), type: 1 });
+                // For calculation purposes, active sessions "end" now
+                events.push({ t: currentTime.getTime(), type: -1 });
+            });
+        }
+
+        // Sort events: time asc. If times equal, process start (+1) before end (-1) to include boundary
+        events.sort((a, b) => a.t === b.t ? b.type - a.type : a.t - b.t);
+
+        let max = 0;
+        let current = 0;
+
+        events.forEach(e => {
+            current += e.type;
+            if (current > max) max = current;
+        });
+
+        return max;
+    };
+
     const handleUserClick = (emp) => {
         if (!isToday) return;
 
@@ -327,7 +362,7 @@ const Productivity = () => {
                         </div>
                     )}
 
-                    <div className="grid grid-cols-4 xl:grid-cols-5 gap-3 overflow-y-auto custom-scrollbar flex-1 content-start pr-1 pb-2">
+                    <div className="grid grid-cols-4 xl:grid-cols-5 gap-3 overflow-y-auto custom-scrollbar flex-1 content-start p-2 -mx-2">
                         {employees.filter(e => e.isBuyer).map(emp => {
                             const session = activeSessions.find(s => s.employeeId === emp.id);
                             const displayName = emp.alias || emp.firstName;
@@ -489,13 +524,13 @@ const Productivity = () => {
                                                     {formatDuration(stat.totalSeconds * 1000)}
                                                 </td>
                                                 <td className="py-2.5 text-center">
-                                                    <input type="number" disabled={!isManagerial || isDayClosed} value={groupCounts.standard || ''} onChange={(e) => handleGroupsUpdate(empId, 'standard', e.target.value)} className="w-6 bg-transparent text-center text-slate-400 outline-none focus:text-pink-400 placeholder-slate-700 font-mono" placeholder="-" />
+                                                    <input type="number" disabled={!isManagerial || isDayClosed} value={groupCounts.standard || ''} onChange={(e) => handleGroupsUpdate(empId, 'standard', e.target.value)} className="w-10 bg-transparent text-center text-slate-400 outline-none focus:text-pink-400 placeholder-slate-700 font-mono focus:bg-white/5 rounded" placeholder="-" />
                                                 </td>
                                                 <td className="py-2.5 text-center">
-                                                    <input type="number" disabled={!isManagerial || isDayClosed} value={groupCounts.jewelry || ''} onChange={(e) => handleGroupsUpdate(empId, 'jewelry', e.target.value)} className="w-6 bg-transparent text-center text-slate-400 outline-none focus:text-pink-400 placeholder-slate-700 font-mono" placeholder="-" />
+                                                    <input type="number" disabled={!isManagerial || isDayClosed} value={groupCounts.jewelry || ''} onChange={(e) => handleGroupsUpdate(empId, 'jewelry', e.target.value)} className="w-10 bg-transparent text-center text-slate-400 outline-none focus:text-pink-400 placeholder-slate-700 font-mono focus:bg-white/5 rounded" placeholder="-" />
                                                 </td>
                                                 <td className="py-2.5 text-center">
-                                                    <input type="number" disabled={!isManagerial || isDayClosed} value={groupCounts.recoverable || ''} onChange={(e) => handleGroupsUpdate(empId, 'recoverable', e.target.value)} className="w-6 bg-transparent text-center text-slate-400 outline-none focus:text-pink-400 placeholder-slate-700 font-mono" placeholder="-" />
+                                                    <input type="number" disabled={!isManagerial || isDayClosed} value={groupCounts.recoverable || ''} onChange={(e) => handleGroupsUpdate(empId, 'recoverable', e.target.value)} className="w-10 bg-transparent text-center text-slate-400 outline-none focus:text-pink-400 placeholder-slate-700 font-mono focus:bg-white/5 rounded" placeholder="-" />
                                                 </td>
                                                 <td className="py-2.5 text-right font-bold text-pink-500 text-sm">{groupCounts.total}</td>
                                                 <td className="py-2.5 text-right text-slate-500 font-mono">{gph}</td>
@@ -549,6 +584,7 @@ const Productivity = () => {
                     onConfirm={handleCloseDay}
                     date={selectedDate}
                     initialIncidentText={dayIncidents[selectedDate] || ''}
+                    maxConcurrent={calculateMaxConcurrentBuyers()}
                 />
             )}
 

@@ -74,7 +74,7 @@ const InfoPanel = ({
             )}
 
             {/* List */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-2">
+            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 grid grid-cols-3 gap-2 content-start">
                 {items.length > 0 ? (
                     items.map(item => (
                         <div key={item.id} className={`group flex items-center justify-between ${styles.itemBg} border ${styles.itemBorder} rounded-lg px-3 py-2`}>

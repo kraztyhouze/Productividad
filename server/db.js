@@ -17,13 +17,16 @@ export const query = (text, params) => pool.query(text, params);
 export async function initDb() {
   const client = await pool.connect();
   try {
+
     await client.query(`
         CREATE TABLE IF NOT EXISTS active_sessions (
             employee_id TEXT PRIMARY KEY,
             employee_name TEXT,
             start_time TEXT
         );
+    `);
 
+    await client.query(`
         CREATE TABLE IF NOT EXISTS daily_records (
             id BIGINT PRIMARY KEY,
             employee_id TEXT,
@@ -34,23 +37,31 @@ export async function initDb() {
             date TEXT,
             groups_count INTEGER DEFAULT 0
         );
+    `);
 
+    await client.query(`
         CREATE TABLE IF NOT EXISTS daily_groups (
             key TEXT PRIMARY KEY,
             standard INTEGER DEFAULT 0,
             jewelry INTEGER DEFAULT 0,
             recoverable INTEGER DEFAULT 0
         );
+    `);
 
+    await client.query(`
         CREATE TABLE IF NOT EXISTS closed_days (
             date TEXT PRIMARY KEY
         );
+    `);
 
+    await client.query(`
         CREATE TABLE IF NOT EXISTS day_incidents (
             date TEXT PRIMARY KEY,
             text TEXT
         );
+    `);
 
+    await client.query(`
         CREATE TABLE IF NOT EXISTS employees (
             id SERIAL PRIMARY KEY,
             first_name TEXT,
@@ -67,7 +78,9 @@ export async function initDb() {
             address TEXT,
             "order" INTEGER DEFAULT 0
         );
+    `);
 
+    await client.query(`
         CREATE TABLE IF NOT EXISTS product_families (
             id SERIAL PRIMARY KEY,
             name TEXT,

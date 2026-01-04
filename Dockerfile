@@ -1,5 +1,6 @@
 
-FROM node:18-alpine
+
+FROM node:20-alpine
 
 # Install Chrome dependencies for Puppeteer
 RUN apk add --no-cache \

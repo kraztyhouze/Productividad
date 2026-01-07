@@ -148,11 +148,15 @@ const Productivity = () => {
 
     const getDailyStats = () => {
         const stats = {};
+
+        // 1. From Records (Time)
         dailyRecords.filter(r => r.date === selectedDate).forEach(r => {
             if (!stats[r.employeeId]) stats[r.employeeId] = { totalSeconds: 0, sessions: 0, name: r.employeeName };
             stats[r.employeeId].totalSeconds += r.durationSeconds;
             stats[r.employeeId].sessions += 1;
         });
+
+        // 2. From Active Sessions (Live Time)
         if (isToday) {
             activeSessions.forEach(s => {
                 if (!stats[s.employeeId]) stats[s.employeeId] = { totalSeconds: 0, sessions: 0, name: s.employeeName };
@@ -160,6 +164,24 @@ const Productivity = () => {
                 stats[s.employeeId].totalSeconds += currentDuration;
             });
         }
+
+        // 3. From Groups (Sales without time records?)
+        // Ensure consistency with Reports: If they have data, they must appear.
+        Object.keys(dailyGroups).forEach(key => {
+            if (key.endsWith(`-${selectedDate}`)) {
+                const empIdStr = key.replace(`-${selectedDate}`, '');
+                const empId = parseInt(empIdStr);
+
+                // If not already in stats (no time record), add them
+                if (!stats[empId]) {
+                    // Try to resolve name
+                    const empObj = employees.find(e => e.id === empId);
+                    const name = empObj ? (empObj.alias || empObj.firstName) : `Emp #${empId}`;
+                    stats[empId] = { totalSeconds: 0, sessions: 0, name };
+                }
+            }
+        });
+
         return stats;
     };
     const dailyStats = getDailyStats();

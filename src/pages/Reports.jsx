@@ -1,14 +1,24 @@
 import React, { useState } from 'react';
 import { useProductivity } from '../context/ProductivityContext';
+import { useTeam } from '../context/TeamContext';
 import { useAuth, ROLES } from '../context/AuthContext';
-import { BarChart, FileText, Filter, Download, Trash2 } from 'lucide-react';
+import { BarChart, FileText, Filter, Download, Trash2, Loader } from 'lucide-react';
 
 const Reports = () => {
-    const { dailyRecords, dailyGroups, deleteNoDeal } = useProductivity();
+    const { dailyRecords, dailyGroups, activeSessions, deleteNoDeal } = useProductivity();
     const { employees } = useTeam();
     const { user } = useAuth();
 
     const isManagerial = user?.role === ROLES.MANAGER;
+
+    if (!dailyRecords || !dailyGroups || !employees) {
+        return (
+            <div className="h-full flex flex-col items-center justify-center text-slate-500 gap-4">
+                <Loader className="animate-spin" size={32} />
+                <p>Cargando datos del informe...</p>
+            </div>
+        );
+    }
 
     // ... rest of component logic ...
 
@@ -84,7 +94,25 @@ const Reports = () => {
         return stats;
     };
 
+    // Calculate stats including active sessions if 'today' is in range
+    const todayStr = new Date().toISOString().split('T')[0];
     const stats = getAggregatedStats();
+
+    if (todayStr >= startDate && todayStr <= endDate && activeSessions) {
+        activeSessions.forEach(session => {
+            const empId = parseInt(session.employeeId);
+            if (!stats[empId]) {
+                stats[empId] = {
+                    totalSeconds: 0,
+                    standard: 0, jewelry: 0, recoverable: 0, totalGroups: 0,
+                    daysActive: new Set([todayStr])
+                };
+            }
+            const duration = (new Date() - new Date(session.startTime)) / 1000;
+            stats[empId].totalSeconds += duration;
+            stats[empId].daysActive.add(todayStr);
+        });
+    }
 
     // Sort by Total Groups desc
     const sortedEmpIds = Object.keys(stats).sort((a, b) => stats[b].totalGroups - stats[a].totalGroups);

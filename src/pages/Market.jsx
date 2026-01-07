@@ -440,7 +440,7 @@ const Market = () => {
                                         ) : (
                                             <div className="flex gap-3 items-center bg-slate-900 p-2 rounded-lg">
                                                 {category === 'phones' && diagnosticSession.status !== 'completed' && (
-                                                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(diagnosticSession.url)}`} className="w-12 h-12 rounded bg-white p-1" alt="QR" />
+                                                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(diagnosticSession.url)}`} className="w-32 h-32 rounded bg-white p-1" alt="QR" />
                                                 )}
                                                 <div className="flex-1 min-w-0">
                                                     {diagnosticSession.status === 'completed' ? (

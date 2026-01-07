@@ -168,18 +168,42 @@ const TouchTest = ({ onComplete }) => {
     const [touched, setTouched] = useState(new Set());
     const rows = 18; const cols = 10; const total = rows * cols;
 
-    const handleTouch = (index) => {
-        setTouched(prev => {
-            const next = new Set(prev);
-            next.add(index);
-            return next;
-        });
+    // Optimized touch handler for swipe
+    const handleInteraction = (e) => {
+        // Prevent scrolling on touch devices
+        if (e.type.startsWith('touch')) {
+            // e.preventDefault(); (Note: Passive listener issue might occur if preventing default on document level, but here on div it's tricky. Best is CSS touch-action: none)
+        }
+
+        // Get coordinates
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+        // Find valid element under cursor/finger
+        const element = document.elementFromPoint(clientX, clientY);
+        if (element && element.dataset.index) {
+            const index = parseInt(element.dataset.index);
+            setTouched(prev => {
+                if (prev.has(index)) return prev;
+                const next = new Set(prev);
+                next.add(index);
+                return next;
+            });
+        }
     };
+
     const progress = (touched.size / total) * 100;
     const isPass = progress > 85;
 
     return (
-        <div className="fixed inset-0 bg-black touch-none select-none flex flex-col z-50">
+        <div
+            className="fixed inset-0 bg-black touch-none select-none flex flex-col z-50 overscroll-none"
+            // Add listeners to parent container for swipe tracking
+            onTouchStart={handleInteraction}
+            onTouchMove={handleInteraction}
+            onPointerDown={handleInteraction}
+            onPointerMove={(e) => { if (e.buttons > 0) handleInteraction(e); }}
+        >
             <div className="absolute top-0 left-0 w-full text-center pointer-events-none z-10 px-4 pt-4">
                 <h2 className="text-white font-bold bg-black/50 p-2 rounded-xl backdrop-blur inline-block">
                     Pinta toda la pantalla
@@ -190,8 +214,10 @@ const TouchTest = ({ onComplete }) => {
             </div>
             <div className="flex-1 grid grid-cols-10 grid-rows-[18]">
                 {Array.from({ length: total }).map((_, i) => (
-                    <div key={i} onPointerEnter={() => handleTouch(i)} onTouchStart={() => handleTouch(i)}
-                        className={`transition-colors duration-0 ${touched.has(i) ? 'bg-green-500' : 'bg-transparent'}`}
+                    <div
+                        key={i}
+                        data-index={i}
+                        className={`transition-colors duration-0 border-[0.5px] border-white/5 ${touched.has(i) ? 'bg-green-500' : 'bg-transparent'}`}
                     ></div>
                 ))}
             </div>
@@ -203,6 +229,7 @@ const TouchTest = ({ onComplete }) => {
         </div>
     );
 };
+// (Duplicated block removed)
 
 /* 4. PIXEL TEST */
 const PixelTest = ({ onComplete }) => {

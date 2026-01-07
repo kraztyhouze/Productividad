@@ -10,7 +10,8 @@ const InfoPanel = ({
     onRemove,
     isManagerial,
     theme = 'emerald',
-    placeholder = "Añadir..."
+    placeholder = "Añadir...",
+    className = ""
 }) => {
     // Definir estilos basados en el tema
     const styles = theme === 'red' ? {
@@ -44,7 +45,7 @@ const InfoPanel = ({
     };
 
     return (
-        <div className={`w-1/2 ${styles.bg} border ${styles.border} rounded-3xl p-5 flex flex-col relative overflow-hidden backdrop-blur-sm`}>
+        <div className={`flex flex-col relative overflow-hidden backdrop-blur-sm ${styles.bg} border ${styles.border} rounded-3xl p-5 ${className}`}>
             {/* Corner Decoration */}
             <div className={`absolute top-0 right-0 w-20 h-20 ${styles.corner} rounded-full blur-xl pointer-events-none`}></div>
 

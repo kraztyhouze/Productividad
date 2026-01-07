@@ -1,34 +1,33 @@
-import React, { useState } from 'react';
-import { Search, ExternalLink, ShoppingCart, Smartphone, Monitor } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, ExternalLink, ShoppingCart, Smartphone, Monitor, Watch, Zap, Hammer, Gamepad2, AlertTriangle, CheckCircle, XCircle, Grid, QrCode } from 'lucide-react';
+
+const CATEGORIES = {
+    phones: { name: 'Móviles/Tablets', margin: 0.40, icon: <Smartphone size={16} />, checklist: ['Enciende', 'Pantalla Tactil/Píxeles', 'Cámaras', 'IMEI Limpio/No Bloqueo', 'Micrófono/Audio', 'Cargador/Puerto'] },
+    laptops: { name: 'Portátiles', margin: 0.40, icon: <Monitor size={16} />, checklist: ['Enciende', 'Cargador Original', 'Teclado Completo', 'Pantalla sin manchas', 'Webcam/Audio', 'Hardware OK'] },
+    consoles: { name: 'Consolas', margin: 0.35, icon: <Gamepad2 size={16} />, checklist: ['Lee discos/cartuchos', 'Mando conecta', 'No baneada (Online)', 'Garantía precintos'] },
+    jewelry: { name: 'Joyería', margin: 0.30, icon: <Watch size={16} />, checklist: ['Sello de contraste', 'Peso verificado', 'Piedras revisadas', 'Cierre funciona', 'Prueba Ácido/Imán'] },
+    tools: { name: 'Herramientas', margin: 0.50, icon: <Hammer size={16} />, checklist: ['Enciende/Funciona', 'Cableado seguro', 'Accesorios incluidos', 'Sin óxido excesivo'] },
+    others: { name: 'Otros', margin: 0.50, icon: <Grid size={16} />, checklist: ['Estado general bueno', 'Completo', 'Funciona correctamente'] }
+};
+
+const GOLD_PRICES_BASE = {
+    24: 65.50, // € per gram
+    18: 49.10,
+    14: 38.20,
+    9: 24.50
+};
 
 const Market = () => {
+    const [mode, setMode] = useState('product'); // 'product' | 'gold'
     const [searchTerm, setSearchTerm] = useState('');
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [hasSearched, setHasSearched] = useState(false);
 
-    const handleSearch = async (e) => {
-        e.preventDefault();
-        if (!searchTerm.trim()) return;
+    // Appraisal State
+    const [category, setCategory] = useState('phones');
+    const [checklist, setChecklist] = useState({});
 
-        setLoading(true);
-        setHasSearched(true);
-        setResults([]); // Clear previous
-
-        try {
-            const res = await fetch(`/api/market/search?q=${encodeURIComponent(searchTerm)}`);
-            if (!res.ok) throw new Error('Search failed');
-            const data = await res.json();
-            setResults(data);
-        } catch (err) {
-            console.error(err);
-            // Fallback empty result
-            setResults([]);
-        } finally {
-            setLoading(false);
-        }
-    };
-    // Survey State
+    // Unified Survey State
     const [survey, setSurvey] = useState({
         askedPrice: '',
         newPrice: '',
@@ -42,17 +41,188 @@ const Market = () => {
 
     const [appraisalResult, setAppraisalResult] = useState(null);
 
+    // IMEI State
+    const [imeiInput, setImeiInput] = useState('');
+    const [imeiCheckResult, setImeiCheckResult] = useState(null);
+    const [imeiLoading, setImeiLoading] = useState(false);
+
+    // Gold State
+    const [goldForm, setGoldForm] = useState({ weight: '', karats: '18' });
+    const [goldQuote, setGoldQuote] = useState(null);
+
+    // Diagnostics State
+    const [diagnosticSession, setDiagnosticSession] = useState(null); // { sessionId, url, status, results }
+
+    // Reset checklist when category changes
+    useEffect(() => {
+        const defaultChecklist = {};
+        CATEGORIES[category].checklist.forEach(item => defaultChecklist[item] = null); // null = unchecks, true = yes, false = no
+        setChecklist(defaultChecklist);
+        setImeiCheckResult(null);
+        setImeiInput('');
+        setDiagnosticSession(null);
+        setAppraisalResult(null); // Reset result
+    }, [category]);
+
+    // Polling for Diagnostics
+    useEffect(() => {
+        if (!diagnosticSession || diagnosticSession.status === 'completed') return;
+
+        const interval = setInterval(async () => {
+            try {
+                const res = await fetch(`/api/diagnostics/session/${diagnosticSession.sessionId}`);
+                if (res.ok) {
+                    const data = await res.json();
+
+                    // Update Status
+                    if (data.status === 'completed') {
+                        setDiagnosticSession(prev => ({ ...prev, status: 'completed', results: data.tests }));
+
+                        // Auto-Check Items
+                        // 1. Pantalla
+                        const screenItem = CATEGORIES['phones'].checklist.find(c => c.includes('Pantalla'));
+                        if (screenItem && data.tests.touch === true && data.tests.pixels === true) {
+                            handleChecklistChange(screenItem, true);
+                        }
+                        // 2. Audio
+                        const audioItem = CATEGORIES['phones'].checklist.find(c => c.includes('Audio'));
+                        if (audioItem && data.tests.audio === true) {
+                            handleChecklistChange(audioItem, true);
+                        }
+                        // 3. Carga
+                        const chargeItem = CATEGORIES['phones'].checklist.find(c => c.includes('Cargador'));
+                        if (chargeItem && data.tests.charging === true) {
+                            handleChecklistChange(chargeItem, true);
+                        }
+                        // 4. Cámaras
+                        const camItem = CATEGORIES['phones'].checklist.find(c => c.includes('Cámaras'));
+                        if (camItem && data.tests.cameras === true) {
+                            handleChecklistChange(camItem, true);
+                        }
+                        // 5. Bloqueos
+                        const lockItem = CATEGORIES['phones'].checklist.find(c => c.includes('Bloqueo'));
+                        if (lockItem && data.tests.accounts === true) {
+                            handleChecklistChange(lockItem, true);
+                        }
+                    }
+
+                    // --- AUTO CHECK LAPTOPS ---
+                    if (category === 'laptops' && data.status === 'completed') {
+                        setDiagnosticSession(prev => ({ ...prev, status: 'completed', results: data.tests }));
+                        // 1. Keyboard
+                        if (data.tests.keyboard === true) {
+                            const item = CATEGORIES['laptops'].checklist.find(c => c.includes('Teclado'));
+                            if (item) handleChecklistChange(item, true);
+                        }
+                        // 2. Screen
+                        if (data.tests.screen === true) {
+                            const item = CATEGORIES['laptops'].checklist.find(c => c.includes('Pantalla'));
+                            if (item) handleChecklistChange(item, true);
+                        }
+                        // 3. Audio/Webcam
+                        if (data.tests.webcam === true && data.tests.audio === true) {
+                            const item = CATEGORIES['laptops'].checklist.find(c => c.includes('Webcam'));
+                            if (item) handleChecklistChange(item, true);
+                        }
+                        // 4. Specs
+                        if (data.tests.specs) {
+                            const item = CATEGORIES['laptops'].checklist.find(c => c.includes('Hardware'));
+                            if (item) handleChecklistChange(item, true);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("Polling error", err);
+            }
+        }, 2000);
+
+        return () => clearInterval(interval);
+    }, [diagnosticSession]);
+
+
+    const startDiagnostic = async (type = 'mobile') => {
+        try {
+            const res = await fetch('/api/diagnostics/init', { method: 'POST' });
+            const data = await res.json();
+            let finalUrl = `${window.location.origin}${data.url}`;
+            if (type === 'laptop') {
+                finalUrl = finalUrl.replace('mobile-test', 'laptop-test');
+            }
+            setDiagnosticSession({
+                sessionId: data.sessionId,
+                url: finalUrl,
+                status: 'waiting'
+            });
+        } catch (e) {
+            alert("Error iniciando diagnóstico");
+        }
+    };
+
+    const handleSearch = async (e) => {
+        e.preventDefault();
+        if (!searchTerm.trim()) return;
+
+        setLoading(true);
+        setResults([]);
+        try {
+            const res = await fetch(`/api/market/search?q=${encodeURIComponent(searchTerm)}`);
+            if (!res.ok) throw new Error('Search failed');
+            const data = await res.json();
+            setResults(data);
+        } catch (err) {
+            console.error(err);
+            setResults([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleSurveyChange = (e) => {
         const { name, value } = e.target;
         setSurvey(prev => ({ ...prev, [name]: value }));
-        // Reset result when input changes to encourage recalculation
         if (appraisalResult) setAppraisalResult(null);
     };
 
-    const handleSurveySubmit = (e) => {
+    const handleCheckImie = async () => {
+        if (!imeiInput || imeiInput.length < 15) {
+            alert("Introduce un IMEI válido (15 dígitos)");
+            return;
+        }
+        setImeiLoading(true);
+        setImeiCheckResult(null);
+        try {
+            const res = await fetch('/api/security/check-imei', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ imei: imeiInput })
+            });
+            const data = await res.json();
+            setImeiCheckResult(data);
+
+            if (data.status === 'CLEAN') {
+                const imeiKey = Object.keys(checklist).find(k => k.includes('IMEI') || k.includes('imei'));
+                if (imeiKey) setChecklist(prev => ({ ...prev, [imeiKey]: true }));
+            } else {
+                const imeiKey = Object.keys(checklist).find(k => k.includes('IMEI') || k.includes('imei'));
+                if (imeiKey) setChecklist(prev => ({ ...prev, [imeiKey]: false }));
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Error conectando con servicio de seguridad");
+        } finally {
+            setImeiLoading(false);
+        }
+    };
+
+    const handleChecklistChange = (item, value) => {
+        setChecklist(prev => ({ ...prev, [item]: value }));
+        if (appraisalResult) setAppraisalResult(null);
+    };
+
+    const calculateAppraisal = (e) => {
         e.preventDefault();
 
-        // 1. Inputs Parsing
+        // 1. Inputs Parsing & Validation
         const asked = parseFloat(survey.askedPrice) || 0;
         const pNew = parseFloat(survey.newPrice) || 0;
         const p2nd = parseFloat(survey.secondHandPrice) || 0;
@@ -63,7 +233,26 @@ const Market = () => {
         }
 
         // 2. Base Calculation
+        // Prefer 2nd hand price as true market value; otherwise derive from new.
         let marketValue = p2nd > 0 ? p2nd : (pNew * 0.65);
+
+        // 3. Condition / Checklist Penalties
+        let conditionPenalty = 0;
+        let criticalFailure = false;
+
+        // Auto-fail if IMEI blocked
+        if (imeiCheckResult && (imeiCheckResult.status === 'BLOCKED' || imeiCheckResult.status === 'INVALID')) {
+            criticalFailure = true;
+        }
+
+        Object.entries(checklist).forEach(([key, val]) => {
+            if (val === false) { // Explicitly failed
+                conditionPenalty += 0.15; // 15% value reduction per failed item
+            }
+        });
+
+        // Apply penalty to market value BEFORE margin
+        marketValue = marketValue * (1 - conditionPenalty);
 
         let targetMargin = 0.30; // Base margin 30%
         let warnings = [];
@@ -71,102 +260,85 @@ const Market = () => {
         let statusColor = 'text-slate-200';
         let recommendation = '';
 
-        // --- NEW BUSINESS RULES LOGIC ---
+        // --- BUSINESS RULES ---
 
-        // RULE 1: CRITICAL RISK (Recup + Nuevo + No Factura)
+        // RULE 1: CRITICAL RISK
         const isCriticalRisk = survey.saleType === 'recuperable' && survey.clientType === 'nuevo' && survey.hasInvoice === 'no';
 
-        if (isCriticalRisk) {
+        if (isCriticalRisk || criticalFailure) {
             status = 'PELIGRO';
             statusColor = 'text-red-600';
-            recommendation = 'MUCHO CUIDADO. Posible origen ilícito o estafa. AVISA A UN RESPONSABLE ANTES DE SEGUIR.';
-            targetMargin = 0.50;
+            recommendation = criticalFailure ? 'PROBLEMA DE SEGURIDAD. NO COMPRAR.' : 'MUCHO CUIDADO. Origen ilícito posible.';
+            targetMargin = 0.99; // Effectively reject
         } else {
-            // Standard Adjustments
-
-            // RULE 2: Recup + Stock (>2 units)
+            // RULE 2: Recup + Stock
             if (survey.saleType === 'recuperable' && survey.hasStock === 'si') {
-                warnings.push("Stock alto: El precio de recompra podría bajar dependiendo del artículo.");
+                warnings.push("Stock alto: Valoración a la baja.");
                 targetMargin += 0.05;
             }
-
-            // RULE 3: Venta + Stock (>2 units)
+            // RULE 3: Venta + Stock
             if (survey.saleType === 'venta' && survey.hasStock === 'si') {
-                targetMargin += 0.15; // Increase margin significantly (e.g. +15%)
-                warnings.push("Stock alto: Precio debe ser inferior al habitual (Margen aumentado).");
+                targetMargin += 0.15;
+                warnings.push("Stock alto: Margen aumentado.");
+            }
+            // RULE 4: High Turnover
+            if (survey.saleType === 'venta' && survey.hasStock === 'no' && survey.hasInvoice === 'si' && survey.isHighTurnover === 'si') {
+                targetMargin -= 0.10;
+                warnings.push("Alta Rotación: Margen reducido.");
             }
 
-            // RULE 4: Venta + No Stock + Factura + High Turnover
-            if (survey.saleType === 'venta' && survey.hasStock === 'no' && survey.hasInvoice === 'si') {
-                if (survey.isHighTurnover === 'si') {
-                    targetMargin -= 0.10; // Reduce margin (pay more)
-                    warnings.push("Alta Rotación: Se puede pagar más (Margen reducido).");
-                }
-            }
-
-            // Other standard adjusters
+            // Standard Adjustments
             if (survey.clientType === 'habitual') targetMargin -= 0.05;
             if (survey.hasInvoice === 'no') targetMargin += 0.05;
 
-            // Cap Margin (10% to 60%)
+            // Cap Margin
             targetMargin = Math.max(0.10, Math.min(0.60, targetMargin));
 
             // Calculate Optimal Price
             const optimalBuyPrice = marketValue * (1 - targetMargin);
-            const actualMargin = (marketValue - asked) / marketValue;
+            const actualMargin = marketValue > 0 ? (marketValue - asked) / marketValue : 0;
 
-            // Determine Status Rules
+            // Status Rules
             if (asked > 250) {
                 status = 'AUTORIZAR';
                 statusColor = 'text-purple-400';
-                recommendation = 'Importe > 250€. Requiere OK responsable.';
+                recommendation = 'Importe > 250€. Revisión requerida.';
             } else if (actualMargin < 0.25) {
-                // If the calculated optimal price allows for a margin < 25%, users rely on "COMPRAR" above.
-                // But strict rule is < 25% needs review.
                 if (asked <= optimalBuyPrice && actualMargin >= 0.20) {
-                    // Exception: If system calculated it's okay (e.g. High Turnover) even if < 25%, maybe allow if not TOO low?
-                    // Let's stick to strict user request: "Todo lo que sea por debajo de 25 debe ser revisado".
                     status = 'REVISAR';
-                    statusColor = 'text-red-500';
-                    recommendation = `Margen técnico bajo (${(actualMargin * 100).toFixed(1)}%). Requiere aprobación (Aun si es óptimo).`;
+                    statusColor = 'text-amber-500';
+                    recommendation = 'Margen técnico bajo.';
                 } else {
                     status = 'REVISAR';
                     statusColor = 'text-red-500';
-                    recommendation = `Margen bajo (${(actualMargin * 100).toFixed(1)}%). Requiere aprobación.`;
+                    recommendation = 'Margen insuficiente.';
                 }
             } else {
                 if (asked <= optimalBuyPrice) {
                     status = 'COMPRAR';
                     statusColor = 'text-green-500';
-                    recommendation = 'Precio dentro de objetivos. Proceder.';
+                    recommendation = 'Precio correcto. Proceder.';
                 } else {
                     status = 'NEGOCIAR';
                     statusColor = 'text-amber-500';
-                    recommendation = `Intenta bajar a ${optimalBuyPrice.toFixed(0)}€ (${(targetMargin * 100).toFixed(0)}%).`;
+                    recommendation = `Objetivo: ${optimalBuyPrice.toFixed(0)}€`;
                 }
             }
         }
 
-        // Add warnings to recommendation
-        if (warnings.length > 0) {
-            recommendation += ' ' + warnings.join(' ');
-        }
+        if (conditionPenalty > 0) warnings.push(`Penalización estado: -${(conditionPenalty * 100).toFixed(0)}%`);
+        if (warnings.length > 0) recommendation += ' | ' + warnings.join(' ');
 
-        // Safety override
         if (asked > marketValue) {
             status = 'RECHAZAR';
             statusColor = 'text-red-600';
-            recommendation = 'El cliente pide más que el valor de mercado. Imposible.';
+            recommendation = 'Pide más que valor de venta.';
         }
 
-        // Final Optimal Price Calculation for display (ensure variable exists in scope)
-        const displayOptimalPrice = marketValue * (1 - targetMargin);
-        const displayActualMargin = (marketValue - asked) / marketValue;
-
         setAppraisalResult({
-            maxBuyPrice: displayOptimalPrice,
+            maxBuyPrice: marketValue * (1 - targetMargin),
             marketValue,
-            currentMargin: (displayActualMargin * 100).toFixed(1),
+            currentMargin: (marketValue > 0 ? (marketValue - asked) / marketValue * 100 : 0).toFixed(1),
             targetMarginPercent: (targetMargin * 100).toFixed(0),
             status,
             statusColor,
@@ -174,237 +346,248 @@ const Market = () => {
         });
     };
 
-    return (
-        <div className="h-full flex flex-col items-center justify-start pt-6 fade-in relative w-full overflow-hidden pb-20">
+    const calculateGold = () => {
+        const w = parseFloat(goldForm.weight) || 0;
+        const k = parseInt(goldForm.karats) || 18;
+        if (w <= 0) return;
+        const fluctuation = (Math.random() * 0.8) - 0.4;
+        const pricePerGram = GOLD_PRICES_BASE[k] + fluctuation;
+        const total = w * pricePerGram;
+        setGoldQuote({
+            pricePerGram,
+            total,
+            timestamp: new Date().toLocaleTimeString()
+        });
+    };
 
-            {/* Header Compact */}
-            <div className="text-center mb-6 shrink-0">
-                <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-amber-500 font-['Varela_Round']">
-                    Escáner de Mercado
-                </h1>
+    return (
+        <div className="h-full flex flex-col pt-4 px-4 pb-20 relative overflow-y-auto no-scrollbar">
+
+            {/* Top Bar Switcher */}
+            <div className="flex justify-center mb-6 shrink-0">
+                <div className="bg-slate-900/50 p-1 rounded-xl flex border border-white/10 backdrop-blur-md relative">
+                    <button onClick={() => setMode('product')} className={`px-6 py-2 rounded-lg font-bold text-sm transition-all flex items-center gap-2 ${mode === 'product' ? 'bg-pink-600 text-white shadow-lg shadow-pink-600/20' : 'text-slate-400 hover:text-white'}`}>
+                        <Search size={16} /> Escáner & Producto
+                    </button>
+                    <button onClick={() => setMode('gold')} className={`px-6 py-2 rounded-lg font-bold text-sm transition-all flex items-center gap-2 ${mode === 'gold' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white'}`}>
+                        <Watch size={16} /> Cotizador Oro
+                    </button>
+                </div>
             </div>
 
-            {/* Search Bar & Results Container */}
-            <div className="w-full max-w-[95%] flex flex-col gap-6">
+            {/* CONTENT: PRODUCT MODE */}
+            {mode === 'product' && (
+                <div className="flex flex-col xl:flex-row gap-6 mx-auto w-full max-w-[1920px]">
 
-                {/* Search Bar */}
-                <form onSubmit={handleSearch} className="w-full max-w-2xl mx-auto relative group z-10 transition-all shrink-0">
-                    <div className="absolute inset-0 bg-pink-500/20 blur-xl rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                    <div className="bg-[#1e293b]/80 backdrop-blur-xl p-2 rounded-2xl flex items-center gap-2 shadow-2xl border border-white/10 relative">
-                        <div className="p-2 bg-slate-800/50 rounded-xl text-slate-400">
-                            <Search size={20} />
-                        </div>
-                        <input
-                            type="text"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="bg-transparent w-full outline-none text-base placeholder-slate-600 text-white font-bold px-2"
-                            placeholder="Buscar producto..."
-                        />
-                        <button type="submit" disabled={loading} className="bg-pink-600 hover:bg-pink-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2 rounded-xl font-bold shadow-lg shadow-pink-600/20 transition-all flex items-center gap-2 text-sm">
-                            {loading ? '...' : 'Buscar'}
-                        </button>
-                    </div>
-                </form>
-
-                {/* Loading */}
-                {loading && (
-                    <div className="w-full flex justify-center py-4">
-                        <div className="w-8 h-8 border-2 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
-                    </div>
-                )}
-
-                {/* Results Grid - Single Row on Wide Screens */}
-                {!loading && results.length > 0 && (
-                    <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 animate-in slide-in-from-bottom-5 duration-700">
-                        {results.map((item) => (
-                            <div
-                                key={item.id}
-                                className={`bg-[#1e293b]/60 backdrop-blur-md rounded-xl p-3 flex flex-col gap-2 border border-white/5 hover:-translate-y-1 hover:shadow-lg transition-all group relative overflow-hidden`}
-                            >
-                                <div className="flex items-center gap-2">
-                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold border text-[10px] shrink-0
-                                        ${item.color === 'green' ? 'bg-green-900/20 text-green-500 border-green-500/20' : ''}
-                                        ${item.color === 'red' ? 'bg-red-900/20 text-red-500 border-red-500/20' : ''}
-                                        ${item.color === 'teal' ? 'bg-teal-900/20 text-teal-500 border-teal-500/20' : ''}
-                                        ${item.color === 'blue' ? 'bg-blue-900/20 text-blue-500 border-blue-500/20' : ''}
-                                        ${item.color === 'purple' ? 'bg-purple-900/20 text-purple-500 border-purple-500/20' : ''}
-                                        ${item.color === 'amber' ? 'bg-amber-900/20 text-amber-500 border-amber-500/20' : ''}
-                                        ${item.color === 'slate' ? 'bg-slate-800 text-slate-300 border-slate-700' : ''}
-                                    `}>
-                                        {item.storeCode}
-                                    </div>
-                                    <div className="min-w-0 overflow-hidden">
-                                        <p className="font-bold text-slate-200 truncate text-xs">{item.store}</p>
-                                        <p className="text-[9px] text-slate-500 font-medium truncate">{item.condition}</p>
-                                    </div>
-                                </div>
-
-                                <a
-                                    href={item.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="w-full py-1.5 rounded-lg bg-slate-800/50 hover:bg-pink-600 hover:text-white text-slate-300 text-xs font-bold transition-all border border-white/5 flex items-center justify-center gap-1 group-hover:border-pink-500/50 mt-auto"
-                                >
-                                    Ver Web <ExternalLink size={10} />
-                                </a>
+                    {/* LEFT: SCANNER */}
+                    <div className="flex-1 flex flex-col gap-4 min-w-[350px]">
+                        <div className="bg-[#1e293b]/80 backdrop-blur rounded-2xl p-5 border border-white/10 shadow-xl">
+                            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Search className="text-pink-500" /> Competencia</h2>
+                            <form onSubmit={handleSearch} className="flex gap-2 mb-4">
+                                <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="EAN o Nombre..." className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:border-pink-500 outline-none font-medium" />
+                                <button type="submit" disabled={loading} className="bg-pink-600 hover:bg-pink-500 text-white px-6 rounded-xl font-bold transition-all disabled:opacity-50">{loading ? '...' : 'Buscar'}</button>
+                            </form>
+                            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                                {results.map((item) => (
+                                    <a key={item.id} href={item.url} target="_blank" rel="noreferrer" className={`p-3 rounded-xl border border-white/5 bg-slate-800/50 hover:bg-slate-700 transition-all group flex flex-col gap-1 items-start relative overflow-hidden`}>
+                                        <div className={`absolute top-0 right-0 w-16 h-16 bg-${item.color}-500/10 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-150`}></div>
+                                        <span className={`text-[10px] font-bold uppercase tracking-wider text-${item.color}-400`}>{item.store}</span>
+                                        <span className="text-white font-bold text-sm leading-tight">{item.context || 'Ver Precios'}</span>
+                                        <ExternalLink size={12} className="text-slate-500 mt-1" />
+                                    </a>
+                                ))}
                             </div>
-                        ))}
-                    </div>
-                )}
-
-                {/* Survey Section - Wide Layout */}
-                <div className="animate-in slide-in-from-bottom-10 duration-1000 delay-200 mt-2 flex flex-col lg:flex-row gap-4 items-start">
-
-                    {/* FORM */}
-                    <div className="bg-[#0f172a]/80 backdrop-blur-xl border border-white/10 rounded-2xl p-4 relative overflow-hidden flex-1 w-full">
-                        <div className="flex items-center gap-2 mb-4">
-                            <ShoppingCart size={18} className="text-amber-500" />
-                            <h2 className="text-lg font-bold text-white">Asistente de Tasación</h2>
                         </div>
+                    </div>
 
-                        <form onSubmit={handleSurveySubmit} className="flex flex-col gap-4">
+                    {/* RIGHT: APPRAISER */}
+                    <div className="flex-1 flex flex-col gap-4 min-w-[350px]">
+                        <div className="bg-[#0f172a]/90 backdrop-blur rounded-2xl p-5 border border-white/10 shadow-xl flex flex-col gap-6">
+                            <h2 className="text-lg font-bold text-white flex items-center gap-2"><Monitor className="text-amber-500" /> Calculadora Inteligente</h2>
 
-                            <div className="flex flex-col xl:flex-row gap-4 xl:items-end">
-                                {/* 1. Prices (Horizontal) */}
-                                <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-900/30 p-3 rounded-xl border border-white/5">
-                                    <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase">Pide Cliente</label>
-                                        <div className="relative mt-1">
-                                            <input type="number" name="askedPrice" value={survey.askedPrice} onChange={handleSurveyChange} className="w-full bg-slate-800 border-2 border-white/10 focus:border-pink-500 rounded-lg py-1.5 px-2 text-white text-sm font-mono outline-none transition-colors" placeholder="0.00" />
-                                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs">€</span>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase">PVP Nuevo</label>
-                                        <div className="relative mt-1">
-                                            <input type="number" name="newPrice" value={survey.newPrice} onChange={handleSurveyChange} className="w-full bg-slate-800 border border-white/10 rounded-lg py-1.5 px-2 text-white text-sm font-mono focus:border-pink-500 outline-none" placeholder="0.00" />
-                                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs">€</span>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase">2ª Mano</label>
-                                        <div className="relative mt-1">
-                                            <input type="number" name="secondHandPrice" value={survey.secondHandPrice} onChange={handleSurveyChange} className="w-full bg-slate-800 border border-white/10 rounded-lg py-1.5 px-2 text-white text-sm font-mono focus:border-pink-500 outline-none" placeholder="0.00" />
-                                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs">€</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* 2. Context & Checks (Horizontal) */}
-                                <div className="flex-[1.5] grid grid-cols-1 md:grid-cols-4 gap-3 bg-slate-900/30 p-3 rounded-xl border border-white/5 items-end">
-
-                                    <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase">Operación</label>
-                                        <select name="saleType" value={survey.saleType} onChange={handleSurveyChange} className="w-full mt-1 bg-slate-800 border border-white/10 rounded-lg py-1.5 px-2 text-slate-200 text-xs outline-none">
-                                            <option value="venta">Venta</option>
-                                            <option value="recuperable">Recuperable</option>
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase">Cliente</label>
-                                        <select name="clientType" value={survey.clientType} onChange={handleSurveyChange} className="w-full mt-1 bg-slate-800 border border-white/10 rounded-lg py-1.5 px-2 text-slate-200 text-xs outline-none">
-                                            <option value="nuevo">Nuevo</option>
-                                            <option value="habitual">Habitual</option>
-                                        </select>
-                                    </div>
-
-                                    {/* Toggle Checks */}
-                                    {/* Toggle Checks - Compact Grid */}
-                                    <div className="md:col-span-2 grid grid-cols-3 gap-2">
-
-                                        <div className="flex flex-col justify-end gap-1">
-                                            <span className="text-[9px] font-bold text-slate-400 uppercase truncate">Factura?</span>
-                                            <div className="flex bg-slate-950 rounded-lg p-0.5 border border-white/10 w-full cursor-pointer h-[26px]">
-                                                <div onClick={() => setSurvey(p => ({ ...p, hasInvoice: 'no' }))} className={`flex-1 flex items-center justify-center rounded text-[9px] font-bold transition-all ${survey.hasInvoice === 'no' ? 'bg-slate-700 text-white' : 'text-slate-500'}`}>NO</div>
-                                                <div onClick={() => setSurvey(p => ({ ...p, hasInvoice: 'si' }))} className={`flex-1 flex items-center justify-center rounded text-[9px] font-bold transition-all ${survey.hasInvoice === 'si' ? 'bg-green-500 text-white' : 'text-slate-500'}`}>SÍ</div>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex flex-col justify-end gap-1">
-                                            <span className="text-[9px] text-slate-400 uppercase font-bold truncate">Stock {'>'} 2?</span>
-                                            <div className="flex bg-slate-950 rounded-lg p-0.5 border border-white/10 w-full cursor-pointer h-[26px]">
-                                                <div onClick={() => setSurvey(p => ({ ...p, hasStock: 'no' }))} className={`flex-1 flex items-center justify-center rounded text-[9px] font-bold transition-all ${survey.hasStock === 'no' ? 'bg-slate-700 text-white' : 'text-slate-500'}`}>NO</div>
-                                                <div onClick={() => setSurvey(p => ({ ...p, hasStock: 'si' }))} className={`flex-1 flex items-center justify-center rounded text-[9px] font-bold transition-all ${survey.hasStock === 'si' ? 'bg-red-500 text-white' : 'text-slate-500'}`}>SÍ</div>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex flex-col justify-end gap-1">
-                                            <span className="text-[9px] text-slate-400 uppercase font-bold truncate">Alta Rot?</span>
-                                            <div className="flex bg-slate-950 rounded-lg p-0.5 border border-white/10 w-full cursor-pointer h-[26px]">
-                                                <div onClick={() => setSurvey(p => ({ ...p, isHighTurnover: 'no' }))} className={`flex-1 flex items-center justify-center rounded text-[9px] font-bold transition-all ${survey.isHighTurnover === 'no' ? 'bg-slate-700 text-white' : 'text-slate-500'}`}>NO</div>
-                                                <div onClick={() => setSurvey(p => ({ ...p, isHighTurnover: 'si' }))} className={`flex-1 flex items-center justify-center rounded text-[9px] font-bold transition-all ${survey.isHighTurnover === 'si' ? 'bg-cyan-500 text-white' : 'text-slate-500'}`}>SÍ</div>
-                                            </div>
-                                        </div>
-
-                                    </div>
-
+                            {/* 1. Category */}
+                            <div>
+                                <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">1. Categoría</label>
+                                <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+                                    {Object.entries(CATEGORIES).map(([key, data]) => (
+                                        <button key={key} onClick={() => setCategory(key)} className={`px-4 py-2 rounded-xl border transition-all flex items-center gap-2 whitespace-nowrap ${category === key ? 'bg-amber-500/20 border-amber-500 text-amber-400' : 'bg-slate-800 border-white/5 text-slate-400 hover:bg-slate-700'}`}>
+                                            {data.icon} <span className="font-bold text-sm">{data.name}</span>
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
 
-                            {/* Action Button */}
-                            <button
-                                type="submit"
-                                className="w-full py-3 bg-gradient-to-r from-pink-600 to-amber-600 hover:from-pink-500 hover:to-amber-500 text-white rounded-xl font-bold shadow-lg shadow-pink-600/20 transition-all flex justify-center items-center gap-2 hover:scale-[1.01]"
-                            >
-                                <Monitor size={18} />
-                                <span>Calcular Tasación</span>
+                            {/* 2. Checklists & Diagnostics */}
+                            <div className="bg-slate-900/50 p-4 rounded-xl border border-white/5">
+                                <label className="text-xs font-bold text-slate-400 uppercase flex items-center gap-2 mb-3"><CheckCircle size={14} /> Protocolo de Prueba</label>
+
+                                {/* Diagnostics Module */}
+                                {(category === 'phones' || category === 'laptops') && (
+                                    <div className="mb-4 bg-slate-800 p-3 rounded-xl border border-dashed border-slate-600 flex flex-col gap-3">
+                                        {!diagnosticSession ? (
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-8 h-8 flex items-center justify-center rounded-full ${category === 'phones' ? 'bg-pink-600' : 'bg-cyan-600'}`}>
+                                                        {category === 'phones' ? <QrCode size={16} className="text-white" /> : <Monitor size={16} className="text-white" />}
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="text-white font-bold text-sm">Diagnóstico Automático</h4>
+                                                        <p className="text-[10px] text-slate-400">Hardware y Sensores</p>
+                                                    </div>
+                                                </div>
+                                                <button onClick={() => startDiagnostic(category === 'phones' ? 'mobile' : 'laptop')} className="px-3 py-1.5 bg-white text-black font-bold text-xs rounded hover:bg-slate-200">INICIAR</button>
+                                            </div>
+                                        ) : (
+                                            <div className="flex gap-3 items-center bg-slate-900 p-2 rounded-lg">
+                                                {category === 'phones' && diagnosticSession.status !== 'completed' && (
+                                                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(diagnosticSession.url)}`} className="w-12 h-12 rounded bg-white p-1" alt="QR" />
+                                                )}
+                                                <div className="flex-1 min-w-0">
+                                                    {diagnosticSession.status === 'completed' ? (
+                                                        <p className="text-green-400 font-bold text-sm flex items-center gap-2"><CheckCircle size={14} /> Completado</p>
+                                                    ) : (
+                                                        <div className="flex flex-col">
+                                                            <p className="text-amber-500 font-bold text-xs animate-pulse">Esperando conexión...</p>
+                                                            <p className="text-[10px] text-slate-500 truncate">{diagnosticSession.url}</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {diagnosticSession.status === 'completed' && (
+                                                    <button onClick={() => setDiagnosticSession(null)} className="text-[10px] underline text-slate-400">Reiniciar</button>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* IMEI Checker */}
+                                {category === 'phones' && (
+                                    <div className="mb-4 bg-slate-950/80 p-3 rounded-lg border border-white/10">
+                                        <div className="flex gap-2 mb-2">
+                                            <input value={imeiInput} onChange={(e) => setImeiInput(e.target.value)} placeholder="IMEI..." className="flex-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white mono" />
+                                            <button onClick={handleCheckImie} disabled={imeiLoading} className="bg-blue-600 px-3 py-1 rounded text-white text-xs font-bold">{imeiLoading ? '...' : 'Check'}</button>
+                                        </div>
+                                        {imeiCheckResult && (
+                                            <div className={`p-2 rounded border text-[10px] font-bold ${imeiCheckResult.status === 'CLEAN' ? 'border-green-500 text-green-500' : 'border-red-500 text-red-500'}`}>
+                                                {imeiCheckResult.message}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Manual Checklist */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                    {CATEGORIES[category].checklist.map(item => (
+                                        <div key={item} className="flex items-center justify-between bg-slate-950 p-2 rounded border border-white/5">
+                                            <span className="text-xs text-slate-300 truncate pr-2">{item}</span>
+                                            <div className="flex gap-1 shrink-0">
+                                                <button onClick={() => handleChecklistChange(item, true)} className={`p-1 rounded ${checklist[item] === true ? 'bg-green-500 text-white' : 'bg-slate-800 text-slate-600'}`}><CheckCircle size={12} /></button>
+                                                <button onClick={() => handleChecklistChange(item, false)} className={`p-1 rounded ${checklist[item] === false ? 'bg-red-500 text-white' : 'bg-slate-800 text-slate-600'}`}><XCircle size={12} /></button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* 3. Inputs & Logic */}
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase">Precio Nuevo</label>
+                                    <input type="number" name="newPrice" value={survey.newPrice} onChange={handleSurveyChange} className="w-full mt-1 bg-slate-800 border border-white/10 rounded-lg py-1.5 px-2 text-white text-sm" placeholder="0.00" />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase">Precio 2ª Mano</label>
+                                    <input type="number" name="secondHandPrice" value={survey.secondHandPrice} onChange={handleSurveyChange} className="w-full mt-1 bg-slate-800 border border-amber-500/30 rounded-lg py-1.5 px-2 text-white text-sm" placeholder="Ej: Wallapop" />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase">Pide Cliente</label>
+                                    <input type="number" name="askedPrice" value={survey.askedPrice} onChange={handleSurveyChange} className="w-full mt-1 bg-slate-800 border border-pink-500/30 rounded-lg py-1.5 px-2 text-white text-sm font-bold" placeholder="0.00" />
+                                </div>
+                            </div>
+
+                            {/* 4. Controls */}
+                            <div className="flex flex-wrap gap-2 text-[10px]">
+                                <label className="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded cursor-pointer">
+                                    <input type="radio" name="saleType" value="venta" checked={survey.saleType === 'venta'} onChange={handleSurveyChange} className="accent-pink-500" />
+                                    <span className="text-white">Venta</span>
+                                </label>
+                                <label className="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded cursor-pointer">
+                                    <input type="radio" name="saleType" value="recuperable" checked={survey.saleType === 'recuperable'} onChange={handleSurveyChange} className="accent-pink-500" />
+                                    <span className="text-white">Recup.</span>
+                                </label>
+                                <div className="w-px h-6 bg-white/10 mx-1"></div>
+                                <label className="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded cursor-pointer">
+                                    <input type="checkbox" checked={survey.hasStock === 'si'} onChange={e => setSurvey({ ...survey, hasStock: e.target.checked ? 'si' : 'no' })} className="accent-pink-500" />
+                                    <span className="text-slate-300">Stock Alto</span>
+                                </label>
+                                <label className="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded cursor-pointer">
+                                    <input type="checkbox" checked={survey.hasInvoice === 'no'} onChange={e => setSurvey({ ...survey, hasInvoice: e.target.checked ? 'no' : 'si' })} className="accent-pink-500" />
+                                    <span className="text-slate-300">Sin Fra.</span>
+                                </label>
+                                <label className="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded cursor-pointer">
+                                    <input type="checkbox" checked={survey.isHighTurnover === 'si'} onChange={e => setSurvey({ ...survey, isHighTurnover: e.target.checked ? 'si' : 'no' })} className="accent-pink-500" />
+                                    <span className="text-slate-300">Alta Rotación</span>
+                                </label>
+                            </div>
+
+                            <button onClick={calculateAppraisal} className="w-full py-3 bg-gradient-to-r from-amber-600 to-pink-600 rounded-xl font-bold text-white shadow-lg hover:brightness-110 active:scale-95 transition-all">
+                                CALCULAR OFERTA
                             </button>
 
-                        </form>
+                            {/* RESULT */}
+                            {appraisalResult && (
+                                <div className="animate-in slide-in-from-bottom-5 fade-in bg-slate-950/80 rounded-xl p-4 border border-white/10">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <span className={`text-2xl font-black ${appraisalResult.statusColor}`}>{appraisalResult.status}</span>
+                                        <div className="text-right">
+                                            <span className="block text-[10px] text-slate-400 uppercase">Oferta Máx</span>
+                                            <span className="text-2xl font-mono text-white font-bold">{appraisalResult.maxBuyPrice.toFixed(0)}€</span>
+                                        </div>
+                                    </div>
+                                    <p className="text-sm text-slate-300 mb-2">{appraisalResult.recommendation}</p>
+                                    <div className="text-[10px] text-slate-500 flex gap-4">
+                                        <span>Valor Ref: {appraisalResult.marketValue.toFixed(0)}€</span>
+                                        <span>Margen: {appraisalResult.currentMargin}% (Obj: {appraisalResult.targetMarginPercent}%)</span>
+                                    </div>
+                                </div>
+                            )}
+
+                        </div>
                     </div>
+                </div>
+            )}
 
-                    {/* RESULTS PANEL (Dynamic) */}
-                    {appraisalResult && (
-                        <div className="bg-[#1e293b]/90 backdrop-blur-xl border border-white/10 rounded-2xl p-6 relative overflow-hidden flex-1 w-full animate-in fade-in zoom-in-95 data-[state=open]:animate-out data-[state=closed]:fade-out-0 duration-300">
-                            <div className="absolute top-0 right-0 p-4 opacity-10">
-                                <Monitor size={100} />
-                            </div>
-
-                            <h3 className="text-slate-400 font-bold uppercase text-xs tracking-wider mb-4">Resultado del Análisis</h3>
-
-                            <div className="flex flex-col gap-6 relative z-10">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm text-slate-400 font-medium">Recomendación</p>
-                                        <h2 className={`text-4xl font-black ${appraisalResult.statusColor} tracking-tight`}>{appraisalResult.status}</h2>
-                                    </div>
-                                    <div className={`px-4 py-2 rounded-xl border ${appraisalResult.statusColor.replace('text', 'border')} ${appraisalResult.statusColor.replace('text', 'bg').replace('500', '500/10')} font-bold`}>
-                                        {appraisalResult.currentMargin}% Margen
-                                    </div>
-                                </div>
-
-                                <div className="h-px bg-white/10 w-full"></div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <p className="text-[10px] text-slate-500 uppercase font-bold">Precio Máx. Compra</p>
-                                        <p className="text-2xl font-mono font-bold text-white">{appraisalResult.maxBuyPrice.toFixed(2)}€</p>
-                                        <p className="text-xs text-slate-400">Objetivo</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-[10px] text-slate-500 uppercase font-bold">Valor Mercado (Est.)</p>
-                                        <p className="text-2xl font-mono font-bold text-slate-200">{appraisalResult.marketValue.toFixed(2)}€</p>
-                                        <p className="text-xs text-slate-400">PVP Venta</p>
-                                    </div>
-                                </div>
-
-                                <div className="bg-slate-950/50 p-3 rounded-xl border border-white/5">
-                                    <p className="text-sm text-slate-300 font-medium leading-relaxed">
-                                        <span className="text-amber-400 font-bold">Consejo:</span> {appraisalResult.recommendation}
-                                    </p>
-                                </div>
-
+            {/* CONTENT: GOLD MODE */}
+            {mode === 'gold' && (
+                <div className="max-w-md mx-auto w-full bg-[#0f172a] rounded-2xl p-6 border border-amber-500/20 shadow-2xl shadow-amber-900/20">
+                    <h2 className="text-xl font-bold text-amber-500 mb-6 flex items-center gap-2"><Watch /> Cotizador de Oro</h2>
+                    <div className="space-y-4">
+                        <div>
+                            <label className="text-xs font-bold text-slate-400 uppercase">Peso (gramos)</label>
+                            <input type="number" value={goldForm.weight} onChange={e => setGoldForm({ ...goldForm, weight: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white text-lg outline-none focus:border-amber-500" placeholder="0.00" />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-slate-400 uppercase">Kilates</label>
+                            <div className="grid grid-cols-4 gap-2 mt-1">
+                                {[24, 18, 14, 9].map(k => (
+                                    <button key={k} onClick={() => setGoldForm({ ...goldForm, karats: k })} className={`py-2 rounded-lg font-bold border transition-all ${goldForm.karats == k ? 'bg-amber-500 text-black border-amber-500' : 'bg-slate-800 text-slate-400 border-white/5'}`}>{k}K</button>
+                                ))}
                             </div>
                         </div>
-                    )}
+                        <button onClick={calculateGold} className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl shadow-lg shadow-amber-500/20 transition-all">CALCULAR VALOR</button>
+                        {goldQuote && (
+                            <div className="mt-4 bg-slate-900/50 p-4 rounded-xl border border-amber-500/30 text-center animate-in zoom-in">
+                                <p className="text-slate-400 text-xs mb-1">Valor Estimado ({goldForm.karats}K)</p>
+                                <p className="text-4xl font-black text-white">{goldQuote.total.toFixed(2)}€</p>
+                                <p className="text-amber-500 text-xs mt-2 font-mono">{goldQuote.pricePerGram.toFixed(2)} €/gr</p>
+                                <p className="text-[10px] text-slate-600 mt-4">Actualizado: {goldQuote.timestamp}</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
-
-            </div>
+            )}
         </div>
     );
 };
 
 export default Market;
-

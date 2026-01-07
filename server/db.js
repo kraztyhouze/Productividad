@@ -22,9 +22,13 @@ export async function initDb() {
         CREATE TABLE IF NOT EXISTS active_sessions (
             employee_id TEXT PRIMARY KEY,
             employee_name TEXT,
-            start_time TEXT
+            start_time TEXT,
+            client_start_time TEXT
         );
     `);
+
+        // Ensure column exists for existing tables
+        await client.query(`ALTER TABLE active_sessions ADD COLUMN IF NOT EXISTS client_start_time TEXT;`);
 
         await client.query(`
         CREATE TABLE IF NOT EXISTS daily_records (
@@ -61,6 +65,13 @@ export async function initDb() {
         );
     `);
 
+        // Migration for closed_days details
+        await client.query(`ALTER TABLE closed_days ADD COLUMN IF NOT EXISTS total_groups INTEGER DEFAULT 0;`);
+        await client.query(`ALTER TABLE closed_days ADD COLUMN IF NOT EXISTS users_report TEXT;`); // JSON String
+        await client.query(`ALTER TABLE closed_days ADD COLUMN IF NOT EXISTS observation TEXT;`);
+        await client.query(`ALTER TABLE closed_days ADD COLUMN IF NOT EXISTS max_concurrent INTEGER DEFAULT 0;`);
+
+
         await client.query(`
         CREATE TABLE IF NOT EXISTS employees (
             id SERIAL PRIMARY KEY,
@@ -95,6 +106,11 @@ export async function initDb() {
         );
     `);
 
+        // Migrations
+        await client.query(`ALTER TABLE daily_groups ADD COLUMN IF NOT EXISTS no_deal INTEGER DEFAULT 0;`);
+        await client.query(`ALTER TABLE daily_groups ADD COLUMN IF NOT EXISTS client_seconds INTEGER DEFAULT 0;`);
+
+
         await client.query(`
         CREATE TABLE IF NOT EXISTS roles (
             id SERIAL PRIMARY KEY,
@@ -125,6 +141,22 @@ export async function initDb() {
             task_id INTEGER,
             user_id INTEGER,
             text TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    `);
+
+        await client.query(`
+        CREATE TABLE IF NOT EXISTS no_deal_details (
+            id SERIAL PRIMARY KEY,
+            date TEXT,
+            employee_id INTEGER,
+            reason TEXT,
+            brand TEXT,
+            model TEXT,
+            price_asked TEXT,
+            price_offered TEXT,
+            price_sale TEXT,
+            notes TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     `);

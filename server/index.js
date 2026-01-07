@@ -195,6 +195,14 @@ app.post('/api/closed-days', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }) }
 });
 
+app.delete('/api/closed-days/:date', async (req, res) => {
+    const { date } = req.params;
+    try {
+        await pool.query('DELETE FROM closed_days WHERE date=$1', [date]);
+        res.json({ message: 'Day reopened' });
+    } catch (err) { res.status(500).json({ error: err.message }) }
+});
+
 // 5. Product Families
 app.get('/api/product-families', async (req, res) => {
     try {
@@ -222,6 +230,305 @@ app.delete('/api/product-families/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }) }
 });
 
+// --- 6. Productivity & Sessions (Restored) ---
+
+// Active Sessions
+app.get('/api/active-sessions', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT TRIM(employee_id) as "employeeId", employee_name as "employeeName", start_time as "startTime", client_start_time as "clientStartTime" FROM active_sessions');
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/active-sessions', async (req, res) => {
+    const { employeeId, employeeName, startTime, clientStartTime } = req.body;
+    try {
+        await pool.query('INSERT INTO active_sessions (employee_id, employee_name, start_time, client_start_time) VALUES ($1, $2, $3, $4)', [employeeId, employeeName, startTime, clientStartTime || null]);
+        res.json({ message: 'Session started' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/active-sessions/:displayId', async (req, res) => {
+    const { displayId } = req.params;
+    const { clientStartTime } = req.body;
+    try {
+        // Robust update handling whitespace
+        const result = await pool.query('UPDATE active_sessions SET client_start_time = $1 WHERE TRIM(employee_id) = $2', [clientStartTime, displayId]);
+        res.json({ message: 'Session updated' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/active-sessions/:displayId', async (req, res) => {
+    const { displayId } = req.params;
+    try {
+        await pool.query('DELETE FROM active_sessions WHERE TRIM(employee_id) = $1', [displayId]);
+        res.json({ message: 'Session ended' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Daily Records
+app.get('/api/daily-records', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT id, employee_id as "employeeId", employee_name as "employeeName", start_time as "startTime", end_time as "endTime", duration_seconds as "durationSeconds", date, groups_count as "groups" FROM daily_records ORDER BY start_time DESC');
+        const mapped = result.rows.map(r => ({ ...r, id: parseInt(r.id) })); // Keep employeeId as String
+        res.json(mapped);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/daily-records', async (req, res) => {
+    const { id, employeeId, employeeName, startTime, endTime, durationSeconds, date, groups } = req.body;
+    try {
+        await pool.query(
+            'INSERT INTO daily_records (id, employee_id, employee_name, start_time, end_time, duration_seconds, date, groups_count) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+            [id, employeeId, employeeName, startTime, endTime, durationSeconds, date, groups || 0]
+        );
+        res.json({ message: 'Record saved' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/daily-records/:id', async (req, res) => {
+    const { id } = req.params;
+    const { durationSeconds } = req.body;
+    try {
+        await pool.query('UPDATE daily_records SET duration_seconds=$1 WHERE id=$2', [durationSeconds, id]);
+        res.json({ message: 'Record updated' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/daily-records/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.query('DELETE FROM daily_records WHERE id=$1', [id]);
+        res.json({ message: 'Record deleted' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Daily Groups
+app.get('/api/daily-groups', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM daily_groups');
+        // Map from SQL (underscore) to JS (camel/object)
+        // Schema: key, standard, jewelry, recoverable, no_deal
+        // Context expects object: { [key]: { standard, jewelry, recoverable, noDeal } } (Wait, context logic check)
+        // Context code: `const groups = await res.json()` then `setDailyGroups`. It expects an object map or array.
+        // Step 29 Context: `setDailyGroups(await groupsRes.json())`. And usage is `dailyGroups[key]`.
+        // So I should return an Object Map: { "emp-date": { standard: 1... } }
+
+        const map = {};
+        result.rows.forEach(row => {
+            map[row.key] = {
+                standard: row.standard,
+                jewelry: row.jewelry,
+                recoverable: row.recoverable,
+                noDeal: row.no_deal, // camelCase for frontend
+                clientSeconds: row.client_seconds || 0
+            };
+        });
+        res.json(map);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/daily-groups', async (req, res) => {
+    const { key, data } = req.body;
+    // data = { standard, jewelry, recoverable, noDeal }
+    try {
+        // Upsert
+        const check = await pool.query('SELECT key FROM daily_groups WHERE key=$1', [key]);
+        if (check.rows.length > 0) {
+            await pool.query(
+                'UPDATE daily_groups SET standard=$1, jewelry=$2, recoverable=$3, no_deal=$4, client_seconds=$5 WHERE key=$6',
+                [data.standard || 0, data.jewelry || 0, data.recoverable || 0, data.noDeal || 0, data.clientSeconds || 0, key]
+            );
+        } else {
+            await pool.query(
+                'INSERT INTO daily_groups (key, standard, jewelry, recoverable, no_deal, client_seconds) VALUES ($1, $2, $3, $4, $5, $6)',
+                [key, data.standard || 0, data.jewelry || 0, data.recoverable || 0, data.noDeal || 0, data.clientSeconds || 0]
+            );
+        }
+        res.json({ message: 'Groups updated' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/daily-groups/:key', async (req, res) => {
+    const { key } = req.params;
+    try {
+        await pool.query('DELETE FROM daily_groups WHERE key=$1', [key]);
+        res.json({ message: 'Deleted' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Day Incidents
+app.get('/api/day-incidents', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM day_incidents');
+        // Map to { date: text }
+        const map = {};
+        result.rows.forEach(r => map[r.date] = r.text);
+        res.json(map);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/day-incidents', async (req, res) => {
+    const { date, text } = req.body;
+    try {
+        const check = await pool.query('SELECT date FROM day_incidents WHERE date=$1', [date]);
+        if (check.rows.length > 0) {
+            await pool.query('UPDATE day_incidents SET text=$1 WHERE date=$2', [text, date]);
+        } else {
+            await pool.query('INSERT INTO day_incidents (date, text) VALUES ($1, $2)', [date, text]);
+        }
+        res.json({ message: 'Incident saved' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/no-deals', async (req, res) => {
+    try {
+        const { start, end } = req.query;
+        let query = 'SELECT * FROM no_deal_details';
+        const params = [];
+        if (start && end) {
+            query += ' WHERE date >= $1 AND date <= $2';
+            params.push(start, end);
+        }
+        query += ' ORDER BY created_at DESC';
+        const result = await pool.query(query, params);
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/no-deals', async (req, res) => {
+    const { date, employee_id, reason, brand, model, price_asked, price_offered, price_sale, notes } = req.body;
+    try {
+        const result = await pool.query(
+            'INSERT INTO no_deal_details (date, employee_id, reason, brand, model, price_asked, price_offered, price_sale, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+            [date, employee_id, reason, brand, model, price_asked, price_offered, price_sale, notes]
+        );
+        res.json(result.rows[0]);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/no-deals/:id', async (req, res) => {
+    const { id } = req.params;
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 1. Get Details to know who/when (needed for decrementing stats)
+        const check = await client.query('SELECT date, employee_id FROM no_deal_details WHERE id = $1', [id]);
+        if (check.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Record not found' });
+        }
+        const { date, employee_id } = check.rows[0];
+
+        // 2. Delete Detail
+        await client.query('DELETE FROM no_deal_details WHERE id = $1', [id]);
+
+        // 3. Decrement Count in daily_groups
+        const key = `${employee_id}-${date}`;
+        await client.query(`
+            UPDATE daily_groups 
+            SET no_deal = GREATEST(0, no_deal - 1) 
+            WHERE key = $1
+        `, [key]);
+
+        await client.query('COMMIT');
+        res.json({ message: 'Deleted and stats updated' });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: err.message });
+    } finally {
+        client.release();
+    }
+});
+
+// --- 7. Security (IMEI Check) ---
+app.post('/api/security/check-imei', async (req, res) => {
+    // ... (keep existing code, just context)
+    const { imei } = req.body;
+    // Simulate API Latency
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    // ... existing imei logic ...
+    // Note: I will just overwrite the whole block to be safe or use proper ranges. 
+    // Actually, I'll append the new code AFTER the security block to avoid messing with it.
+    // Wait, the user asked to ADD, so I will append.
+    // I need to return the EXISTING content for the match, then add the new stuff.
+    // Let's just REPLACE the end of the file or insert before the aggregator.
+    // BETTER: Insert BEFORE the Market Link Aggregator, keeping IMEI check intact.
+
+    if (!imei || imei.length < 15) {
+        return res.json({ status: 'INVALID', message: 'IMEI inválido (15 dígitos mín)' });
+    }
+
+    if (imei.endsWith('000')) {
+        return res.json({
+            status: 'BLOCKED',
+            message: 'Reportado como ROBO/PÉRDIDA',
+            details: 'Policía Nacional / GSMA Blacklist',
+            risk: 'CRITICAL'
+        });
+    }
+
+    if (imei.endsWith('111')) {
+        return res.json({
+            status: 'CAUTION',
+            message: 'Posible financiación pendiente',
+            details: 'Operadora local',
+            risk: 'MEDIUM'
+        });
+    }
+
+    return res.json({
+        status: 'CLEAN',
+        message: 'IMEI Limpio. Sin incidencias.',
+        details: 'Verificado en bases globales.',
+        risk: 'NONE'
+    });
+});
+
+// --- 8. Mobile Diagnostics (Satellite App) ---
+const diagnosticSessions = {}; // In-memory store: { id: { status: 'waiting', results: {} } }
+
+app.post('/api/diagnostics/init', (req, res) => {
+    const sessionId = Math.random().toString(36).substring(2, 9);
+    diagnosticSessions[sessionId] = {
+        status: 'waiting',
+        createdAt: Date.now(),
+        tests: { touch: null, pixels: null, camera: null }
+    };
+
+    // Clean up old sessions
+    const now = Date.now();
+    Object.keys(diagnosticSessions).forEach(k => {
+        if (now - diagnosticSessions[k].createdAt > 3600000) delete diagnosticSessions[k];
+    });
+
+    res.json({ sessionId, url: `/mobile-test/${sessionId}` });
+});
+
+app.get('/api/diagnostics/session/:id', (req, res) => {
+    const { id } = req.params;
+    const session = diagnosticSessions[id];
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    res.json(session);
+});
+
+app.post('/api/diagnostics/update/:id', (req, res) => {
+    const { id } = req.params;
+    const { test, result, status } = req.body; // test: 'touch', result: true/false
+
+    if (!diagnosticSessions[id]) return res.status(404).json({ error: 'Session not found' });
+
+    if (test) {
+        diagnosticSessions[id].tests[test] = result;
+    }
+    if (status) {
+        diagnosticSessions[id].status = status;
+    }
+
+    res.json({ success: true });
+});
+
 // --- Market Link Aggregator (Instant) ---
 app.get('/api/market/search', (req, res) => {
     const { q } = req.query;
@@ -232,45 +539,45 @@ app.get('/api/market/search', (req, res) => {
 
     const results = [
         {
-            id: 'ebay', store: 'eBay', storeCode: 'EB', color: 'blue',
-            price: 'Ver web', condition: 'Segunda mano',
-            url: `https://www.ebay.es/sch/i.html?_nkw=${encodedQ}&_sacat=0&LH_ItemCondition=3000`,
+            id: 'amazon', store: 'Amazon', storeCode: 'AM', color: 'amber',
+            price: 'Ver Nuevo', condition: 'Nuevo (Ref. Techo)',
+            url: `https://www.amazon.es/s?k=${encodedQ}`,
+            context: 'Referencia PVP Nuevo',
             found: true
         },
         {
-            id: 'game', store: 'GAME', storeCode: 'GM', color: 'purple',
-            price: 'Ver web', condition: 'Seminuevo',
-            url: `https://www.game.es/buscar/${encodedQ}`,
+            id: 'ebay_sold', store: 'eBay (Vendidos)', storeCode: 'EB', color: 'blue',
+            price: 'Ver Vendidos', condition: 'Realmente Vendidos',
+            url: `https://www.ebay.es/sch/i.html?_nkw=${encodedQ}&LH_Sold=1&LH_Complete=1&LH_ItemCondition=3000`,
+            context: 'Precio Real Mercado',
             found: true
         },
         {
-            id: 'w', store: 'Wallapop', storeCode: 'W', color: 'teal',
-            price: 'Ver web', condition: 'Segunda mano',
+            id: 'wallapop', store: 'Wallapop', storeCode: 'W', color: 'teal',
+            price: 'Ver Calle', condition: 'Segunda Mano',
             url: `https://es.wallapop.com/app/search?keywords=${encodedQ}`,
+            context: 'Competencia Directa',
             found: true
         },
         {
-            id: 'cc', store: 'Cash Converters', storeCode: 'CC', color: 'green',
-            price: 'Ver web', condition: 'Usado',
-            url: `https://www.cashconverters.es/es/es/search/?q=${encodedQ}`,
-            found: true
-        },
-        {
-            id: 'bm', store: 'Back Market', storeCode: 'BM', color: 'slate',
-            price: 'Ver web', condition: 'Reacondicionado',
+            id: 'backmarket', store: 'Back Market', storeCode: 'BM', color: 'slate',
+            price: 'Ver Reacond.', condition: 'Reacondicionado',
             url: `https://www.backmarket.es/es-es/search?q=${encodedQ}`,
+            context: 'Ref. Reacondicionado',
             found: true
         },
         {
             id: 'cex', store: 'CeX', storeCode: 'CeX', color: 'red',
-            price: 'Ver web', condition: 'Usado',
+            price: 'Ver Web', condition: 'Usado',
             url: `https://es.webuy.com/search?stext=${encodedQ}`,
+            context: 'Precio Venta Tienda',
             found: true
         },
         {
-            id: 'c24', store: 'Chrono24', storeCode: '24', color: 'amber',
-            price: 'Ver web', condition: 'Usado',
-            url: `https://www.chrono24.es/search/index.htm?query=${encodedQ}`,
+            id: 'cash', store: 'Cash Converters', storeCode: 'CC', color: 'green',
+            price: 'Ver Web', condition: 'Usado',
+            url: `https://www.cashconverters.es/es/es/search/?q=${encodedQ}`,
+            context: 'Precio Venta Tienda',
             found: true
         }
     ];

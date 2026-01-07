@@ -12,6 +12,8 @@ import Productivity from './pages/Productivity';
 import Dashboard from './pages/Dashboard';
 import Reports from './pages/Reports';
 import Market from './pages/Market';
+import MobileDiagnostics from './pages/MobileDiagnostics';
+import LaptopDiagnostics from './pages/LaptopDiagnostics';
 
 const ProtectedRoute = () => {
     const { user } = useAuth();
@@ -29,6 +31,10 @@ function App() {
                     <BrowserRouter>
                         <Routes>
                             <Route path="/login" element={<Login />} />
+
+                            {/* Public Mobile Route */}
+                            <Route path="/mobile-test/:sessionId" element={<MobileDiagnostics />} />
+                            <Route path="/laptop-test/:sessionId" element={<LaptopDiagnostics />} />
 
                             <Route element={<ProtectedRoute />}>
                                 <Route path="/" element={<DashboardLayout />}>

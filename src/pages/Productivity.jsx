@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useProductivity } from '../context/ProductivityContext';
 import { useTeam } from '../context/TeamContext';
 import { useAuth, ROLES } from '../context/AuthContext';
-import { Users, ShoppingBag, Clock, UserCheck, AlertCircle, Lock, RefreshCw, Plus, Trash2, StopCircle, UserPlus, Check, X, Watch, Percent } from 'lucide-react';
+import { Users, ShoppingBag, Clock, UserCheck, AlertCircle, Lock, RefreshCw, Plus, Trash2, StopCircle, UserPlus, Check, X, Watch, Percent, Info } from 'lucide-react';
 import InfoPanel from '../components/Productivity/InfoPanel';
 import CloseDayModal from '../components/Productivity/CloseDayModal';
 import EditTimeModal from '../components/Productivity/EditTimeModal';
@@ -57,6 +57,23 @@ const Productivity = () => {
     const [editingRecord, setEditingRecord] = useState(null);
     const [editingStats, setEditingStats] = useState(null);
     const [noDealDetail, setNoDealDetail] = useState(null);
+
+    const [externalPrices, setExternalPrices] = useState(null);
+    const [showGoldDetails, setShowGoldDetails] = useState(false);
+
+    // Fetch External Gold Prices
+    useEffect(() => {
+        const fetchGold = async () => {
+            try {
+                const res = await fetch('/api/gold-prices');
+                if (res.ok) {
+                    const data = await res.json();
+                    setExternalPrices(data);
+                }
+            } catch (err) { console.error("Failed to fetch gold prices", err); }
+        };
+        fetchGold();
+    }, []);
 
     // ... (keep goldPrice) ...
     const [goldPrice, setGoldPrice] = useState(() => localStorage.getItem('goldPrice') || '77');
@@ -227,6 +244,7 @@ const Productivity = () => {
             {/* TOP SECTION: TEAM GRID */}
             <div className="flex-[3] flex gap-6 min-h-0">
                 <div className="w-2/3 bg-[#1e293b]/60 backdrop-blur-xl rounded-[2.5rem] p-6 border border-white/5 flex flex-col shadow-2xl relative">
+                    {/* ... (Team Grid Header & Content - unchanged) ... */}
                     <div className="flex justify-between items-center mb-6">
                         <div>
                             <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
@@ -258,10 +276,8 @@ const Productivity = () => {
 
                     <div className="grid grid-cols-4 xl:grid-cols-5 gap-3 overflow-y-auto custom-scrollbar flex-1 content-start p-2 -mx-2">
                         {employees.filter(e => e.isBuyer).map(emp => {
-                            // Harden comparison: Ensure both sides are strings
                             const session = activeSessions.find(s => String(s.employeeId) === String(emp.id));
                             const isClientActive = !!clientSessions[emp.id];
-                            // Force session active if client is active to prevent UI flickering during sync
                             const isSessionActive = !!session || isClientActive;
 
                             return (
@@ -269,20 +285,8 @@ const Productivity = () => {
                                     key={emp.id}
                                     onClick={() => {
                                         if (!isToday) return;
-
-                                        // Priority 1: If Client Active (Buying), Open Modal to Finish/View
-                                        if (isClientActive) {
-                                            setActiveClientModal(emp.id);
-                                            return;
-                                        }
-
-                                        // Priority 2: If No Session, Start Shift
-                                        if (!isSessionActive) {
-                                            startSession(emp.id, `${emp.firstName} ${emp.lastName}`);
-                                            return;
-                                        }
-
-                                        // Priority 3: If Session Active (and not buying), Start Client
+                                        if (isClientActive) { setActiveClientModal(emp.id); return; }
+                                        if (!isSessionActive) { startSession(emp.id, `${emp.firstName} ${emp.lastName}`); return; }
                                         startClient(emp.id);
                                     }}
                                     className={`relative rounded-2xl p-2 flex flex-col gap-1 transition-all duration-300 border h-28 overflow-hidden group select-none cursor-pointer 
@@ -291,22 +295,16 @@ const Productivity = () => {
                                                 'bg-slate-800/40 border-white/5 opacity-60 hover:opacity-100 hover:bg-slate-800'
                                         }`}
                                 >
-                                    {/* Managerial Close Session (Discrete) */}
                                     {isManagerial && isSessionActive && !isClientActive && (
                                         <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (confirm('¿Terminar turno de ' + emp.alias + '?')) endSession(emp.id);
-                                            }}
+                                            onClick={(e) => { e.stopPropagation(); if (confirm('¿Terminar turno de ' + emp.alias + '?')) endSession(emp.id); }}
                                             className="absolute top-2 right-2 p-1.5 text-slate-400 hover:text-white bg-black/20 hover:bg-red-500 rounded-full z-20 transition-all backdrop-blur-sm"
-                                            title="Terminar Turno (Manager)"
                                         >
                                             <X size={14} />
                                         </button>
                                     )}
 
                                     {!isSessionActive ? (
-                                        // INACTIVE STATE
                                         <div className="flex-1 flex flex-col items-center justify-center gap-2 group-hover:scale-105 transition-transform opacity-70 group-hover:opacity-100">
                                             <div className="w-10 h-10 rounded-xl bg-slate-700 border-2 border-slate-600 flex items-center justify-center text-sm font-bold text-slate-400 group-hover:border-pink-500 group-hover:text-pink-500 transition-colors">
                                                 {emp.firstName.substring(0, 1)}
@@ -314,9 +312,7 @@ const Productivity = () => {
                                             <p className="text-xl font-black text-slate-400 group-hover:text-white uppercase tracking-tight">{emp.alias || emp.firstName}</p>
                                         </div>
                                     ) : (
-                                        // ACTIVE STATE
                                         <div className="flex-1 flex flex-col h-full w-full relative">
-                                            {/* Header */}
                                             <div className="flex items-center gap-2 mb-2 px-1 relative z-10">
                                                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold border shadow-lg ${isClientActive ? 'bg-black text-amber-500 border-black' : 'bg-pink-600 border-pink-500 text-white'}`}>
                                                     {emp.firstName.substring(0, 1)}
@@ -325,8 +321,6 @@ const Productivity = () => {
                                                     {emp.alias || emp.firstName}
                                                 </p>
                                             </div>
-
-                                            {/* Status Indicator */}
                                             <div className="flex-1 flex items-center justify-center">
                                                 {isClientActive ? (
                                                     <div className="flex flex-col items-center animate-pulse">
@@ -352,17 +346,45 @@ const Productivity = () => {
                 <div className="w-1/3 flex flex-col gap-4">
                     {/* Cell 1: Gold Price & Shop Active Timer */}
                     <div className="flex gap-4 h-24 shrink-0 transition-transform hover:scale-[1.02]">
-                        <button
+                        <div
+                            className="flex-1 bg-gradient-to-r from-amber-200 via-yellow-400 to-amber-600 rounded-3xl shadow-xl relative overflow-hidden group cursor-pointer"
+                            onMouseEnter={() => setShowGoldDetails(true)}
+                            onMouseLeave={() => setShowGoldDetails(false)}
                             onClick={handleGoldPriceUpdate}
-                            className="flex-1 bg-gradient-to-r from-amber-200 via-yellow-400 to-amber-600 p-4 rounded-3xl shadow-xl flex items-center justify-between text-black relative overflow-hidden group"
                         >
                             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/brushed-alum.png')] opacity-20 mix-blend-overlay"></div>
-                            <div>
-                                <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Oro 18k/24k</p>
-                                <p className="text-4xl font-black font-mono tracking-tighter">{goldPrice}€</p>
+
+                            {/* Main Content */}
+                            <div className={`absolute inset-0 p-4 flex items-center justify-between transition-opacity duration-300 ${showGoldDetails ? 'opacity-0' : 'opacity-100'}`}>
+                                <div>
+                                    <p className="text-[10px] font-black uppercase tracking-widest opacity-70 text-black">Oro 18k/24k</p>
+                                    <p className="text-4xl font-black font-mono tracking-tighter text-black">{goldPrice}€</p>
+                                </div>
+                                <Watch size={32} className="opacity-50 text-black" />
                             </div>
-                            <Watch size={32} className="opacity-50" />
-                        </button>
+
+                            {/* Hover Details (External Prices) */}
+                            <div className={`absolute inset-0 bg-black/80 backdrop-blur-md p-3 flex flex-col justify-center text-amber-400 transition-opacity duration-300 ${showGoldDetails ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                                {externalPrices ? (
+                                    <>
+                                        <div className="flex justify-between items-center text-xs font-bold border-b border-white/10 pb-1 mb-1">
+                                            <span>Andorrano:</span>
+                                            <span className="text-white font-mono">{externalPrices.andorrano}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-xs font-bold">
+                                            <span>Q.Gold (&lt;100g):</span>
+                                            <span className="text-white font-mono">{externalPrices.quickgold}</span>
+                                        </div>
+                                        <p className="text-[9px] text-slate-500 mt-1 text-center font-mono">Actualizado: {new Date(externalPrices.timestamp).toLocaleTimeString()}</p>
+                                    </>
+                                ) : (
+                                    <div className="flex items-center justify-center gap-2">
+                                        <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+                                        <span className="text-xs font-bold">Cargando...</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
 
                         <div className="w-1/3 bg-slate-800 rounded-3xl border border-white/10 flex flex-col items-center justify-center relative overflow-hidden">
                             <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest absolute top-3">Tiempo Tienda</p>

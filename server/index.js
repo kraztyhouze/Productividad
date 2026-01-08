@@ -585,6 +585,102 @@ app.get('/api/market/search', (req, res) => {
     res.json(results);
 });
 
+// --- 9. Gold Price Scraper (New) ---
+let goldPriceCache = { timestamp: 0, data: null };
+
+app.get('/api/gold-prices', async (req, res) => {
+    // 1 hour cache
+    if (Date.now() - goldPriceCache.timestamp < 3600000 && goldPriceCache.data) {
+        return res.json(goldPriceCache.data);
+    }
+
+    let browser;
+    try {
+        console.log('[GoldScraper] Starting scrape...');
+        browser = await puppeteer.launch({
+            headless: 'new',
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+        const page = await browser.newPage();
+
+        // 1. Andorrano
+        let andorranoPrice = null;
+        try {
+            await page.goto('https://www.andorrano-joyeria.com/vender-oro', { waitUntil: 'domcontentloaded', timeout: 30000 });
+            // Selector: .quilates:nth-of-type(4) .cotizacion
+            andorranoPrice = await page.evaluate(() => {
+                try {
+                    const el = document.querySelector('.quilates:nth-of-type(4) .cotizacion');
+                    return el ? el.innerText.trim() : null;
+                } catch (e) { return null; }
+            });
+        } catch (e) { console.error('Andorrano fail', e.message); }
+
+        // 2. QuickGold
+        let quickGoldPrice = null;
+        try {
+            await page.goto('https://quickgold.es/vender-oro/compro-oro-sevilla/avenida-de-andalucia-18', { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+            // Try to click "+ PRECIOS" if needed, but first check if simple selector exists
+            // Based on subagent, we might need to click.
+            try {
+                // Try clicking accept cookies if present (optional but helps stability)
+                const buttons = await page.$$('button');
+                for (const b of buttons) {
+                    const t = await b.evaluate(el => el.textContent);
+                    if (t && t.includes('Permitir todas')) { await b.click(); break; }
+                }
+            } catch (e) { }
+
+            // Wait for potential interactions?
+            // Actually, try to click + PRECIOS
+            try {
+                const buttons = await page.$$('button, a');
+                for (const b of buttons) {
+                    const t = await b.evaluate(el => el.textContent);
+                    if (t && t.includes('+ PRECIOS')) {
+                        await b.click();
+                        await new Promise(r => setTimeout(r, 1000)); // Wait for expand
+                        break;
+                    }
+                }
+            } catch (e) { }
+
+            quickGoldPrice = await page.evaluate(() => {
+                try {
+                    // Specific selector found by subagent for < 100g 18k
+                    // .conversor_contenedorOtrosPrecios__VTwI9:nth-of-type(3) .conversor_OtrosPrecios__wCKTc:nth-of-type(2) .conversor_precio__8VOV7
+                    const el = document.querySelector('.conversor_contenedorOtrosPrecios__VTwI9:nth-of-type(3) .conversor_OtrosPrecios__wCKTc:nth-of-type(2) .conversor_precio__8VOV7');
+                    if (el) return el.innerText.trim();
+
+                    // Fallback: search by text
+                    const blocks = Array.from(document.querySelectorAll('div, p, span'));
+                    // Look for block containing "18k" near "Menos de 100g"
+                    // This is hard to do robustly with just text search without structure. 
+                    // Let's rely on the selector or returns null.
+
+                    return null;
+                } catch (e) { return null; }
+            });
+        } catch (e) { console.error('QuickGold fail', e.message); }
+
+        const result = {
+            andorrano: andorranoPrice || 'N/A',
+            quickgold: quickGoldPrice || 'N/A',
+            timestamp: Date.now()
+        };
+
+        goldPriceCache = { timestamp: Date.now(), data: result };
+        res.json(result);
+
+    } catch (error) {
+        console.error('Scraper error:', error);
+        res.status(500).json({ error: 'Failed to scrape prices' });
+    } finally {
+        if (browser) await browser.close();
+    }
+});
+
 app.use(express.static(path.join(__dirname, '../dist')));
 
 app.get(/(.*)/, (req, res) => {

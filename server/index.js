@@ -635,53 +635,32 @@ app.get('/api/gold-prices', async (req, res) => {
             });
         } catch (e) { console.error('Andorrano fail', e.message); }
 
-        // 2. QuickGold
+        // 2. QuickGold (Optimized: Direct Visible Price > 100g - 0.35)
         let quickGoldPrice = null;
         try {
-            await page.goto('https://quickgold.es/vender-oro/compro-oro-sevilla/avenida-de-andalucia-18', { waitUntil: 'domcontentloaded', timeout: 30000 });
+            // Use the main text page which renders the >100g price immediately
+            await page.goto('https://quickgold.es/vender-oro/compro-oro-sevilla/', { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-            // Try to click "+ PRECIOS" if needed, but first check if simple selector exists
-            // Based on subagent, we might need to click.
-            try {
-                // Try clicking accept cookies if present (optional but helps stability)
-                const buttons = await page.$$('button');
-                for (const b of buttons) {
-                    const t = await b.evaluate(el => el.textContent);
-                    if (t && t.includes('Permitir todas')) { await b.click(); break; }
-                }
-            } catch (e) { }
-
-            // Wait for potential interactions?
-            // Actually, try to click + PRECIOS
-            try {
-                const buttons = await page.$$('button, a');
-                for (const b of buttons) {
-                    const t = await b.evaluate(el => el.textContent);
-                    if (t && t.includes('+ PRECIOS')) {
-                        await b.click();
-                        await new Promise(r => setTimeout(r, 1000)); // Wait for expand
-                        break;
-                    }
-                }
-            } catch (e) { }
+            // The price is in a <p> with class containing "conversor_precio18k"
+            // Example: <p class="conversor_precio18k__tEwgL">81.70<span> €/g</span></p>
+            // We use a CSS attribute selector for robustness against hash changes
+            await page.waitForSelector('p[class*="conversor_precio18k"]', { timeout: 5000 });
 
             quickGoldPrice = await page.evaluate(() => {
                 try {
-                    // Specific selector found by subagent for < 100g 18k
-                    // .conversor_contenedorOtrosPrecios__VTwI9:nth-of-type(3) .conversor_OtrosPrecios__wCKTc:nth-of-type(2) .conversor_precio__8VOV7
-                    const el = document.querySelector('.conversor_contenedorOtrosPrecios__VTwI9:nth-of-type(3) .conversor_OtrosPrecios__wCKTc:nth-of-type(2) .conversor_precio__8VOV7');
-                    if (el) return el.innerText.trim();
+                    const el = document.querySelector('p[class*="conversor_precio18k"]');
+                    if (!el) return null;
+                    // Get text (e.g. "81.70 €/g") and parse
+                    const text = el.innerText.replace('€/g', '').replace(',', '.').trim();
+                    const val = parseFloat(text);
+                    if (isNaN(val)) return null;
 
-                    // Fallback: search by text
-                    const blocks = Array.from(document.querySelectorAll('div, p, span'));
-                    // Look for block containing "18k" near "Menos de 100g"
-                    // This is hard to do robustly with just text search without structure. 
-                    // Let's rely on the selector or returns null.
-
-                    return null;
+                    // Logic: Visible price is for >100g. We subtract 0.35 for <100g price.
+                    return (val - 0.35).toFixed(2);
                 } catch (e) { return null; }
             });
-        } catch (e) { console.error('QuickGold fail', e.message); }
+
+        } catch (e) { console.error('QuickGold optimized fail', e.message); }
 
         const result = {
             andorrano: andorranoPrice || 'N/A',

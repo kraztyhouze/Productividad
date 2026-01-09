@@ -107,10 +107,17 @@ export const ProductivityProvider = ({ children }) => {
             employeeName: session.employeeName,
             startTime: session.startTime,
             endTime: endTime.toISOString(),
-            durationSeconds: durationSeconds,
+            durationSeconds: isNaN(durationSeconds) ? 0 : Math.max(0, durationSeconds), // Prevent NaN and Negative
             date: new Date().toISOString().split('T')[0],
             groups: 0
         };
+
+        // Safety check: If duration is 0, warn but allow (maybe they clicked unintentionally)
+        if (record.durationSeconds === 0) {
+            console.warn(`[Productivity] Session ended with 0 duration. Start: ${session.startTime}, End: ${endTime.toISOString()}`);
+            // Optional: Set a minimum of 1s if valid start time?
+            if (session.startTime) record.durationSeconds = 1;
+        }
 
         // Optimistic UI
         const newSessions = [...activeSessions];

@@ -73,6 +73,8 @@ const Productivity = () => {
             } catch (err) { console.error("Failed to fetch gold prices", err); }
         };
         fetchGold();
+        const interval = setInterval(fetchGold, 1800000); // 30 mins
+        return () => clearInterval(interval);
     }, []);
 
     // ... (keep goldPrice) ...
@@ -346,41 +348,41 @@ const Productivity = () => {
                 <div className="w-1/3 flex flex-col gap-4">
                     {/* Cell 1: Gold Price & Shop Active Timer */}
                     <div className="flex gap-4 h-24 shrink-0 transition-transform hover:scale-[1.02]">
-                        <div
-                            className="flex-1 bg-gradient-to-r from-amber-200 via-yellow-400 to-amber-600 rounded-3xl shadow-xl relative overflow-hidden group cursor-pointer"
-                            onMouseEnter={() => setShowGoldDetails(true)}
-                            onMouseLeave={() => setShowGoldDetails(false)}
-                            onClick={handleGoldPriceUpdate}
-                        >
+                        <div className="flex-1 flex bg-gradient-to-r from-amber-200 via-yellow-400 to-amber-600 rounded-3xl shadow-xl relative overflow-hidden group">
                             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/brushed-alum.png')] opacity-20 mix-blend-overlay"></div>
 
-                            {/* Main Content */}
-                            <div className={`absolute inset-0 p-4 flex items-center justify-between transition-opacity duration-300 ${showGoldDetails ? 'opacity-0' : 'opacity-100'}`}>
-                                <div>
-                                    <p className="text-[10px] font-black uppercase tracking-widest opacity-70 text-black">Oro 18k/24k</p>
-                                    <p className="text-4xl font-black font-mono tracking-tighter text-black">{goldPrice}€</p>
+                            {/* Left: Editable Main Price */}
+                            <div
+                                onClick={handleGoldPriceUpdate}
+                                className="flex-[3] p-3 flex flex-col justify-center cursor-pointer hover:bg-black/5 transition-colors relative z-10"
+                            >
+                                <p className="text-[9px] font-black uppercase tracking-widest opacity-60 text-black mb-0.5">Precio Tienda</p>
+                                <div className="flex items-baseline gap-1">
+                                    <p className="text-4xl font-black font-mono tracking-tighter text-black leading-none">{goldPrice}</p>
+                                    <span className="text-xs font-bold text-black/60">€/gr</span>
                                 </div>
-                                <Watch size={32} className="opacity-50 text-black" />
                             </div>
 
-                            {/* Hover Details (External Prices) */}
-                            <div className={`absolute inset-0 bg-black/80 backdrop-blur-md p-3 flex flex-col justify-center text-amber-400 transition-opacity duration-300 ${showGoldDetails ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                            {/* Right: External Reference Prices (Permanent) */}
+                            <div className="flex-[2] bg-black/10 backdrop-blur-sm border-l border-black/5 p-2 flex flex-col justify-center gap-1.5 relative z-10">
                                 {externalPrices ? (
                                     <>
-                                        <div className="flex justify-between items-center text-xs font-bold border-b border-white/10 pb-1 mb-1">
-                                            <span>Andorrano:</span>
-                                            <span className="text-white font-mono">{externalPrices.andorrano}</span>
+                                        <div className="flex justify-between items-center px-1">
+                                            <span className="text-[8px] font-black text-black/50 uppercase tracking-tighter">ANDORRANO</span>
+                                            <span className="text-xs font-mono font-bold text-black leading-none">{externalPrices.andorrano}</span>
                                         </div>
-                                        <div className="flex justify-between items-center text-xs font-bold">
-                                            <span>Q.Gold (&lt;100g):</span>
-                                            <span className="text-white font-mono">{externalPrices.quickgold}</span>
+                                        <div className="flex justify-between items-center px-1">
+                                            <span className="text-[8px] font-black text-black/50 uppercase tracking-tighter">QUICKGOLD</span>
+                                            <span className="text-xs font-mono font-bold text-black leading-none">{externalPrices.quickgold}</span>
                                         </div>
-                                        <p className="text-[9px] text-slate-500 mt-1 text-center font-mono">Actualizado: {new Date(externalPrices.timestamp).toLocaleTimeString()}</p>
+                                        <div className="text-[7px] text-black/40 text-center font-mono mt-0.5">
+                                            {new Date(externalPrices.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </div>
                                     </>
                                 ) : (
-                                    <div className="flex items-center justify-center gap-2">
-                                        <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
-                                        <span className="text-xs font-bold">Cargando...</span>
+                                    <div className="flex flex-col items-center justify-center h-full gap-1">
+                                        <div className="w-3 h-3 border-2 border-black/30 border-t-transparent rounded-full animate-spin"></div>
+                                        <span className="text-[8px] font-bold text-black/40">Cargando...</span>
                                     </div>
                                 )}
                             </div>

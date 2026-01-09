@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { Monitor, Cpu, Keyboard, Wifi, Camera, Mic, Battery, Play, CheckCircle, XCircle, Grid } from 'lucide-react';
+import { db, doc, updateDoc } from '../firebase';
 
 const LaptopDiagnostics = () => {
     const { sessionId } = useParams();
@@ -10,10 +11,9 @@ const LaptopDiagnostics = () => {
 
     const sendUpdate = async (testName, result) => {
         try {
-            await fetch(`/api/diagnostics/update/${sessionId}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ test: testName, result })
+            await updateDoc(doc(db, "tests", sessionId), {
+                [`results_laptop_${testName}`]: result, // Optional: tracking details
+                [testName]: result // Main key for Market checking
             });
         } catch (e) {
             console.error("Failed to sync", e);
@@ -24,6 +24,16 @@ const LaptopDiagnostics = () => {
         setResults(prev => ({ ...prev, [test]: data }));
         sendUpdate(test, data);
     };
+
+    // Auto-finish on done
+    useEffect(() => {
+        if (step === 'done') {
+            updateDoc(doc(db, "tests", sessionId), {
+                status: 'completed',
+                tests: { ...results, specs } // Save all flat for easy reading
+            });
+        }
+    }, [step]);
 
     if (step === 'intro') {
         return (

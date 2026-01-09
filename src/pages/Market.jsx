@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Search, ExternalLink, ShoppingCart, Smartphone, Monitor, Watch, Zap, Hammer, Gamepad2, AlertTriangle, CheckCircle, XCircle, Grid, QrCode } from 'lucide-react';
+import { Search, ExternalLink, ShoppingCart, Smartphone, Monitor, Watch, Zap, Hammer, Gamepad2, AlertTriangle, CheckCircle, XCircle, Grid, QrCode, FileText, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const CATEGORIES = {
-    phones: { name: 'Móviles/Tablets', margin: 0.40, icon: <Smartphone size={16} />, checklist: ['Enciende', 'Pantalla Tactil/Píxeles', 'Cámaras', 'IMEI Limpio/No Bloqueo', 'Micrófono/Audio', 'Cargador/Puerto'] },
+    phones: { name: 'Móviles/Tablets', margin: 0.40, icon: <Smartphone size={16} />, checklist: ['IMEI/Red', 'Cosmético', 'Seguridad', 'Pantalla/Touch', 'Vibración/Sensores', 'Micrófono/Audio', 'Cámaras/Flash', 'GPS', 'Carga'] },
     laptops: { name: 'Portátiles', margin: 0.40, icon: <Monitor size={16} />, checklist: ['Enciende', 'Cargador Original', 'Teclado Completo', 'Pantalla sin manchas', 'Webcam/Audio', 'Hardware OK'] },
     consoles: { name: 'Consolas', margin: 0.35, icon: <Gamepad2 size={16} />, checklist: ['Lee discos/cartuchos', 'Mando conecta', 'No baneada (Online)', 'Garantía precintos'] },
     jewelry: { name: 'Joyería', margin: 0.30, icon: <Watch size={16} />, checklist: ['Sello de contraste', 'Peso verificado', 'Piedras revisadas', 'Cierre funciona', 'Prueba Ácido/Imán'] },
@@ -64,97 +66,216 @@ const Market = () => {
         setAppraisalResult(null); // Reset result
     }, [category]);
 
-    // Polling for Diagnostics
+    // Poll for Diagnostics Status
     useEffect(() => {
         if (!diagnosticSession || diagnosticSession.status === 'completed') return;
 
-        const interval = setInterval(async () => {
+        const poll = setInterval(async () => {
             try {
                 const res = await fetch(`/api/diagnostics/session/${diagnosticSession.sessionId}`);
-                if (res.ok) {
-                    const data = await res.json();
+                if (!res.ok) return; // Session might be gone or error
+                const data = await res.json();
 
-                    // Update Status
-                    if (data.status === 'completed') {
-                        setDiagnosticSession(prev => ({ ...prev, status: 'completed', results: data.tests }));
+                // Update Status
+                if (data.status && data.status !== diagnosticSession.status) {
+                    setDiagnosticSession(prev => ({ ...prev, status: data.status, results: data.results || [], deviceInfo: data.deviceInfo || {} }));
+                }
 
-                        // Auto-Check Items
-                        // 1. Pantalla
-                        const screenItem = CATEGORIES['phones'].checklist.find(c => c.includes('Pantalla'));
-                        if (screenItem && data.tests.touch === true && data.tests.pixels === true) {
-                            handleChecklistChange(screenItem, true);
-                        }
-                        // 2. Audio
-                        const audioItem = CATEGORIES['phones'].checklist.find(c => c.includes('Audio'));
-                        if (audioItem && data.tests.audio === true) {
-                            handleChecklistChange(audioItem, true);
-                        }
-                        // 3. Carga
-                        const chargeItem = CATEGORIES['phones'].checklist.find(c => c.includes('Cargador'));
-                        if (chargeItem && data.tests.charging === true) {
-                            handleChecklistChange(chargeItem, true);
-                        }
-                        // 4. Cámaras
-                        const camItem = CATEGORIES['phones'].checklist.find(c => c.includes('Cámaras'));
-                        if (camItem && data.tests.cameras === true) {
-                            handleChecklistChange(camItem, true);
-                        }
-                        // 5. Bloqueos
-                        const lockItem = CATEGORIES['phones'].checklist.find(c => c.includes('Bloqueo'));
-                        if (lockItem && data.tests.accounts === true) {
-                            handleChecklistChange(lockItem, true);
-                        }
+                // Sync Results live
+                if (data.results) {
+                    setDiagnosticSession(prev => ({ ...prev, results: data.results, deviceInfo: data.deviceInfo || prev.deviceInfo }));
+                }
+
+                if (data.status === 'completed') {
+                    clearInterval(poll);
+
+                    // Normalize results to map
+                    const rs = data.results || [];
+                    const testsMap = {};
+                    rs.forEach(r => testsMap[r.name] = r.passed);
+
+                    // --- MOBILE CHECKS (Same Logic) ---
+                    if (category === 'phones') {
+                        if (testsMap['imei'] && testsMap['network']) handleChecklistChange('IMEI/Red', true);
+                        if (testsMap['cosmetic']) handleChecklistChange('Cosmético', true);
+                        if (testsMap['security']) handleChecklistChange('Seguridad', true);
+                        if (testsMap['pixels'] && testsMap['touch']) handleChecklistChange('Pantalla/Touch', true);
+                        if (testsMap['vibration'] && testsMap['sensors']) handleChecklistChange('Vibración/Sensores', true);
+                        if (testsMap['mic'] && testsMap['audio']) handleChecklistChange('Micrófono/Audio', true);
+                        if (testsMap['front-camera'] && testsMap['camera'] && testsMap['flashlight']) handleChecklistChange('Cámaras/Flash', true);
+                        if (testsMap['gps']) handleChecklistChange('GPS', true);
+                        if (testsMap['charging']) handleChecklistChange('Carga', true);
                     }
 
-                    // --- AUTO CHECK LAPTOPS ---
-                    if (category === 'laptops' && data.status === 'completed') {
-                        setDiagnosticSession(prev => ({ ...prev, status: 'completed', results: data.tests }));
-                        // 1. Keyboard
-                        if (data.tests.keyboard === true) {
+                    // --- LAPTOP CHECKS ---
+                    if (category === 'laptops') {
+                        if (testsMap['keyboard']) {
                             const item = CATEGORIES['laptops'].checklist.find(c => c.includes('Teclado'));
                             if (item) handleChecklistChange(item, true);
                         }
-                        // 2. Screen
-                        if (data.tests.screen === true) {
+                        if (testsMap['screen']) {
                             const item = CATEGORIES['laptops'].checklist.find(c => c.includes('Pantalla'));
                             if (item) handleChecklistChange(item, true);
                         }
-                        // 3. Audio/Webcam
-                        if (data.tests.webcam === true && data.tests.audio === true) {
+                        if (testsMap['webcam'] && testsMap['audio']) {
                             const item = CATEGORIES['laptops'].checklist.find(c => c.includes('Webcam'));
                             if (item) handleChecklistChange(item, true);
                         }
-                        // 4. Specs
-                        if (data.tests.specs) {
+                        if (testsMap['specs']) {
                             const item = CATEGORIES['laptops'].checklist.find(c => c.includes('Hardware'));
                             if (item) handleChecklistChange(item, true);
                         }
                     }
                 }
-            } catch (err) {
-                console.error("Polling error", err);
+            } catch (error) {
+                console.error("Polling error", error);
             }
-        }, 2000);
+        }, 2000); // Poll every 2s
 
-        return () => clearInterval(interval);
+        return () => clearInterval(poll);
     }, [diagnosticSession]);
 
+    const downloadReport = () => {
+        if (!diagnosticSession || !diagnosticSession.results) return;
+        const doc = new jsPDF();
+
+        // Define Brand Colors
+        const PINK = [219, 39, 119];
+        const DARK = [15, 23, 42];
+        const GRAY = [100, 116, 139];
+        const GREEN = [22, 163, 74];
+        const RED = [220, 38, 38];
+
+        // --- HEADER ---
+        // Brand Bar
+        doc.setFillColor(...DARK);
+        doc.rect(0, 0, 210, 40, 'F');
+
+        // Title
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(26);
+        doc.setTextColor(255, 255, 255);
+        doc.text("PhoneCheck AI", 14, 25);
+
+        // Subtitle
+        doc.setFontSize(10);
+        doc.setTextColor(...PINK);
+        doc.text("INFORME DE CERTIFICACIÓN DE DISPOSITIVO", 14, 32);
+
+        // Date & Ref (Right aligned)
+        doc.setFontSize(9);
+        doc.setTextColor(200, 200, 200);
+        const dateStr = new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString();
+        doc.text(dateStr, 196, 20, { align: "right" });
+        doc.text(`REF: ${diagnosticSession.sessionId.toUpperCase().slice(0, 8)}`, 196, 26, { align: "right" });
+
+        // --- DEVICE INFO BOX ---
+        const info = diagnosticSession.deviceInfo || {};
+        doc.setFillColor(248, 250, 252); // slate-50
+        doc.setDrawColor(226, 232, 240); // slate-200
+        doc.roundedRect(14, 50, 182, 35, 3, 3, 'FD');
+
+        doc.setFontSize(10);
+        doc.setTextColor(...GRAY);
+        doc.text("DISPOSITIVO", 20, 60);
+        doc.text("PLATAFORMA", 100, 60);
+
+        doc.setFontSize(12);
+        doc.setTextColor(...DARK);
+        doc.setFont("helvetica", "bold");
+        doc.text(info.model || "Desconocido", 20, 67);
+        doc.text(info.platform || "-", 100, 67);
+
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...GRAY);
+        doc.text(info.userAgent ? "User-Agent Detectado" : "-", 20, 75);
+        if (info.screen) doc.text(`Pantalla: ${info.screen}`, 100, 75);
+
+        // --- SCORE / SUMMARY ---
+        const rs = Array.isArray(diagnosticSession.results) ? diagnosticSession.results : Object.values(diagnosticSession.results);
+        const failedCount = rs.filter(r => !r.passed).length;
+        const totalCount = rs.length;
+        const isClean = failedCount === 0 && totalCount > 0;
+
+        // Stamp
+        doc.setDrawColor(...(isClean ? GREEN : RED));
+        doc.setLineWidth(1);
+        doc.roundedRect(150, 55, 40, 25, 2, 2, 'D');
+
+        doc.setFontSize(14);
+        doc.setTextColor(...(isClean ? GREEN : RED));
+        doc.setFont("helvetica", "bold");
+        doc.text(isClean ? "APTO" : "REVISAR", 170, 68, { align: "center" });
+
+        doc.setFontSize(8);
+        doc.text(isClean ? "100% FUNCIONAL" : `${failedCount} ERRORES`, 170, 74, { align: "center" });
+
+
+        // --- TABLE ---
+        const rows = rs.map(r => [
+            r.name.toUpperCase(),
+            r.passed ? 'CORRECTO' : 'FALLO',
+            r.details || '-'
+        ]);
+
+        autoTable(doc, {
+            startY: 95,
+            head: [['COMPONENTE / TEST', 'ESTADO', 'DETALLES TÉCNICOS']],
+            body: rows,
+            theme: 'grid',
+            headStyles: {
+                fillColor: [...DARK],
+                textColor: 255,
+                fontStyle: 'bold',
+                halign: 'left'
+            },
+            bodyStyles: {
+                textColor: 50
+            },
+            columnStyles: {
+                0: { fontStyle: 'bold', width: 50 },
+                1: { fontStyle: 'bold', width: 40 },
+                2: { fontStyle: 'italic' }
+            },
+            didParseCell: function (data) {
+                if (data.section === 'body' && data.column.index === 1) {
+                    if (data.cell.raw === 'FALLO') {
+                        data.cell.styles.textColor = [...RED];
+                    } else {
+                        data.cell.styles.textColor = [...GREEN];
+                    }
+                }
+            }
+        });
+
+        // --- FOOTER ---
+        const pageCount = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.setFontSize(8);
+            doc.setTextColor(150);
+            doc.text(`Generado automáticamente por TikTak Market Suite - Página ${i} de ${pageCount}`, 105, 290, { align: "center" });
+        }
+
+        doc.save(`Certificado_${diagnosticSession.sessionId.slice(0, 8)}.pdf`);
+    };
 
     const startDiagnostic = async (type = 'mobile') => {
         try {
             const res = await fetch('/api/diagnostics/init', { method: 'POST' });
-            const data = await res.json();
-            let finalUrl = `${window.location.origin}${data.url}`;
-            if (type === 'laptop') {
-                finalUrl = finalUrl.replace('mobile-test', 'laptop-test');
-            }
+            if (!res.ok) throw new Error('Init failed');
+            const data = await res.json(); // { sessionId, url }
+
             setDiagnosticSession({
                 sessionId: data.sessionId,
-                url: finalUrl,
-                status: 'waiting'
+                url: `${window.location.origin}${data.url}`, // Prepend origin
+                status: 'waiting',
+                results: []
             });
         } catch (e) {
-            alert("Error iniciando diagnóstico");
+            console.error("Error creating session", e);
+            alert("Error iniciando diagnóstico. Verifica servidor.");
         }
     };
 
@@ -454,6 +575,11 @@ const Market = () => {
                                                 </div>
                                                 {diagnosticSession.status === 'completed' && (
                                                     <button onClick={() => setDiagnosticSession(null)} className="text-[10px] underline text-slate-400">Reiniciar</button>
+                                                )}
+                                                {diagnosticSession.status === 'completed' && (
+                                                    <button onClick={downloadReport} className="ml-2 bg-pink-600 hover:bg-pink-500 text-white p-2 rounded-lg transition-all" title="Descargar PDF">
+                                                        <Download size={16} />
+                                                    </button>
                                                 )}
                                             </div>
                                         )}

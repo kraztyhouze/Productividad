@@ -487,14 +487,14 @@ app.post('/api/security/check-imei', async (req, res) => {
 });
 
 // --- 8. Mobile Diagnostics (Satellite App) ---
-const diagnosticSessions = {}; // In-memory store: { id: { status: 'waiting', results: {} } }
+const diagnosticSessions = {}; // In-memory store
 
 app.post('/api/diagnostics/init', (req, res) => {
     const sessionId = Math.random().toString(36).substring(2, 9);
     diagnosticSessions[sessionId] = {
         status: 'waiting',
         createdAt: Date.now(),
-        tests: { touch: null, pixels: null, camera: null }
+        results: [] // Store full result objects { name, passed, details }
     };
 
     // Clean up old sessions
@@ -503,6 +503,9 @@ app.post('/api/diagnostics/init', (req, res) => {
         if (now - diagnosticSessions[k].createdAt > 3600000) delete diagnosticSessions[k];
     });
 
+    // Return full URL for QR code
+    // We need to know the host; for now assume referer or relative
+    // But the QR needs a full URL. We'll return the relative part and let frontend prepend origin.
     res.json({ sessionId, url: `/mobile-test/${sessionId}` });
 });
 
@@ -515,15 +518,31 @@ app.get('/api/diagnostics/session/:id', (req, res) => {
 
 app.post('/api/diagnostics/update/:id', (req, res) => {
     const { id } = req.params;
-    const { test, result, status } = req.body; // test: 'touch', result: true/false
+    const { result, status, results } = req.body;
 
     if (!diagnosticSessions[id]) return res.status(404).json({ error: 'Session not found' });
 
-    if (test) {
-        diagnosticSessions[id].tests[test] = result;
-    }
+    // Update Status
     if (status) {
         diagnosticSessions[id].status = status;
+    }
+
+    // Append single result
+    if (result) {
+        // Check if exists to update or append
+        const idx = diagnosticSessions[id].results.findIndex(r => r.name === result.name);
+        if (idx >= 0) diagnosticSessions[id].results[idx] = result;
+        else diagnosticSessions[id].results.push(result);
+    }
+
+    // Replace all results (sync)
+    if (results) {
+        diagnosticSessions[id].results = results;
+    }
+
+    // Extras (device info, etc)
+    if (req.body.deviceInfo) {
+        diagnosticSessions[id].deviceInfo = req.body.deviceInfo;
     }
 
     res.json({ success: true });

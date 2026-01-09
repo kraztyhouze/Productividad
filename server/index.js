@@ -616,7 +616,13 @@ app.get('/api/gold-prices', async (req, res) => {
         console.log('[GoldScraper] Starting scrape...');
         browser = await puppeteer.launch({
             headless: 'new',
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage', // Critical for Docker/Cloud
+                '--disable-accelerated-2d-canvas',
+                '--disable-gpu'
+            ]
         });
         const page = await browser.newPage();
 
@@ -624,7 +630,9 @@ app.get('/api/gold-prices', async (req, res) => {
         let andorranoPrice = null;
         try {
             await page.goto('https://www.andorrano-joyeria.com/vender-oro', { waitUntil: 'domcontentloaded', timeout: 30000 });
-            // Selector: .quilates:nth-of-type(4) .cotizacion
+            // Wait for data to load
+            await page.waitForSelector('.quilates:nth-of-type(4) .cotizacion', { timeout: 10000 });
+
             andorranoPrice = await page.evaluate(() => {
                 try {
                     const el = document.querySelector('.quilates:nth-of-type(4) .cotizacion');
@@ -642,7 +650,7 @@ app.get('/api/gold-prices', async (req, res) => {
             // The price is in a <p> with class containing "conversor_precio18k"
             // Example: <p class="conversor_precio18k__tEwgL">81.70<span> €/g</span></p>
             // We use a CSS attribute selector for robustness against hash changes
-            await page.waitForSelector('p[class*="conversor_precio18k"]', { timeout: 5000 });
+            await page.waitForSelector('p[class*="conversor_precio18k"]', { timeout: 10000 });
 
             quickGoldPrice = await page.evaluate(() => {
                 try {

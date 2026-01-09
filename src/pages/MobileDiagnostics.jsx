@@ -381,47 +381,85 @@ const VibrationTest = ({ btnSecondary, btnDanger, onComplete }) => {
 
 /* 8. SENSORS */
 const SensorTest = ({ onComplete }) => {
+    const [status, setStatus] = useState('started'); // started, listening, error
     const [val, setVal] = useState(0);
 
-    useEffect(() => {
+    const start = () => {
+        // iOS 13+ requires permission
+        if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+            DeviceMotionEvent.requestPermission()
+                .then(response => {
+                    if (response === 'granted') {
+                        startListening();
+                    } else {
+                        alert("Permiso denegado para sensores.");
+                        setStatus('error');
+                    }
+                })
+                .catch(e => {
+                    console.error(e);
+                    alert("Error al pedir permiso (necesitas HTTPS): " + e.message);
+                    setStatus('error');
+                });
+        } else {
+            // Non-iOS 13+ devices
+            startListening();
+        }
+    };
+
+    const startListening = () => {
+        setStatus('listening');
         const handler = (e) => {
             const acc = e.accelerationIncludingGravity;
             if (acc) {
                 const total = Math.abs(acc.x) + Math.abs(acc.y) + Math.abs(acc.z);
-                setVal(prev => prev + total);
-                if (total > 25) { // Shake detected
+                // setVal(total); // debug
+                if (total > 25) { // Shake detected threshold
                     window.removeEventListener('devicemotion', handler);
-                    // Slight delay for UX
-                    setTimeout(() => onComplete({ passed: true, details: 'Acelerómetro OK' }), 500);
+                    onComplete({ passed: true, details: 'Acelerómetro OK' });
                 }
             }
         };
 
-        if (window.DeviceMotionEvent) {
-            // iOS requires permission request (not implemented here purely auto, but usually needs a click)
-            // For this flow we assume it works or user accepts if prompted previously
+        if ('DeviceMotionEvent' in window) {
             window.addEventListener('devicemotion', handler);
+            // Timeout to fail if no motion detected after 5s
+            setTimeout(() => {
+                window.removeEventListener('devicemotion', handler);
+                if (status === 'listening') setStatus('error'); // Show fallbacks
+            }, 5000);
         } else {
-            onComplete({ passed: false, details: 'No soportado' });
+            setStatus('error');
         }
-
-        // Timeout fallback
-        const tm = setTimeout(() => {
-            window.removeEventListener('devicemotion', handler);
-            onComplete({ passed: true, details: 'Sensor (Timeout/Skip)' }); // Lenient pass or fail?
-        }, 5000);
-
-        return () => {
-            window.removeEventListener('devicemotion', handler);
-            clearTimeout(tm);
-        };
-    }, []);
+    };
 
     return (
         <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-8 text-center">
             <Maximize size={64} className="mb-6 text-blue-500 animate-spin-slow" />
-            <h2 className="text-2xl font-bold mb-4">Sensores</h2>
-            <p className="text-slate-400">Mueve el dispositivo...</p>
+            <h2 className="text-2xl font-bold mb-4">Sensores (Acelerómetro)</h2>
+
+            {status === 'started' && (
+                <button
+                    onClick={start}
+                    className="w-full max-w-xs py-4 bg-blue-600 rounded-xl font-bold text-lg shadow-lg mb-8"
+                >
+                    INICIAR TEST
+                </button>
+            )}
+
+            {status === 'listening' && (
+                <p className="text-xl animate-pulse text-blue-300">¡Agita el dispositivo!</p>
+            )}
+
+            {(status === 'error' || status === 'listening') && (
+                <div className="mt-8 w-full max-w-xs animate-in fade-in">
+                    <p className="text-sm text-slate-400 mb-4">Si no detecta movimiento (por falta de HTTPS/Permisos):</p>
+                    <div className="flex gap-4">
+                        <button onClick={() => onComplete({ passed: true, details: 'Sensor Manual OK' })} className="flex-1 py-3 bg-white text-slate-900 rounded-xl font-bold">FUNCIONA</button>
+                        <button onClick={() => onComplete({ passed: false, details: 'Fallo Sensor' })} className="flex-1 py-3 bg-slate-800 text-red-500 border border-red-500/50 rounded-xl font-bold">FALLO</button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -615,25 +653,55 @@ const FlashlightTest = ({ btnPrimary, btnSecondary, btnDanger, onComplete }) => 
 
 /* 13. GPS */
 const GPSTest = ({ onComplete }) => {
-    useEffect(() => {
+    const [status, setStatus] = useState('idle'); // idle, locating, error
+
+    const start = () => {
+        setStatus('locating');
         if ("geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(
                 (p) => onComplete({ passed: true, details: `${p.coords.latitude.toFixed(4)},${p.coords.longitude.toFixed(4)}` }),
                 (e) => {
-                    console.error(e);
-                    alert("Error GPS: " + e.message + ". Asegúrate de dar permiso y usar HTTPS.");
-                    onComplete({ passed: false, details: 'Error Permisos/HTTPS' });
-                }
+                    console.error("GPS Error", e);
+                    setStatus('error');
+                    // alert("Error GPS: " + e.message); // Opcional: mostrar alerta nativa
+                },
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
             );
         } else {
             onComplete({ passed: false, details: 'No soportado' });
         }
-    }, []);
+    };
 
     return (
         <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-8 text-center">
-            <MapPin size={64} className="mb-6 text-red-500 animate-bounce" />
-            <h2 className="text-2xl font-bold">Obteniendo Ubicación...</h2>
+            <MapPin size={64} className={`mb-6 text-red-500 ${status === 'locating' ? 'animate-bounce' : ''}`} />
+            <h2 className="text-2xl font-bold mb-4">Prueba GPS</h2>
+
+            {status === 'idle' && (
+                <>
+                    <p className="text-slate-400 mb-8 max-w-xs text-sm">Se solicitará permiso para acceder a la ubicación precisa.</p>
+                    <button
+                        onClick={start}
+                        className="w-full max-w-xs py-4 bg-red-600 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-transform"
+                    >
+                        OBTENER UBICACIÓN
+                    </button>
+                </>
+            )}
+
+            {status === 'locating' && <p className="text-slate-400 animate-pulse">Solicitando permiso / satélites...</p>}
+
+            {status === 'error' && (
+                <div className="w-full max-w-xs animate-in fade-in">
+                    <p className="text-sm text-yellow-500 mb-4 bg-yellow-500/10 p-3 rounded-lg border border-yellow-500/20">
+                        ⚠️ No se pudo obtener la ubicación. Verifica los permisos del navegador.
+                    </p>
+                    <div className="flex flex-col gap-3">
+                        <button onClick={start} className="w-full py-3 bg-slate-700 rounded-xl font-bold">REINTENTAR</button>
+                        <button onClick={() => onComplete({ passed: false, details: 'Fallo GPS (Manual)' })} className="w-full py-3 bg-slate-800 text-slate-400 border border-slate-700 rounded-xl font-bold text-sm">SALTAR ESTA PRUEBA</button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

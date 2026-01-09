@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useProductivity } from '../context/ProductivityContext';
 import { useTeam } from '../context/TeamContext';
 import { useAuth, ROLES } from '../context/AuthContext';
-import { Users, ShoppingBag, Clock, UserCheck, AlertCircle, Lock, RefreshCw, Plus, Trash2, StopCircle, UserPlus, Check, X, Watch, Percent, Info } from 'lucide-react';
+import { ShoppingBag, Clock, RefreshCw, Trash2, UserPlus, Check, X, Watch, Pencil, BarChart2 } from 'lucide-react';
 import InfoPanel from '../components/Productivity/InfoPanel';
 import CloseDayModal from '../components/Productivity/CloseDayModal';
 import EditTimeModal from '../components/Productivity/EditTimeModal';
 import EditStatsModal from '../components/Productivity/EditStatsModal';
 import NoDealModal from '../components/Productivity/NoDealModal';
-import { Pencil, BarChart2 } from 'lucide-react';
+
 
 const REJECTION_REASONS = [
     "Precio pide muy alto",

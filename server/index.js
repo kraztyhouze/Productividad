@@ -5,8 +5,6 @@ import pg from 'pg';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import axios from 'axios';
-import * as cheerio from 'cheerio';
 import puppeteer from 'puppeteer';
 import { initDb, pool } from './db.js';
 
@@ -494,7 +492,7 @@ app.post('/api/diagnostics/init', (req, res) => {
     diagnosticSessions[sessionId] = {
         status: 'waiting',
         createdAt: Date.now(),
-        results: [] // Store full result objects { name, passed, details }
+        results: []
     };
 
     // Clean up old sessions
@@ -503,10 +501,10 @@ app.post('/api/diagnostics/init', (req, res) => {
         if (now - diagnosticSessions[k].createdAt > 3600000) delete diagnosticSessions[k];
     });
 
-    // Return full URL for QR code
-    // We need to know the host; for now assume referer or relative
-    // But the QR needs a full URL. We'll return the relative part and let frontend prepend origin.
-    res.json({ sessionId, url: `/mobile-test/${sessionId}` });
+    const type = req.body.type || 'mobile';
+    const url = type === 'laptop' ? `/laptop-test/${sessionId}` : `/mobile-test/${sessionId}`;
+
+    res.json({ sessionId, url });
 });
 
 app.get('/api/diagnostics/session/:id', (req, res) => {

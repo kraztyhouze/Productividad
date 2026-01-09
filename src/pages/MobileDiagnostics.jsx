@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { Smartphone, CheckCircle, Monitor, Camera, Play, Check, Mic, Speaker, Battery, MapPin, Activity, ShieldAlert, Key, Zap, Wifi, Grid, Maximize, AlertTriangle } from 'lucide-react';
-// Firebase removed
+import { useParams } from 'react-router-dom';
+import { Smartphone, CheckCircle, Mic, Speaker, Battery, MapPin, Activity, ShieldAlert, Zap, Wifi, Grid, Maximize } from 'lucide-react';
 
 const MobileDiagnostics = () => {
     const { sessionId } = useParams();

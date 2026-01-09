@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useProductivity } from '../context/ProductivityContext';
 import { useTeam } from '../context/TeamContext';
 import { useAuth } from '../context/AuthContext';
-import { Sun, Calendar, TrendingUp, Users, CheckCircle, BarChart as LucideBarChart, Clock } from 'lucide-react';
+import { Calendar, TrendingUp, BarChart as LucideBarChart, Clock } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, ComposedChart, Line, CartesianGrid, Legend } from 'recharts';
 
 const Dashboard = () => {

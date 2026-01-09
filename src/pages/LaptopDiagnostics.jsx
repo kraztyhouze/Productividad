@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { Monitor, Cpu, Keyboard, Wifi, Camera, Mic, Battery, Play, CheckCircle, XCircle, Grid } from 'lucide-react';
-import { db, doc, updateDoc } from '../firebase';
+
 
 const LaptopDiagnostics = () => {
     const { sessionId } = useParams();
@@ -11,9 +11,16 @@ const LaptopDiagnostics = () => {
 
     const sendUpdate = async (testName, result) => {
         try {
-            await updateDoc(doc(db, "tests", sessionId), {
-                [`results_laptop_${testName}`]: result, // Optional: tracking details
-                [testName]: result // Main key for Market checking
+            await fetch(`/api/diagnostics/update/${sessionId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    result: {
+                        name: testName,
+                        passed: result === true || (typeof result === 'object' && !result.error), // Simplified pass check
+                        details: typeof result === 'object' ? JSON.stringify(result) : (result ? 'Passed' : 'Failed')
+                    }
+                })
             });
         } catch (e) {
             console.error("Failed to sync", e);
@@ -28,10 +35,19 @@ const LaptopDiagnostics = () => {
     // Auto-finish on done
     useEffect(() => {
         if (step === 'done') {
-            updateDoc(doc(db, "tests", sessionId), {
-                status: 'completed',
-                tests: { ...results, specs } // Save all flat for easy reading
-            });
+            fetch(`/api/diagnostics/update/${sessionId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    status: 'completed',
+                    results: Object.entries(results).map(([k, v]) => ({
+                        name: k,
+                        passed: v === true || (typeof v === 'object' && !v.error),
+                        details: typeof v === 'object' ? JSON.stringify(v) : (v ? 'Passed' : 'Failed')
+                    })),
+                    deviceInfo: specs
+                })
+            }).catch(console.error);
         }
     }, [step]);
 

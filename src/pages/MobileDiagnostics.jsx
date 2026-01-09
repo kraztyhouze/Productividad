@@ -31,12 +31,9 @@ const MobileDiagnostics = () => {
             };
             setDeviceInfo(info);
 
-            // Mark as in_progress
-            fetch(`/api/diagnostics/update/${sessionId}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: 'in_progress', deviceInfo: info })
-            }).catch(e => console.error(e));
+            // We do NOT update immediately here, we wait for Employee Name in next step.
+            // But we can pre-fill device info.
+
         }
     }, [sessionId]);
 
@@ -71,10 +68,26 @@ const MobileDiagnostics = () => {
                 <Smartphone size={64} className="text-pink-500 mb-6 animate-pulse" />
                 <h1 className="text-3xl font-black mb-2">PhoneCheck AI</h1>
                 <p className="text-slate-400 mb-2">ID: <span className="font-mono text-pink-400">{sessionId ? sessionId.slice(0, 8) : '...'}</span></p>
-                <p className="text-slate-500 mb-8 max-w-xs text-sm">{deviceInfo.model || 'Detectando...'}</p>
+                <p className="text-slate-500 mb-6 max-w-xs text-sm">{deviceInfo.model || 'Detectando...'}</p>
+
+                <input
+                    type="text"
+                    placeholder="Tu Alias / Nombre"
+                    className="w-full max-w-xs bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white mb-6 focus:border-pink-500 outline-none text-center font-bold"
+                    onChange={(e) => setDeviceInfo(prev => ({ ...prev, employee: e.target.value }))}
+                />
 
                 <button
-                    onClick={() => next('imei')}
+                    onClick={() => {
+                        if (!deviceInfo.employee) return alert("Introduce tu nombre/alias");
+                        // Register session start with alias
+                        fetch(`/api/diagnostics/update/${sessionId}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ status: 'in_progress', deviceInfo })
+                        }).catch(e => console.error(e));
+                        next('imei');
+                    }}
                     className={btnPrimary}
                 >
                     COMENZAR TEST
@@ -344,7 +357,11 @@ const TouchTest = ({ onComplete }) => {
 /* 7. VIBRATION */
 const VibrationTest = ({ btnSecondary, btnDanger, onComplete }) => {
     const vibrate = () => {
-        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+        if (navigator.vibrate) {
+            navigator.vibrate([200, 100, 200]);
+        } else {
+            alert("Tu navegador/dispositivo (probablemente iOS) no permite vibración web. Verifica manualmente.");
+        }
     };
 
     return (
@@ -418,11 +435,14 @@ const MicTest = ({ btnPrimary, btnSecondary, btnDanger, onComplete }) => {
     const start = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const recorder = new MediaRecorder(stream);
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' :
+                MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '';
+
+            const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
             const chunks = [];
             recorder.ondataavailable = e => chunks.push(e.data);
             recorder.onstop = () => {
-                const blob = new Blob(chunks, { type: 'audio/webm' }); // Use webm or default
+                const blob = new Blob(chunks, { type: mimeType || 'audio/webm' });
                 setAudioUrl(URL.createObjectURL(blob));
                 setStatus('playback');
                 stream.getTracks().forEach(t => t.stop());
@@ -543,7 +563,7 @@ const CameraTest = ({ type, title, sessionId, upload, onComplete }) => {
                 <h2 className="text-white font-bold drop-shadow-md">{title}</h2>
             </div>
 
-            <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+            <video ref={videoRef} autoPlay playsInline muted={true} className="w-full h-full object-cover" />
             <canvas ref={canvasRef} className="hidden" />
 
             <div className="absolute bottom-0 w-full p-8 bg-gradient-to-t from-black/90 to-transparent flex justify-center items-center gap-12">
@@ -598,8 +618,12 @@ const GPSTest = ({ onComplete }) => {
     useEffect(() => {
         if ("geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(
-                (p) => onComplete({ passed: true, details: `${p.coords.latitude.toFixed(2)},${p.coords.longitude.toFixed(2)}` }),
-                (e) => onComplete({ passed: false, details: 'Error: ' + e.message })
+                (p) => onComplete({ passed: true, details: `${p.coords.latitude.toFixed(4)},${p.coords.longitude.toFixed(4)}` }),
+                (e) => {
+                    console.error(e);
+                    alert("Error GPS: " + e.message + ". Asegúrate de dar permiso y usar HTTPS.");
+                    onComplete({ passed: false, details: 'Error Permisos/HTTPS' });
+                }
             );
         } else {
             onComplete({ passed: false, details: 'No soportado' });

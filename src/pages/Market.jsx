@@ -162,6 +162,14 @@ const Market = () => {
         doc.setTextColor(...PINK);
         doc.text("INFORME DE CERTIFICACIÓN DE DISPOSITIVO", 14, 32);
 
+        // Employee Info
+        const emp = diagnosticSession.deviceInfo?.employee;
+        if (emp) {
+            doc.setTextColor(150, 150, 150);
+            doc.setFontSize(8);
+            doc.text(`TÉCNICO: ${emp.toUpperCase()}`, 14, 37);
+        }
+
         // Date & Ref (Right aligned)
         doc.setFontSize(9);
         doc.setTextColor(200, 200, 200);

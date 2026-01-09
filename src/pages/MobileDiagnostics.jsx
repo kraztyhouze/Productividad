@@ -107,32 +107,36 @@ const MobileDiagnostics = () => {
     if (step === 'gps') return <GPSTest onComplete={(res) => { handleResult('gps', res.passed, res.details); next('charging'); }} />;
     if (step === 'charging') return <ChargingTest onComplete={(res) => { handleResult('charging', res.passed, res.details); next('done'); }} />;
 
-    if (step === 'done') {
-        // Final upload ensure
-        useEffect(() => {
-            if (sessionId) {
-                fetch(`/api/diagnostics/update/${sessionId}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: 'completed', results })
-                }).catch(e => console.error(e));
-            }
-        }, []);
-
-        return (
-            <div className="min-h-screen bg-green-600 text-white flex flex-col items-center justify-center p-8 text-center safe-area-inset">
-                <CheckCircle size={80} className="mb-6 animate-bounce" />
-                <h1 className="text-4xl font-black mb-4">¡FINALIZADO!</h1>
-                <p className="text-xl font-medium opacity-90 mb-8">Resultados enviados al PC.</p>
-                <div className="bg-white/20 p-4 rounded-xl backdrop-blur-sm text-sm">
-                    <p>Ya puedes cerrar esta ventana.</p>
-                </div>
-            </div>
-        );
-    }
+    if (step === 'done') return <FinalStep sessionId={sessionId} results={results} />;
 
     return null;
 };
+
+/* 0. DONE STEP (Extracted to fix Hook Rules) */
+const FinalStep = ({ sessionId, results }) => {
+    useEffect(() => {
+        if (sessionId) {
+            fetch(`/api/diagnostics/update/${sessionId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'completed', results })
+            }).catch(e => console.error(e));
+        }
+    }, [sessionId]);
+
+    return (
+        <div className="min-h-screen bg-green-600 text-white flex flex-col items-center justify-center p-8 text-center safe-area-inset">
+            <CheckCircle size={80} className="mb-6 animate-bounce" />
+            <h1 className="text-4xl font-black mb-4">¡FINALIZADO!</h1>
+            <p className="text-xl font-medium opacity-90 mb-8">Resultados enviados al PC.</p>
+            <div className="bg-white/20 p-4 rounded-xl backdrop-blur-sm text-sm">
+                <p>Ya puedes cerrar esta ventana.</p>
+            </div>
+        </div>
+    );
+};
+
+
 
 // --- SUB-COMPONENTS ---
 
@@ -418,14 +422,14 @@ const MicTest = ({ btnPrimary, btnSecondary, btnDanger, onComplete }) => {
             const chunks = [];
             recorder.ondataavailable = e => chunks.push(e.data);
             recorder.onstop = () => {
-                const blob = new Blob(chunks, { type: 'audio/wav' });
+                const blob = new Blob(chunks, { type: 'audio/webm' }); // Use webm or default
                 setAudioUrl(URL.createObjectURL(blob));
                 setStatus('playback');
                 stream.getTracks().forEach(t => t.stop());
             };
             recorder.start();
             setStatus('recording');
-            setTimeout(() => recorder.stop(), 3000);
+            setTimeout(() => { if (recorder.state === 'recording') recorder.stop(); }, 3000);
         } catch (e) {
             onComplete({ passed: false, details: 'Error Mic: ' + e.message });
         }
@@ -629,6 +633,10 @@ const ChargingTest = ({ onComplete }) => {
                 };
                 check();
                 b.addEventListener('chargingchange', check);
+            }).catch(e => {
+                console.error(e);
+                setIsSupported(false);
+                setStatus('Error API Batería');
             });
         } else {
             setIsSupported(false);

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useStore } from './StoreContext';
 
 const AuthContext = createContext(null);
 
@@ -11,47 +12,49 @@ export const ROLES = {
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const { currentStore } = useStore(); // Access current store context
 
     useEffect(() => {
         // Check local storage for persisted session
         const storedUser = localStorage.getItem('is_user');
         if (storedUser) {
-            setUser(JSON.parse(storedUser));
+            const parsedUser = JSON.parse(storedUser);
+            // Validate that the user belongs to the current store
+            if (currentStore && parsedUser.storeId && parsedUser.storeId !== currentStore) {
+                console.warn("Session Mismatch: User belongs to", parsedUser.storeId, "but current store is", currentStore);
+                localStorage.removeItem('is_user');
+                setUser(null);
+            } else {
+                setUser(parsedUser);
+            }
         }
         setLoading(false);
-    }, []);
+    }, [currentStore]);
 
     // Real login with username/password (Async against DB)
     const login = async (username, password) => {
         try {
-            // Fetch employees from API to check credentials
-            const res = await fetch('/api/employees');
-            if (!res.ok) throw new Error("Error connecting to server");
+            // Get current store
+            const currentStore = localStorage.getItem('tiktak_current_store');
 
-            const employees = await res.json();
+            // Secure Login via API
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-store-id': currentStore || 'store_1'
+                },
+                body: JSON.stringify({ username, password })
+            });
 
-            if (!employees || employees.length === 0) {
-                return { success: false, message: 'No hay empleados registrados en el sistema.' };
+            const data = await res.json();
+
+            if (!res.ok || !data.success) {
+                return { success: false, message: data.message || 'Error de inicio de sesión' };
             }
 
-            const employee = employees.find(emp => emp.username === username && emp.password === password);
-
-            if (!employee) {
-                return { success: false, message: 'Usuario o contraseña incorrectos' };
-            }
-
-            // Create user session
-            const userSession = {
-                id: employee.id,
-                name: `${employee.firstName} ${employee.lastName}`,
-                role: employee.role,
-                // Use alias as avatar initial or fallback
-                avatar: employee.alias || `${employee.firstName[0]}${employee.lastName[0]}`,
-                username: employee.username,
-                email: employee.email,
-                isMaster: false,
-                isBuyer: employee.isBuyer // Useful for permissions
-            };
+            // Create user session from server response
+            const userSession = data.user;
 
             setUser(userSession);
             localStorage.setItem('is_user', JSON.stringify(userSession));

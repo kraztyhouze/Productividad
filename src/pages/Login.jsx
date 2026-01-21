@@ -1,15 +1,22 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Lock, User, AlertCircle } from 'lucide-react';
+import { useStore } from '../context/StoreContext';
+import { Lock, User, AlertCircle, Store } from 'lucide-react';
 
 const Login = () => {
     const { login } = useAuth();
+    const { clearStore, selectedStoreData } = useStore();
     const navigate = useNavigate();
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    const handleBackToStore = () => {
+        clearStore();
+        navigate('/select-store');
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -46,6 +53,14 @@ const Login = () => {
 
                 <div className="relative bg-slate-900/40 backdrop-blur-2xl rounded-[2rem] border border-white/10 shadow-2xl overflow-hidden p-8 px-10">
 
+                    <button
+                        onClick={handleBackToStore}
+                        className="absolute top-4 right-4 text-slate-400 hover:text-white flex items-center gap-1.5 text-xs bg-slate-800/50 px-2 py-1 rounded-full transition-colors"
+                    >
+                        <Store size={12} />
+                        {selectedStoreData?.name || 'Cambiar Tienda'}
+                    </button>
+
                     <div className="flex flex-col items-center justify-center mb-8">
                         {/* Logo - Natural Aspect Ratio */}
                         <div className="mb-4">
@@ -57,7 +72,7 @@ const Login = () => {
                         </h1>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-5">
+                    <form onSubmit={handleSubmit} className="space-y-5" autoComplete="off">
                         {error && (
                             <div className="bg-red-500/10 border border-red-500/50 text-red-200 px-4 py-3 rounded-xl flex items-center gap-2 text-sm animate-in fade-in slide-in-from-top-2 backdrop-blur-md">
                                 <AlertCircle size={18} />
@@ -74,6 +89,7 @@ const Login = () => {
                                     onChange={(e) => setUsername(e.target.value)}
                                     required
                                     placeholder="Usuario"
+                                    autoComplete="off"
                                     className="w-full pl-12 pr-4 py-4 rounded-xl border border-pink-500/30 bg-slate-950/50 text-white placeholder:text-slate-400 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 transition-all font-medium"
                                 />
                             </div>
@@ -88,6 +104,7 @@ const Login = () => {
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
                                     placeholder="Contraseña"
+                                    autoComplete="new-password"
                                     className="w-full pl-12 pr-4 py-4 rounded-xl border border-pink-500/30 bg-slate-950/50 text-white placeholder:text-slate-400 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 transition-all font-medium"
                                 />
                             </div>
@@ -103,32 +120,8 @@ const Login = () => {
 
                         <div className="flex flex-col items-center gap-2 text-sm text-slate-400 pt-2">
                             <button type="button" className="hover:text-pink-400 transition-colors underline decoration-pink-500/30 underline-offset-4">Olvidé mi contraseña</button>
-                            <button type="button" className="hover:text-pink-400 transition-colors underline decoration-pink-500/30 underline-offset-4">Crear cuenta</button>
                         </div>
                     </form>
-                </div>
-
-                <div className="text-center mt-6 text-[10px] text-slate-500 font-mono opacity-50">
-                    TEST CREDS: admin / admin • juanma / admin123
-                    <br />
-                    <button
-                        onClick={() => {
-                            localStorage.setItem('is_user', JSON.stringify({
-                                id: 999,
-                                name: 'Invitado Gerente',
-                                role: 'Gerente',
-                                avatar: 'G',
-                                username: 'guest',
-                                email: 'guest@tiktak.com',
-                                isMaster: true,
-                                isBuyer: true
-                            }));
-                            window.location.href = '/market';
-                        }}
-                        className="mt-2 underline text-pink-500 hover:text-white cursor-pointer"
-                    >
-                        [DEV] Entrar como Invitado (Sin DB)
-                    </button>
                 </div>
             </div>
         </div>

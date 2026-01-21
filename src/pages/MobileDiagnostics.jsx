@@ -14,11 +14,28 @@ const MobileDiagnostics = () => {
         if (sessionId) {
             const getDeviceName = () => {
                 const ua = navigator.userAgent;
-                const androidMatch = ua.match(/Android.*?; (.*?)(\)| Build)/);
-                if (androidMatch && androidMatch[1]) return androidMatch[1].trim();
+                // Try modern User-Agent Client Hints API first (Chrome/Android)
+                if (navigator.userAgentData) {
+                    const mobileBrand = navigator.userAgentData.brands.find(b => b.brand !== "Not A;Brand" && b.brand !== "Chromium" && b.brand !== "Google Chrome");
+                    if (mobileBrand) return `${mobileBrand.brand} ${navigator.userAgentData.mobile ? '(Mobile)' : ''}`;
+                }
+
+                // Enhanced Regex for Android Model
+                // Looks for text between "; " and " Build/" or ")"
+                // Common formats: "Linux; Android 10; K)" -> "K", "Linux; Android 13; SM-G991B)" -> "SM-G991B"
+                const androidMatch = ua.match(/Android.*?; (.*?)(?:\)| Build)/);
+
+                if (androidMatch && androidMatch[1]) {
+                    // Filter out language codes if accidentally captured (e.g. "en-us")
+                    const candidate = androidMatch[1].trim();
+                    if (candidate.length > 2 && !candidate.includes('wv')) {
+                        return candidate;
+                    }
+                }
+
                 if (ua.match(/iPhone/i)) return "Apple iPhone";
                 if (ua.match(/iPad/i)) return "Apple iPad";
-                return "Dispositivo Genérico";
+                return "Dispositivo Android / Genérico";
             };
 
             const info = {
@@ -616,17 +633,37 @@ const CameraTest = ({ type, title, sessionId, upload, onComplete }) => {
 const FlashlightTest = ({ btnPrimary, btnSecondary, btnDanger, onComplete }) => {
     const toggle = async (on) => {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            // Stop previous tracks if any to release camera
+            if (window.flashlightTrack) {
+                window.flashlightTrack.stop();
+                window.flashlightTrack = null;
+            }
+
+            if (!on) return; // Just turning off = stop track (done above)
+
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: 'environment',
+                    advanced: [{ torch: true }] // Try requesting torch immediately
+                }
+            });
+
             const track = stream.getVideoTracks()[0];
+            window.flashlightTrack = track; // Keep ref to stop it later
+
+            // Apply constraints explicitly just in case 'advanced' in getUserMedia didn't work
             const cap = track.getCapabilities();
-            if (!cap.torch) throw new Error("No Torch");
+            if (cap.torch) {
+                await track.applyConstraints({ advanced: [{ torch: true }] });
+            } else {
+                // Warning: Torrent not supported on this track/device
+                console.warn("Torch capability missing");
+            }
 
-            await track.applyConstraints({ advanced: [{ torch: on }] });
-            if (!on) track.stop(); // Stop completely on release
-            else return track; // Returned to keep alive? 
-
-            // Note: If we stop the track, the light goes off. So on release we stop the track.
-        } catch (e) { console.warn(e); }
+        } catch (e) {
+            console.warn("Flashlight Error:", e);
+            // alert("No se pudo iniciar el Flash: " + e.message); 
+        }
     };
 
     return (

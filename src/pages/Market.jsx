@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ExternalLink, Smartphone, Monitor, Watch, Hammer, Gamepad2, CheckCircle, XCircle, Grid, QrCode, Download } from 'lucide-react';
 import { generateDiagnosticCertificate } from '../utils/pdfGenerator';
 
 const CATEGORIES = {
-    phones: { name: 'Móviles/Tablets', margin: 0.40, icon: <Smartphone size={16} />, checklist: ['IMEI/Red', 'Cosmético', 'Seguridad', 'Pantalla/Touch', 'Vibración/Sensores', 'Micrófono/Audio', 'Cámaras/Flash', 'GPS', 'Carga'] },
-    laptops: { name: 'Portátiles', margin: 0.40, icon: <Monitor size={16} />, checklist: ['Enciende', 'Cargador Original', 'Teclado Completo', 'Pantalla sin manchas', 'Webcam/Audio', 'Hardware OK'] },
-    consoles: { name: 'Consolas', margin: 0.35, icon: <Gamepad2 size={16} />, checklist: ['Lee discos/cartuchos', 'Mando conecta', 'No baneada (Online)', 'Garantía precintos'] },
-    jewelry: { name: 'Joyería', margin: 0.30, icon: <Watch size={16} />, checklist: ['Sello de contraste', 'Peso verificado', 'Piedras revisadas', 'Cierre funciona', 'Prueba Ácido/Imán'] },
-    tools: { name: 'Herramientas', margin: 0.50, icon: <Hammer size={16} />, checklist: ['Enciende/Funciona', 'Cableado seguro', 'Accesorios incluidos', 'Sin óxido excesivo'] },
-    others: { name: 'Otros', margin: 0.50, icon: <Grid size={16} />, checklist: ['Estado general bueno', 'Completo', 'Funciona correctamente'] }
+    phones: { name: 'Móviles/Tablets', margin: 0.40, icon: <Smartphone size={18} />, color: 'pink', checklist: ['IMEI/Red', 'Cosmético', 'Seguridad', 'Pantalla/Touch', 'Vibración/Sensores', 'Micrófono/Audio', 'Cámaras/Flash', 'GPS', 'Carga'] },
+    laptops: { name: 'Portátiles', margin: 0.40, icon: <Monitor size={18} />, color: 'cyan', checklist: ['Enciende', 'Cargador Original', 'Teclado Completo', 'Pantalla sin manchas', 'Webcam/Audio', 'Hardware OK'] },
+    consoles: { name: 'Consolas', margin: 0.35, icon: <Gamepad2 size={18} />, color: 'purple', checklist: ['Lee discos/cartuchos', 'Mando conecta', 'No baneada (Online)', 'Garantía precintos'] },
+    jewelry: { name: 'Joyería', margin: 0.30, icon: <Watch size={18} />, color: 'amber', checklist: ['Sello de contraste', 'Peso verificado', 'Piedras revisadas', 'Cierre funciona', 'Prueba Ácido/Imán'] },
+    tools: { name: 'Herramientas', margin: 0.50, icon: <Hammer size={18} />, color: 'orange', checklist: ['Enciende/Funciona', 'Cableado seguro', 'Accesorios incluidos', 'Sin óxido excesivo'] },
+    others: { name: 'Otros', margin: 0.50, icon: <Grid size={18} />, color: 'slate', checklist: ['Estado general bueno', 'Completo', 'Funciona correctamente'] }
 };
 
 const GOLD_PRICES_BASE = {
@@ -402,18 +403,43 @@ const Market = () => {
 
                     {/* RIGHT: APPRAISER */}
                     <div className="flex-1 flex flex-col gap-4 min-w-[350px]">
-                        <div className="bg-[#0f172a]/90 backdrop-blur rounded-2xl p-5 border border-white/10 shadow-xl flex flex-col gap-6">
-                            <h2 className="text-lg font-bold text-white flex items-center gap-2"><Monitor className="text-amber-500" /> Calculadora Inteligente</h2>
+                        <div className="bg-[#0f172a]/80 backdrop-blur-xl rounded-3xl p-6 border border-white/10 shadow-2xl relative overflow-hidden group">
+                            {/* Decorative Glow */}
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
+
+                            <h2 className="text-xl font-bold text-white flex items-center gap-3 mb-6 relative z-10">
+                                <span className="p-2 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20 text-amber-500 border border-amber-500/30">
+                                    <Monitor size={20} />
+                                </span>
+                                Calculadora Inteligente
+                            </h2>
 
                             {/* 1. Category */}
-                            <div>
-                                <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">1. Categoría</label>
-                                <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-                                    {Object.entries(CATEGORIES).map(([key, data]) => (
-                                        <button key={key} onClick={() => setCategory(key)} className={`px-4 py-2 rounded-xl border transition-all flex items-center gap-2 whitespace-nowrap ${category === key ? 'bg-amber-500/20 border-amber-500 text-amber-400' : 'bg-slate-800 border-white/5 text-slate-400 hover:bg-slate-700'}`}>
-                                            {data.icon} <span className="font-bold text-sm">{data.name}</span>
-                                        </button>
-                                    ))}
+                            <div className="mb-6 relative z-10">
+                                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 block">1. Categoría del Producto</label>
+                                <div className="flex gap-2 overflow-x-auto pb-4 no-scrollbar snap-x">
+                                    {Object.entries(CATEGORIES).map(([key, data]) => {
+                                        const isSelected = category === key;
+                                        return (
+                                            <motion.button
+                                                key={key}
+                                                onClick={() => setCategory(key)}
+                                                whileHover={{ scale: 1.05 }}
+                                                whileTap={{ scale: 0.95 }}
+                                                className={`snap-start relative px-4 py-3 rounded-2xl border transition-all flex flex-col items-center gap-2 min-w-[100px] ${isSelected
+                                                    ? 'bg-gradient-to-b from-slate-800 to-slate-900 border-amber-500/50 text-amber-400 shadow-lg shadow-amber-900/20'
+                                                    : 'bg-slate-900/50 border-white/5 text-slate-500 hover:bg-slate-800 hover:text-slate-300'}`}
+                                            >
+                                                <div className={`p-2 rounded-full ${isSelected ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-800 text-current'}`}>
+                                                    {data.icon}
+                                                </div>
+                                                <span className="font-medium text-xs whitespace-nowrap">{data.name}</span>
+                                                {isSelected && (
+                                                    <motion.div layoutId="activeCat" className="absolute inset-0 border-2 border-amber-500 rounded-2xl" transition={{ type: "spring", bounce: 0.2, duration: 0.6 }} />
+                                                )}
+                                            </motion.button>
+                                        );
+                                    })}
                                 </div>
                             </div>
 
@@ -488,83 +514,149 @@ const Market = () => {
                                     </div>
                                 )}
 
+
                                 {/* Manual Checklist */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                    {CATEGORIES[category].checklist.map(item => (
-                                        <div key={item} className="flex items-center justify-between bg-slate-950 p-2 rounded border border-white/5">
-                                            <span className="text-xs text-slate-300 truncate pr-2">{item}</span>
-                                            <div className="flex gap-1 shrink-0">
-                                                <button onClick={() => handleChecklistChange(item, true)} className={`p-1 rounded ${checklist[item] === true ? 'bg-green-500 text-white' : 'bg-slate-800 text-slate-600'}`}><CheckCircle size={12} /></button>
-                                                <button onClick={() => handleChecklistChange(item, false)} className={`p-1 rounded ${checklist[item] === false ? 'bg-red-500 text-white' : 'bg-slate-800 text-slate-600'}`}><XCircle size={12} /></button>
+                                    {CATEGORIES[category].checklist.map((item, idx) => (
+                                        <motion.div
+                                            key={item}
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: idx * 0.05 }}
+                                            className="flex items-center justify-between bg-slate-900/80 p-3 rounded-xl border border-white/5 hover:border-white/10 transition-colors"
+                                        >
+                                            <span className="text-xs text-slate-300 font-medium truncate pr-2">{item}</span>
+                                            <div className="flex gap-1 shrink-0 p-0.5 bg-slate-950 rounded-lg">
+                                                <button onClick={() => handleChecklistChange(item, true)} className={`p-1.5 rounded-md transition-all ${checklist[item] === true ? 'bg-green-500 text-white shadow-lg shadow-green-900/50' : 'text-slate-600 hover:text-slate-400'}`}><CheckCircle size={14} /></button>
+                                                <button onClick={() => handleChecklistChange(item, false)} className={`p-1.5 rounded-md transition-all ${checklist[item] === false ? 'bg-red-500 text-white shadow-lg shadow-red-900/50' : 'text-slate-600 hover:text-slate-400'}`}><XCircle size={14} /></button>
                                             </div>
-                                        </div>
+                                        </motion.div>
                                     ))}
                                 </div>
                             </div>
 
                             {/* 3. Inputs & Logic */}
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase">Precio Nuevo</label>
-                                    <input type="number" name="newPrice" value={survey.newPrice} onChange={handleSurveyChange} className="w-full mt-1 bg-slate-800 border border-white/10 rounded-lg py-1.5 px-2 text-white text-sm" placeholder="0.00" />
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4 relative z-10">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Precio Nuevo</label>
+                                    <div className="relative group">
+                                        <span className="absolute left-3 top-2.5 text-slate-500 text-sm">€</span>
+                                        <input type="number" name="newPrice" value={survey.newPrice} onChange={handleSurveyChange} className="w-full bg-slate-900/80 border border-white/10 rounded-xl py-2 pl-8 pr-3 text-white text-sm font-medium focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-all outline-none" placeholder="0.00" />
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase">Precio 2ª Mano</label>
-                                    <input type="number" name="secondHandPrice" value={survey.secondHandPrice} onChange={handleSurveyChange} className="w-full mt-1 bg-slate-800 border border-amber-500/30 rounded-lg py-1.5 px-2 text-white text-sm" placeholder="Ej: Wallapop" />
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Precio 2ª Mano</label>
+                                    <div className="relative group">
+                                        <span className="absolute left-3 top-2.5 text-slate-500 text-sm">€</span>
+                                        <input type="number" name="secondHandPrice" value={survey.secondHandPrice} onChange={handleSurveyChange} className="w-full bg-slate-900/80 border border-amber-500/30 rounded-xl py-2 pl-8 pr-3 text-white text-sm font-medium focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none" placeholder="Wallapop" />
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase">Pide Cliente</label>
-                                    <input type="number" name="askedPrice" value={survey.askedPrice} onChange={handleSurveyChange} className="w-full mt-1 bg-slate-800 border border-pink-500/30 rounded-lg py-1.5 px-2 text-white text-sm font-bold" placeholder="0.00" />
+                                <div className="space-y-1 md:col-span-1 col-span-2">
+                                    <label className="text-[10px] font-bold text-pink-400 uppercase tracking-wider pl-1">Pide Cliente</label>
+                                    <div className="relative group">
+                                        <span className="absolute left-3 top-2.5 text-pink-500/70 text-sm">€</span>
+                                        <input type="number" name="askedPrice" value={survey.askedPrice} onChange={handleSurveyChange} className="w-full bg-slate-900/80 border border-pink-500/50 rounded-xl py-2 pl-8 pr-3 text-white text-lg font-bold focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 transition-all outline-none bg-pink-500/5" placeholder="0.00" />
+                                    </div>
                                 </div>
                             </div>
 
                             {/* 4. Controls */}
-                            <div className="flex flex-wrap gap-2 text-[10px]">
-                                <label className="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded cursor-pointer">
-                                    <input type="radio" name="saleType" value="venta" checked={survey.saleType === 'venta'} onChange={handleSurveyChange} className="accent-pink-500" />
-                                    <span className="text-white">Venta</span>
-                                </label>
-                                <label className="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded cursor-pointer">
-                                    <input type="radio" name="saleType" value="recuperable" checked={survey.saleType === 'recuperable'} onChange={handleSurveyChange} className="accent-pink-500" />
-                                    <span className="text-white">Recup.</span>
-                                </label>
-                                <div className="w-px h-6 bg-white/10 mx-1"></div>
-                                <label className="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded cursor-pointer">
-                                    <input type="checkbox" checked={survey.hasStock === 'si'} onChange={e => setSurvey({ ...survey, hasStock: e.target.checked ? 'si' : 'no' })} className="accent-pink-500" />
-                                    <span className="text-slate-300">Stock Alto</span>
-                                </label>
-                                <label className="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded cursor-pointer">
-                                    <input type="checkbox" checked={survey.hasInvoice === 'no'} onChange={e => setSurvey({ ...survey, hasInvoice: e.target.checked ? 'no' : 'si' })} className="accent-pink-500" />
-                                    <span className="text-slate-300">Sin Fra.</span>
-                                </label>
-                                <label className="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded cursor-pointer">
-                                    <input type="checkbox" checked={survey.isHighTurnover === 'si'} onChange={e => setSurvey({ ...survey, isHighTurnover: e.target.checked ? 'si' : 'no' })} className="accent-pink-500" />
-                                    <span className="text-slate-300">Alta Rotación</span>
-                                </label>
+                            <div className="flex flex-wrap gap-2 text-[10px] mb-6 relative z-10">
+                                {/* Use custom styled radio/checks */}
+                                {['venta', 'recuperable'].map((type) => (
+                                    <label key={type} className={`cursor-pointer px-3 py-1.5 rounded-lg border transition-all flex items-center gap-2 ${survey.saleType === type ? 'bg-indigo-500/20 border-indigo-500 text-indigo-300' : 'bg-slate-900/50 border-white/5 text-slate-400 hover:bg-slate-800'}`}>
+                                        <input type="radio" name="saleType" value={type} checked={survey.saleType === type} onChange={handleSurveyChange} className="hidden" />
+                                        <div className={`w-2 h-2 rounded-full ${survey.saleType === type ? 'bg-indigo-400' : 'bg-slate-600'}`} />
+                                        <span className="capitalize">{type}</span>
+                                    </label>
+                                ))}
+                                <div className="w-px h-8 bg-white/10 mx-1"></div>
+                                {[
+                                    { k: 'hasStock', label: 'Stock Alto' },
+                                    { k: 'hasInvoice', label: 'Sin Fra.', inv: true }, // Logic inverted in original rendering
+                                    { k: 'isHighTurnover', label: 'Alta Rotación' },
+                                ].map((opt) => {
+                                    const isChecked = opt.inv ? survey[opt.k] === 'no' : survey[opt.k] === 'si';
+                                    const toggle = () => {
+                                        const newVal = isChecked ? (opt.inv ? 'si' : 'no') : (opt.inv ? 'no' : 'si');
+                                        setSurvey({ ...survey, [opt.k]: newVal });
+                                    };
+                                    return (
+                                        <label key={opt.k} className={`cursor-pointer px-3 py-1.5 rounded-lg border transition-all select-none ${isChecked ? 'bg-pink-500/20 border-pink-500 text-pink-300' : 'bg-slate-900/50 border-white/5 text-slate-400 hover:bg-slate-800'}`}>
+                                            <input type="checkbox" checked={isChecked} onChange={toggle} className="hidden" />
+                                            <span>{opt.label}</span>
+                                        </label>
+                                    );
+                                })}
                             </div>
 
-                            <button onClick={calculateAppraisal} className="w-full py-3 bg-gradient-to-r from-amber-600 to-pink-600 rounded-xl font-bold text-white shadow-lg hover:brightness-110 active:scale-95 transition-all">
-                                CALCULAR OFERTA
-                            </button>
+                            <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={calculateAppraisal}
+                                className="relative z-10 w-full py-4 bg-gradient-to-r from-amber-600 to-pink-600 rounded-2xl font-bold text-white shadow-xl shadow-amber-900/20 hover:shadow-pink-900/30 transition-all flex justify-center items-center gap-2 uppercase tracking-wide text-sm"
+                            >
+                                <Monitor size={16} /> Calcular Oferta
+                            </motion.button>
 
-                            {/* RESULT */}
-                            {appraisalResult && (
-                                <div className="animate-in slide-in-from-bottom-5 fade-in bg-slate-950/80 rounded-xl p-4 border border-white/10">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <span className={`text-2xl font-black ${appraisalResult.statusColor}`}>{appraisalResult.status}</span>
-                                        <div className="text-right">
-                                            <span className="block text-[10px] text-slate-400 uppercase">Oferta Máx</span>
-                                            <span className="text-2xl font-mono text-white font-bold">{appraisalResult.maxBuyPrice.toFixed(0)}€</span>
+                            {/* RESULT - Animated Presence */}
+                            <AnimatePresence>
+                                {appraisalResult && (
+                                    <motion.div
+                                        initial={{ opacity: 0, height: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, height: 'auto', scale: 1 }}
+                                        exit={{ opacity: 0, height: 0, scale: 0.9 }}
+                                        className="mt-6 relative z-10"
+                                    >
+                                        <div className={`relative overflow-hidden rounded-2xl border p-6 ${appraisalResult.status === 'COMPRAR' ? 'bg-emerald-950/40 border-emerald-500/30' :
+                                                appraisalResult.status === 'RECHAZAR' || appraisalResult.status === 'PELIGRO' ? 'bg-red-950/40 border-red-500/30' :
+                                                    'bg-amber-950/40 border-amber-500/30'
+                                            }`}>
+
+                                            {/* Status Badge */}
+                                            <div className="flex justify-between items-start mb-6">
+                                                <div>
+                                                    <span className="text-[10px] uppercase tracking-widest font-bold opacity-60 text-white">Decisión del Sistema</span>
+                                                    <h3 className={`text-3xl font-black tracking-tight ${appraisalResult.statusColor} drop-shadow-sm`}>
+                                                        {appraisalResult.status}
+                                                    </h3>
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className="block text-[10px] text-slate-400 uppercase tracking-widest">Oferta Máxima</span>
+                                                    <span className="text-4xl font-mono text-white font-bold tracking-tighter">
+                                                        {appraisalResult.maxBuyPrice.toFixed(0)}<span className="text-lg align-top opacity-50">€</span>
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* Recommendation Details */}
+                                            <div className="bg-black/20 rounded-xl p-4 border border-white/5 backdrop-blur-sm">
+                                                <div className="flex items-start gap-3">
+                                                    <div className={`mt-1 p-1 rounded-full ${appraisalResult.status === 'COMPRAR' ? 'bg-emerald-500 text-black' : 'bg-slate-700 text-slate-300'
+                                                        }`}>
+                                                        {appraisalResult.status === 'COMPRAR' ? <CheckCircle size={14} /> : <Monitor size={14} />}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-medium text-white leading-relaxed">
+                                                            {appraisalResult.recommendation}
+                                                        </p>
+                                                        <div className="text-[10px] text-slate-400 mt-2 flex gap-4 font-mono">
+                                                            <span className="px-2 py-0.5 rounded bg-white/5">Ref: {appraisalResult.marketValue.toFixed(0)}€</span>
+                                                            <span className="px-2 py-0.5 rounded bg-white/5">Mg: {appraisalResult.currentMargin}% (Obj: {appraisalResult.targetMarginPercent}%)</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Decorative Status Bar */}
+                                            <div className={`absolute bottom-0 left-0 right-0 h-1 ${appraisalResult.status === 'COMPRAR' ? 'bg-emerald-500' :
+                                                    appraisalResult.status === 'RECHAZAR' ? 'bg-red-500' :
+                                                        'bg-amber-500'
+                                                }`}></div>
                                         </div>
-                                    </div>
-                                    <p className="text-sm text-slate-300 mb-2">{appraisalResult.recommendation}</p>
-                                    <div className="text-[10px] text-slate-500 flex gap-4">
-                                        <span>Valor Ref: {appraisalResult.marketValue.toFixed(0)}€</span>
-                                        <span>Margen: {appraisalResult.currentMargin}% (Obj: {appraisalResult.targetMarginPercent}%)</span>
-                                    </div>
-                                </div>
-                            )}
-
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </div>
                     </div>
                 </div>

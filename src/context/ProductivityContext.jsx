@@ -1,8 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useStore } from './StoreContext'; // Importar hook del store
 
 const ProductivityContext = createContext(null);
 
 export const ProductivityProvider = ({ children }) => {
+    const { currentStore } = useStore(); // Get current store explicitly
+
     // --- STATE ---
     const [activeSessions, setActiveSessions] = useState([]);
     const [dailyRecords, setDailyRecords] = useState([]);
@@ -11,16 +14,34 @@ export const ProductivityProvider = ({ children }) => {
     const [dayIncidents, setDayIncidents] = useState({});
     const [productFamilies, setProductFamilies] = useState([]);
 
+    // Helper for Multi-Store Headers
+    const getHeaders = () => {
+        // Use currentStore from context if available, otherwise fallback/localStorage. 
+        // Sync with what useStore provides is safer.
+        const storeId = currentStore || localStorage.getItem('tiktak_current_store') || 'store_1';
+        return {
+            'Content-Type': 'application/json',
+            'x-store-id': storeId
+        };
+    };
+
+    const getFetchOptions = () => ({
+        headers: getHeaders(),
+        cache: 'no-store' // CRITICAL: Prevent browser from reusing data from Store A when switching to Store B
+    });
+
     // --- LOAD DATA ---
     const fetchData = async () => {
         try {
+            const options = getFetchOptions();
+
             const results = await Promise.allSettled([
-                fetch('/api/active-sessions'),
-                fetch('/api/daily-records'),
-                fetch('/api/daily-groups'),
-                fetch('/api/closed-days'),
-                fetch('/api/day-incidents'),
-                fetch('/api/product-families')
+                fetch('/api/active-sessions', options),
+                fetch('/api/daily-records', options),
+                fetch('/api/daily-groups', options),
+                fetch('/api/closed-days', options),
+                fetch('/api/day-incidents', options),
+                fetch('/api/product-families', options)
             ]);
 
             const [sessionsRes, recordsRes, groupsRes, closedRes, incidentsRes, familiesRes] = results;
@@ -39,13 +60,28 @@ export const ProductivityProvider = ({ children }) => {
         }
     };
 
-
+    // --- EFFECT: STORE CHANGED or MOUNT ---
     useEffect(() => {
-        fetchData();
-        // Polling every 5 seconds to keep in sync
+        // 1. Wipe clean old store data
+        setActiveSessions([]);
+        setDailyRecords([]);
+        setDailyGroups({});
+        setClosedDays([]);
+        setDayIncidents({});
+        setProductFamilies([]);
+
+        // 2. Load new store data
+        if (currentStore) {
+            fetchData();
+        }
+    }, [currentStore]); // Dependencies: Re-run ONLY when store changes
+
+    // --- EFFECT: POLLING ---
+    useEffect(() => {
+        if (!currentStore) return;
         const interval = setInterval(fetchData, 5000);
         return () => clearInterval(interval);
-    }, []);
+    }, [currentStore]);
 
     // --- ACTIONS ---
 
@@ -66,7 +102,7 @@ export const ProductivityProvider = ({ children }) => {
         try {
             await fetch('/api/active-sessions', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getHeaders(),
                 body: JSON.stringify(newSession)
             });
         } catch (err) {
@@ -85,7 +121,7 @@ export const ProductivityProvider = ({ children }) => {
         try {
             await fetch(`/api/active-sessions/${idStr}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getHeaders(),
                 body: JSON.stringify({ clientStartTime: startTime })
             });
         } catch (err) { console.error(err); }
@@ -127,10 +163,10 @@ export const ProductivityProvider = ({ children }) => {
 
         try {
             await Promise.all([
-                fetch(`/api/active-sessions/${idStr}`, { method: 'DELETE' }),
+                fetch(`/api/active-sessions/${idStr}`, { method: 'DELETE', headers: getHeaders() }),
                 fetch('/api/daily-records', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getHeaders(),
                     body: JSON.stringify(record)
                 })
             ]);
@@ -160,7 +196,7 @@ export const ProductivityProvider = ({ children }) => {
         try {
             await fetch('/api/daily-groups', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getHeaders(),
                 body: JSON.stringify({ key, data: newState })
             });
         } catch (err) {
@@ -176,21 +212,21 @@ export const ProductivityProvider = ({ children }) => {
 
         await fetch(`/api/daily-records/${recordId}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getHeaders(),
             body: JSON.stringify({ durationSeconds: newDurationSeconds })
         });
     };
 
     const deleteRecord = async (recordId) => {
         setDailyRecords(prev => prev.filter(r => r.id !== recordId));
-        await fetch(`/api/daily-records/${recordId}`, { method: 'DELETE' });
+        await fetch(`/api/daily-records/${recordId}`, { method: 'DELETE', headers: getHeaders() });
     };
 
     const addManualRecord = async (record) => {
         setDailyRecords(prev => [record, ...prev]);
         await fetch('/api/daily-records', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getHeaders(),
             body: JSON.stringify(record)
         });
     };
@@ -199,7 +235,7 @@ export const ProductivityProvider = ({ children }) => {
         setDayIncidents(prev => ({ ...prev, [date]: text }));
         await fetch('/api/day-incidents', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getHeaders(),
             body: JSON.stringify({ date, text })
         });
     };
@@ -210,7 +246,7 @@ export const ProductivityProvider = ({ children }) => {
             try {
                 await fetch('/api/closed-days', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getHeaders(),
                     body: JSON.stringify({
                         date,
                         total_groups: details.total_groups || 0,
@@ -230,7 +266,7 @@ export const ProductivityProvider = ({ children }) => {
 
         try {
             console.log(`Attempting to reopen day: ${date}`);
-            const res = await fetch(`/api/closed-days/${date}`, { method: 'DELETE' });
+            const res = await fetch(`/api/closed-days/${date}`, { method: 'DELETE', headers: getHeaders() });
             if (!res.ok) {
                 const err = await res.json();
                 throw new Error(err.error || 'Failed to reopen day');
@@ -253,7 +289,7 @@ export const ProductivityProvider = ({ children }) => {
             if (isToday) {
                 // Optimistic local update
                 setActiveSessions(prev => prev.filter(s => String(s.employeeId) !== idStr));
-                await fetch(`/api/active-sessions/${idStr}`, { method: 'DELETE' });
+                await fetch(`/api/active-sessions/${idStr}`, { method: 'DELETE', headers: getHeaders() });
             }
 
             // 2. Identify and remove records locally & remotely
@@ -261,7 +297,7 @@ export const ProductivityProvider = ({ children }) => {
             const recordIds = recordsToDelete.map(r => r.id);
             setDailyRecords(prev => prev.filter(r => !(String(r.employeeId) === idStr && r.date === date)));
 
-            await Promise.all(recordIds.map(id => fetch(`/api/daily-records/${id}`, { method: 'DELETE' })));
+            await Promise.all(recordIds.map(id => fetch(`/api/daily-records/${id}`, { method: 'DELETE', headers: getHeaders() })));
 
             // 3. Remove Daily Groups
             const groupKey = `${idStr}-${date}`;
@@ -269,7 +305,7 @@ export const ProductivityProvider = ({ children }) => {
             delete newGroups[groupKey];
             setDailyGroups(newGroups);
 
-            await fetch(`/api/daily-groups/${groupKey}`, { method: 'DELETE' });
+            await fetch(`/api/daily-groups/${groupKey}`, { method: 'DELETE', headers: getHeaders() });
 
             // 4. Force Sync
             await fetchData();
@@ -296,7 +332,7 @@ export const ProductivityProvider = ({ children }) => {
         try {
             const res = await fetch('/api/product-families', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getHeaders(),
                 body: JSON.stringify({ name, type, date })
             });
             if (res.ok) {
@@ -308,7 +344,7 @@ export const ProductivityProvider = ({ children }) => {
 
     const removeProductFamily = async (id) => {
         setProductFamilies(prev => prev.filter(f => f.id !== id));
-        await fetch(`/api/product-families/${id}`, { method: 'DELETE' });
+        await fetch(`/api/product-families/${id}`, { method: 'DELETE', headers: getHeaders() });
     };
 
     return (
@@ -337,14 +373,14 @@ export const ProductivityProvider = ({ children }) => {
                 try {
                     await fetch('/api/no-deals', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: getHeaders(),
                         body: JSON.stringify(data)
                     });
                 } catch (err) { console.error(err); }
             },
             deleteNoDeal: async (id) => {
                 try {
-                    await fetch(`/api/no-deals/${id}`, { method: 'DELETE' });
+                    await fetch(`/api/no-deals/${id}`, { method: 'DELETE', headers: getHeaders() });
                     fetchData(); // Sync states (both noDeals list and groups counts)
                 } catch (err) { console.error(err); }
             }

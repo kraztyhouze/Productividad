@@ -85,7 +85,7 @@ export const generateDiagnosticCertificate = (session) => {
     // --- TABLE ---
     const rows = rs.map(r => [
         r.name.toUpperCase(),
-        r.passed ? 'CORRECTO' : 'FALLO',
+        r.skipped ? 'SALTADO' : (r.passed ? 'CORRECTO' : 'FALLO'),
         r.details || '-'
     ]);
 
@@ -109,6 +109,7 @@ export const generateDiagnosticCertificate = (session) => {
         didParseCell: function (data) {
             if (data.section === 'body' && data.column.index === 1) {
                 if (data.cell.raw === 'FALLO') data.cell.styles.textColor = [...RED];
+                else if (data.cell.raw === 'SALTADO') data.cell.styles.textColor = [234, 88, 12]; // Orange-600
                 else data.cell.styles.textColor = [...GREEN];
             }
         }

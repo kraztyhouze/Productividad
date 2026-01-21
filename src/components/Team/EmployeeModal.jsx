@@ -88,7 +88,7 @@ const EmployeeModal = ({
                                 </select>
                                 <div className="grid grid-cols-2 gap-4">
                                     <input required name="username" value={formData.username || ''} onChange={handleInputChange} className="w-full p-2 bg-[#0f172a]/50 border-white/10 rounded text-slate-200 text-sm outline-none focus:border-pink-500" placeholder="Usuario" />
-                                    <input required name="password" value={formData.password || ''} onChange={handleInputChange} className="w-full p-2 bg-[#0f172a]/50 border-white/10 rounded text-slate-200 text-sm outline-none focus:border-pink-500" placeholder="Contraseña" />
+                                    <input required={!editingEmployee} type="password" autoComplete="new-password" name="password" value={formData.password || ''} onChange={handleInputChange} className="w-full p-2 bg-[#0f172a]/50 border-white/10 rounded text-slate-200 text-sm outline-none focus:border-pink-500" placeholder={editingEmployee ? "Contraseña (Dejar vacío para mantener)" : "Contraseña"} />
                                 </div>
                                 <label className="flex items-center gap-3 cursor-pointer p-3 bg-pink-500/10 border border-pink-500/20 rounded-xl hover:bg-pink-500/20 transition-colors">
                                     <input type="checkbox" name="isBuyer" checked={formData.isBuyer === true} onChange={handleInputChange} className="accent-pink-500 w-5 h-5" />

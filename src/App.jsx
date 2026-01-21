@@ -16,6 +16,7 @@ import Reports from './pages/Reports';
 import Market from './pages/Market';
 import MobileDiagnostics from './pages/MobileDiagnostics';
 import LaptopDiagnostics from './pages/LaptopDiagnostics';
+import LaptopRemoteTest from './pages/LaptopRemoteTest';
 
 // Componente para proteger rutas que requieren Tienda seleccionada
 const RequireStore = () => {

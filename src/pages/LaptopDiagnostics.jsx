@@ -195,6 +195,7 @@ const LaptopDiagnostics = () => {
                             <div className="text-left">
                                 <p className="font-bold text-lg">Esperando conexión...</p>
                                 <p className="text-sm text-slate-400">Entra en <span className="text-cyan-400 font-mono">productividad.onrender.com/laptop-remote-test</span></p>
+                                <a href="/api/utils/download-shortcut" className="text-xs text-slate-500 underline hover:text-white mt-1 block">💾 Descargar Acceso Directo (USB)</a>
                             </div>
                         </div>
                         {isDone && <div className="px-4 py-1 bg-green-500 text-black text-xs font-bold uppercase rounded-full animate-bounce">Completado</div>}

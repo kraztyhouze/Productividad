@@ -934,6 +934,14 @@ app.get('/api/admin/backup', async (req, res) => {
     }
 });
 
+// --- Shortcut Generator ---
+app.get('/api/utils/download-shortcut', (req, res) => {
+    const fileContent = `[InternetShortcut]\nURL=https://productividad.onrender.com/laptop-remote-test\nIconIndex=0\nIconFile=https://productividad.onrender.com/favicon.ico`;
+    res.setHeader('Content-Disposition', 'attachment; filename=INICIAR_TEST_TIKTAK.url');
+    res.setHeader('Content-Type', 'application/x-mswinurl');
+    res.send(fileContent);
+});
+
 // Serve Static Assets (Frontend)
 const distPath = path.resolve(__dirname, '../dist');
 app.use(express.static(distPath));

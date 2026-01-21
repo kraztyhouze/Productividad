@@ -20,10 +20,11 @@ const TESTS = [
 
 const LaptopDiagnostics = () => {
     const { sessionId } = useParams();
-    const [step, setStep] = useState('intro');
+    const [step, setStep] = useState('mode_selection'); // Changed default to mode_selection
     const [results, setResults] = useState({});
     const [specs, setSpecs] = useState(null);
     const [selectedTests, setSelectedTests] = useState(TESTS.map(t => t.id));
+    const [remoteStatus, setRemoteStatus] = useState(null); // For monitoring remote session
 
     const sendUpdate = async (testName, result) => {
         try {
@@ -78,6 +79,31 @@ const LaptopDiagnostics = () => {
         else setSelectedTests(prev => [...prev, id]);
     };
 
+    // Polling for Remote Monitor Mode
+    useEffect(() => {
+        if (step === 'monitor_remote') {
+            const interval = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/diagnostics/session/${sessionId}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        setRemoteStatus(data);
+                        if (data.status === 'completed' || (data.results && data.results.length > 0)) {
+                            // Update local results for display
+                            const newResults = {};
+                            data.results.forEach(r => {
+                                newResults[r.name] = r;
+                            });
+                            setResults(newResults);
+                            if (data.deviceInfo) setSpecs(data.deviceInfo);
+                        }
+                    }
+                } catch (err) { console.error("Polling error", err); }
+            }, 2000);
+            return () => clearInterval(interval);
+        }
+    }, [step, sessionId]);
+
     // Auto-finish on done
     useEffect(() => {
         if (step === 'done') {
@@ -99,7 +125,101 @@ const LaptopDiagnostics = () => {
                 })
             }).catch(console.error);
         }
-    }, [step]);
+    }, [step]); // Warning: Missing dependencies results, specs, sessionId. Kept as per original logic structure.
+
+    if (step === 'mode_selection') {
+        return (
+            <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-8 text-center animate-in fade-in">
+                <div className="bg-slate-900/50 p-10 rounded-3xl border border-white/5 max-w-2xl w-full shadow-2xl backdrop-blur-sm">
+                    <Monitor size={60} className="text-pink-500 mx-auto mb-6" />
+                    <h1 className="text-4xl font-black mb-4 tracking-tight">Menú de Diagnóstico</h1>
+                    <p className="text-slate-400 mb-10 text-lg">¿Dónde quieres ejecutar las pruebas?</p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <button
+                            onClick={() => setStep('intro')}
+                            className="group relative flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-slate-700 hover:border-pink-500 bg-slate-800/50 hover:bg-slate-800 transition-all active:scale-95"
+                        >
+                            <div className="p-4 bg-slate-700 rounded-full group-hover:bg-pink-500 transition-colors">
+                                <Monitor size={32} className="text-white" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-xl mb-1">Este Equipo</h3>
+                                <p className="text-xs text-slate-400">Ejecutar tests aquí mismo</p>
+                            </div>
+                        </button>
+
+                        <button
+                            onClick={() => setStep('monitor_remote')}
+                            className="group relative flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-slate-700 hover:border-cyan-400 bg-slate-800/50 hover:bg-slate-800 transition-all active:scale-95"
+                        >
+                            <div className="absolute top-3 right-3 px-2 py-0.5 bg-cyan-500/20 text-cyan-400 text-[10px] font-bold uppercase rounded-full border border-cyan-500/30">Nuevo</div>
+                            <div className="p-4 bg-slate-700 rounded-full group-hover:bg-cyan-500 transition-colors">
+                                <Wifi size={32} className="text-white" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-xl mb-1">Equipo Remoto</h3>
+                                <p className="text-xs text-slate-400">Generar código para otro PC</p>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (step === 'monitor_remote') {
+        const completedTests = remoteStatus?.results?.length || 0;
+        const totalTests = TESTS.length; // Approx hardcoded or from TESTS
+        const progress = (completedTests / totalTests) * 100;
+        const isDone = remoteStatus?.status === 'completed';
+
+        return (
+            <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-8 text-center animate-in fade-in">
+                <div className="max-w-4xl w-full flex flex-col items-center">
+                    <div className="mb-10 text-center">
+                        <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-2">MODO MONITOR REMOTO</h2>
+                        <h1 className="text-5xl font-black text-white mb-6">Escanea o Introduce el Código</h1>
+
+                        <div className="bg-white text-black p-8 rounded-3xl inline-flex flex-col items-center shadow-[0_0_50px_rgba(255,255,255,0.2)]">
+                            <div className="text-6xl font-black font-mono tracking-widest mb-2">{sessionId}</div>
+                            <p className="text-sm font-bold opacity-60">CÓDIGO DE SESIÓN</p>
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-900/80 p-6 rounded-2xl border border-white/10 w-full mb-8 flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center">
+                                <Wifi size={24} className="text-cyan-400 animate-pulse" />
+                            </div>
+                            <div className="text-left">
+                                <p className="font-bold text-lg">Esperando conexión...</p>
+                                <p className="text-sm text-slate-400">Entra en <span className="text-cyan-400 font-mono">productividad.onrender.com/laptop-remote-test</span></p>
+                            </div>
+                        </div>
+                        {isDone && <div className="px-4 py-1 bg-green-500 text-black text-xs font-bold uppercase rounded-full animate-bounce">Completado</div>}
+                    </div>
+
+                    {remoteStatus?.results?.length > 0 && (
+                        <div className="w-full grid grid-cols-2 md:grid-cols-4 gap-3">
+                            {remoteStatus.results.map((r, i) => (
+                                <div key={i} className={`p-3 rounded-lg border flex items-center gap-3 ${r.passed ? 'bg-green-900/20 border-green-500/30' : 'bg-red-900/20 border-red-500/30'}`}>
+                                    {r.passed ? <CheckCircle size={16} className="text-green-500" /> : <XCircle size={16} className="text-red-500" />}
+                                    <span className="text-sm font-bold truncate">{r.name}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {isDone && (
+                        <button onClick={() => setStep('done')} className="mt-8 px-10 py-3 bg-cyan-500 hover:bg-cyan-400 text-black font-bold rounded-xl shadow-lg transition-transform active:scale-95">
+                            Ver Informe Completo
+                        </button>
+                    )}
+                </div>
+            </div>
+        );
+    }
 
     if (step === 'intro') {
         return (

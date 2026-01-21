@@ -139,6 +139,7 @@ const Productivity = () => {
     };
 
     const isManagerial = user?.role === ROLES.MANAGER;
+    const canEditPanels = [ROLES.MANAGER, ROLES.RESPONSIBLE, ROLES.SUPERVISOR].includes(user?.role);
     const isToday = selectedDate === new Date().toISOString().split('T')[0];
     const isDayClosed = closedDays.includes(selectedDate);
     const unclosedDays = getUnclosedPastDays();
@@ -445,7 +446,7 @@ const Productivity = () => {
                             setInputValue={setNeedInput}
                             onAdd={handleAddNeed}
                             onRemove={removeProductFamily}
-                            isManagerial={isManagerial}
+                            isManagerial={canEditPanels}
                             theme="emerald"
                             placeholder="Añadir necesidad..."
                             className="w-full h-full"
@@ -457,7 +458,7 @@ const Productivity = () => {
                             setInputValue={setOverstockInput}
                             onAdd={handleAddOverstock}
                             onRemove={removeProductFamily}
-                            isManagerial={isManagerial}
+                            isManagerial={canEditPanels}
                             theme="red"
                             placeholder="Añadir sobrestock..."
                             className="w-full h-full"

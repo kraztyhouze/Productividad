@@ -601,6 +601,36 @@ app.delete('/api/no-deals/:id', async (req, res) => {
     }
 });
 
+// --- Product Families (Needs/Overstock) ---
+app.get('/api/product-families', async (req, res) => {
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    try {
+        const result = await pool.query('SELECT * FROM product_families WHERE store_id = $1 ORDER BY id DESC', [storeId]);
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/product-families', async (req, res) => {
+    const { name, type, date } = req.body;
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    try {
+        const result = await pool.query(
+            'INSERT INTO product_families (name, type, date, store_id) VALUES ($1, $2, $3, $4) RETURNING *',
+            [name, type, date, storeId]
+        );
+        res.json(result.rows[0]);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/product-families/:id', async (req, res) => {
+    const { id } = req.params;
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    try {
+        await pool.query('DELETE FROM product_families WHERE id = $1 AND store_id = $2', [id, storeId]);
+        res.json({ message: 'Deleted' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // --- 7. Security (IMEI Check) ---
 app.post('/api/security/check-imei', async (req, res) => {
     // ... (keep existing code, just context)

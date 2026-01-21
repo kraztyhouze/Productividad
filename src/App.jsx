@@ -55,6 +55,7 @@ function App() {
                                 {/* Rutas de Diagnóstico (Públicas globales) */}
                                 <Route path="/mobile-test/:sessionId" element={<MobileDiagnostics />} />
                                 <Route path="/laptop-test/:sessionId" element={<LaptopDiagnostics />} />
+                                <Route path="/laptop-remote-test" element={<LaptopRemoteTest />} /> {/* New route for LaptopRemoteTest */}
 
                                 {/* Rutas que requieren haber seleccionado tienda */}
                                 <Route element={<RequireStore />}>

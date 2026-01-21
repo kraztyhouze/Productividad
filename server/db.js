@@ -214,6 +214,23 @@ export async function initDb() {
             }
         }
 
+        // 5. Store Settings (Gold Price, etc.)
+        await client.query(`
+        CREATE TABLE IF NOT EXISTS store_settings (
+            store_id TEXT PRIMARY KEY,
+            gold_price NUMERIC DEFAULT 77.00,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    `);
+
+        // Ensure default settings exist for known stores
+        for (const storeId of stores) {
+            await client.query(`
+            INSERT INTO store_settings (store_id, gold_price) VALUES ($1, 77.00)
+            ON CONFLICT (store_id) DO NOTHING
+        `, [storeId]);
+        }
+
         console.log("Database tables initialized (PostgreSQL)");
     } catch (err) {
         console.error("Error initializing DB:", err);

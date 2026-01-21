@@ -77,15 +77,50 @@ const Productivity = () => {
         return () => clearInterval(interval);
     }, []);
 
-    // ... (keep goldPrice) ...
-    const [goldPrice, setGoldPrice] = useState(() => localStorage.getItem('goldPrice') || '77');
+    // Gold Price State (from Server)
+    const [goldPrice, setGoldPrice] = useState('77');
 
-    const handleGoldPriceUpdate = () => {
-        if (!isManagerial) return;
+    const fetchInternalGold = async () => {
+        try {
+            const storeId = localStorage.getItem('tiktak_current_store') || 'store_1';
+            const res = await fetch('/api/settings/gold', {
+                headers: { 'x-store-id': storeId }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setGoldPrice(data.price);
+            }
+        } catch (e) { console.error("Error fetching internal gold price", e); }
+    };
+
+    useEffect(() => {
+        fetchInternalGold();
+        const interval = setInterval(fetchInternalGold, 30000); // Poll every 30s
+        return () => clearInterval(interval);
+    }, []);
+
+    const handleGoldPriceUpdate = async () => {
+        // Allow Managers, Supervisors, Responsibles
+        const allowedRoles = [ROLES.MANAGER, ROLES.SUPERVISOR, ROLES.RESPONSIBLE];
+        if (!allowedRoles.includes(user?.role)) {
+            alert("No tienes permisos para modificar el precio.");
+            return;
+        }
+
         const newPrice = prompt("Introduce el nuevo precio del oro (€/gr):", goldPrice);
-        if (newPrice !== null && newPrice.trim() !== "") {
-            setGoldPrice(newPrice);
-            localStorage.setItem('goldPrice', newPrice);
+        if (newPrice !== null && newPrice.trim() !== "" && !isNaN(newPrice)) {
+            try {
+                const storeId = localStorage.getItem('tiktak_current_store') || 'store_1';
+                await fetch('/api/settings/gold', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-store-id': storeId },
+                    body: JSON.stringify({ price: newPrice })
+                });
+                setGoldPrice(newPrice); // Optimistic update
+                fetchInternalGold(); // Re-fetch to be sure
+            } catch (e) {
+                alert("Error al guardar precio.");
+            }
         }
     };
 
@@ -297,7 +332,7 @@ const Productivity = () => {
                                                 'bg-slate-800/40 border-white/5 opacity-60 hover:opacity-100 hover:bg-slate-800'
                                         }`}
                                 >
-                                    {isManagerial && isSessionActive && !isClientActive && (
+                                    {isSessionActive && !isClientActive && (isManagerial || emp.id === user?.id) && (
                                         <button
                                             onClick={(e) => { e.stopPropagation(); if (confirm('¿Terminar turno de ' + emp.alias + '?')) endSession(emp.id); }}
                                             className="absolute top-2 right-2 p-1.5 text-slate-400 hover:text-white bg-black/20 hover:bg-red-500 rounded-full z-20 transition-all backdrop-blur-sm"

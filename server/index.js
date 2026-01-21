@@ -869,6 +869,41 @@ app.get('/api/gold-prices', async (req, res) => {
     }
 });
 
+// 6. Admin Backup
+app.get('/api/admin/backup', async (req, res) => {
+    try {
+        const tables = [
+            'employees', 'active_sessions', 'daily_records', 'daily_groups',
+            'closed_days', 'day_incidents', 'product_families',
+            'no_deal_details', 'store_settings', 'roles', 'laptop_results'
+        ];
+
+        const backupData = {
+            version: '1.0',
+            timestamp: new Date().toISOString(),
+            data: {}
+        };
+
+        // Postgres query to get all tables might be better, but explicit list is safer for now
+        for (const table of tables) {
+            try {
+                // Simple existence check via try/catch on select or metadata
+                // Let's just try SELECT. If table doesn't exist, it throws, we catch and skip.
+                const result = await pool.query(`SELECT * FROM "${table}"`); // Quotes for safety
+                backupData.data[table] = result.rows;
+            } catch (e) {
+                // Ignore missing tables (e.g. roles might not be created yet)
+                console.log(`Backup: Table ${table} skipped or empty (${e.message})`);
+            }
+        }
+
+        res.json(backupData);
+    } catch (err) {
+        console.error('Backup failed:', err);
+        res.status(500).json({ error: 'Backup failed' });
+    }
+});
+
 // Serve Static Assets (Frontend)
 const distPath = path.resolve(__dirname, '../dist');
 app.use(express.static(distPath));

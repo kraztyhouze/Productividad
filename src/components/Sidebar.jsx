@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth, ROLES } from '../context/AuthContext';
 import { useTeam } from '../context/TeamContext';
-import { Users, ShoppingBag, LogOut, LayoutGrid, FileText, Search } from 'lucide-react';
+import { Users, ShoppingBag, LogOut, LayoutGrid, FileText, Search, Download } from 'lucide-react';
 
 const Sidebar = ({ expanded, setExpanded }) => {
     const { user, logout } = useAuth();
@@ -12,6 +12,27 @@ const Sidebar = ({ expanded, setExpanded }) => {
     const handleLogout = () => {
         logout();
         navigate('/login');
+    };
+
+    const handleBackup = async () => {
+        if (!confirm("¿Descargar copia de seguridad completa de la base de datos?")) return;
+        try {
+            const res = await fetch('/api/admin/backup');
+            if (!res.ok) throw new Error("Error en backup");
+            const data = await res.json();
+
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `tiktak_backup_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        } catch (e) {
+            alert("Error al descargar backup: " + e.message);
+        }
     };
 
     return (
@@ -70,6 +91,13 @@ const Sidebar = ({ expanded, setExpanded }) => {
                     <Search size={20} className="shrink-0 group-hover:scale-110 transition-transform" />
                     <span className={`font-bold text-sm transition-opacity duration-300 ${expanded ? 'opacity-100' : 'opacity-0 hidden'}`}>Mercado</span>
                 </NavLink>
+
+                {user?.role === ROLES.MANAGER && (
+                    <button onClick={handleBackup} className={`w-full flex items-center gap-3 px-3 py-3 mt-4 rounded-xl text-slate-500 hover:bg-slate-800 hover:text-blue-400 transition-all duration-300 group ${!expanded ? 'justify-center' : ''}`}>
+                        <Download size={20} className="shrink-0 group-hover:scale-110 transition-transform" />
+                        <span className={`font-bold text-sm transition-opacity duration-300 ${expanded ? 'opacity-100' : 'opacity-0 hidden'}`}>Backup DB</span>
+                    </button>
+                )}
             </nav>
 
             {/* Footer / User Profile */}

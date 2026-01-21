@@ -382,6 +382,46 @@ app.delete('/api/product-families/:id', async (req, res) => {
 
 // --- 6. Productivity & Sessions (Restored & ISOLATED) ---
 
+// --- SYNC ENDPOINT (Performance Optimization) ---
+app.get('/api/sync/productivity', async (req, res) => {
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    try {
+        const [sessions, records, groups, closed, incidents, families] = await Promise.all([
+            pool.query('SELECT TRIM(employee_id) as "employeeId", employee_name as "employeeName", start_time as "startTime", client_start_time as "clientStartTime" FROM active_sessions WHERE store_id = $1', [storeId]),
+            pool.query('SELECT id, employee_id as "employeeId", employee_name as "employeeName", start_time as "startTime", end_time as "endTime", duration_seconds as "durationSeconds", date, groups_count as "groups" FROM daily_records WHERE store_id = $1 ORDER BY start_time DESC', [storeId]),
+            pool.query('SELECT * FROM daily_groups WHERE store_id = $1', [storeId]),
+            pool.query('SELECT * FROM closed_days WHERE store_id = $1', [storeId]),
+            pool.query('SELECT * FROM day_incidents WHERE store_id = $1', [storeId]),
+            pool.query('SELECT * FROM product_families WHERE store_id = $1 ORDER BY id DESC', [storeId])
+        ]);
+
+        const dailyGroupsMap = {};
+        groups.rows.forEach(row => {
+            dailyGroupsMap[row.key] = {
+                standard: row.standard,
+                jewelry: row.jewelry,
+                recoverable: row.recoverable,
+                noDeal: row.no_deal,
+                clientSeconds: row.client_seconds || 0
+            };
+        });
+
+        const dayIncidentsMap = {};
+        incidents.rows.forEach(r => dayIncidentsMap[r.date] = r.text);
+
+        res.json({
+            activeSessions: sessions.rows,
+            dailyRecords: records.rows.map(r => ({ ...r, id: parseInt(r.id) })),
+            dailyGroups: dailyGroupsMap,
+            closedDays: closed.rows.map(d => d.date),
+            dayIncidents: dayIncidentsMap,
+            productFamilies: families.rows
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Active Sessions
 app.get('/api/active-sessions', async (req, res) => {
     const storeId = req.headers['x-store-id'] || 'store_1';
@@ -425,8 +465,6 @@ app.get('/api/daily-records', async (req, res) => {
     const storeId = req.headers['x-store-id'] || 'store_1';
     try {
         const result = await pool.query('SELECT id, employee_id as "employeeId", employee_name as "employeeName", start_time as "startTime", end_time as "endTime", duration_seconds as "durationSeconds", date, groups_count as "groups" FROM daily_records WHERE store_id = $1 ORDER BY start_time DESC', [storeId]);
-
-        console.log(`[DEBUG_DATA] GET /daily-records | Store: ${storeId} | Rows: ${result.rows.length}`);
 
         const mapped = result.rows.map(r => ({ ...r, id: parseInt(r.id) }));
         res.json(mapped);

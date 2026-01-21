@@ -34,29 +34,19 @@ export const ProductivityProvider = ({ children }) => {
     const fetchData = async () => {
         try {
             const options = getFetchOptions();
+            const res = await fetch('/api/sync/productivity', options);
+            if (!res.ok) throw new Error('Sync failed');
 
-            const results = await Promise.allSettled([
-                fetch('/api/active-sessions', options),
-                fetch('/api/daily-records', options),
-                fetch('/api/daily-groups', options),
-                fetch('/api/closed-days', options),
-                fetch('/api/day-incidents', options),
-                fetch('/api/product-families', options)
-            ]);
+            const data = await res.json();
 
-            const [sessionsRes, recordsRes, groupsRes, closedRes, incidentsRes, familiesRes] = results;
-
-            if (sessionsRes.status === 'fulfilled' && sessionsRes.value.ok) setActiveSessions(await sessionsRes.value.json());
-            if (recordsRes.status === 'fulfilled' && recordsRes.value.ok) setDailyRecords(await recordsRes.value.json());
-            if (groupsRes.status === 'fulfilled' && groupsRes.value.ok) setDailyGroups(await groupsRes.value.json());
-            if (closedRes.status === 'fulfilled' && closedRes.value.ok) {
-                const closedData = await closedRes.value.json();
-                setClosedDays(closedData.map(d => d.date));
-            }
-            if (incidentsRes.status === 'fulfilled' && incidentsRes.value.ok) setDayIncidents(await incidentsRes.value.json());
-            if (familiesRes.status === 'fulfilled' && familiesRes.value.ok) setProductFamilies(await familiesRes.value.json());
+            setActiveSessions(data.activeSessions || []);
+            setDailyRecords(data.dailyRecords || []);
+            setDailyGroups(data.dailyGroups || {});
+            setClosedDays(data.closedDays || []);
+            setDayIncidents(data.dayIncidents || {});
+            setProductFamilies(data.productFamilies || []);
         } catch (error) {
-            console.error("Error loading data:", error);
+            console.error("Error loading sync data:", error);
         }
     };
 

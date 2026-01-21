@@ -869,10 +869,22 @@ app.get('/api/gold-prices', async (req, res) => {
     }
 });
 
-app.use(express.static(path.join(__dirname, '../dist')));
+// Serve Static Assets (Frontend)
+const distPath = path.resolve(__dirname, '../dist');
+app.use(express.static(distPath));
 
-app.get(/(.*)/, (req, res) => {
-    res.sendFile(path.join(__dirname, '../dist/index.html'));
+// Catch-All Handler (SPA Routing)
+// Using regex /.*/ because string '*' causes "Missing originalPath" in Express 5
+app.get(/.*/, (req, res) => {
+    const indexPath = path.join(distPath, 'index.html');
+    if (fs.existsSync(indexPath)) {
+        // Fallback to stream to avoid Express 5 sendFile issues if any
+        res.setHeader('Content-Type', 'text/html');
+        fs.createReadStream(indexPath).pipe(res);
+    } else {
+        console.error(`[CRITICAL] Frontend build not found at: ${indexPath}`);
+        res.status(404).send('Application not built. Run "npm run build" first.');
+    }
 });
 
 app.listen(PORT, '0.0.0.0', () => {

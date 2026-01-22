@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import './telegramBot.js'; // Start Telegram Bot
 import cors from 'cors';
 import pg from 'pg';
 import path from 'path';
@@ -353,32 +354,7 @@ app.delete('/api/closed-days/:date', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }) }
 });
 
-// 5. Product Families
-app.get('/api/product-families', async (req, res) => {
-    try {
-        const result = await pool.query('SELECT * FROM product_families ORDER BY id ASC');
-        res.json(result.rows);
-    } catch (err) { res.status(500).json({ error: err.message }) }
-});
 
-app.post('/api/product-families', async (req, res) => {
-    const { name, type, date } = req.body;
-    try {
-        const result = await pool.query(
-            'INSERT INTO product_families (name, type, date) VALUES ($1, $2, $3) RETURNING *',
-            [name, type, date]
-        );
-        res.json(result.rows[0]);
-    } catch (err) { res.status(500).json({ error: err.message }) }
-});
-
-app.delete('/api/product-families/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-        await pool.query('DELETE FROM product_families WHERE id = $1', [id]);
-        res.json({ message: 'Deleted' });
-    } catch (err) { res.status(500).json({ error: err.message }) }
-});
 
 // --- 6. Productivity & Sessions (Restored & ISOLATED) ---
 
@@ -639,49 +615,14 @@ app.delete('/api/no-deals/:id', async (req, res) => {
     }
 });
 
-// --- Product Families (Needs/Overstock) ---
-app.get('/api/product-families', async (req, res) => {
-    const storeId = req.headers['x-store-id'] || 'store_1';
-    try {
-        const result = await pool.query('SELECT * FROM product_families WHERE store_id = $1 ORDER BY id DESC', [storeId]);
-        res.json(result.rows);
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.post('/api/product-families', async (req, res) => {
-    const { name, type, date } = req.body;
-    const storeId = req.headers['x-store-id'] || 'store_1';
-    try {
-        const result = await pool.query(
-            'INSERT INTO product_families (name, type, date, store_id) VALUES ($1, $2, $3, $4) RETURNING *',
-            [name, type, date, storeId]
-        );
-        res.json(result.rows[0]);
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.delete('/api/product-families/:id', async (req, res) => {
-    const { id } = req.params;
-    const storeId = req.headers['x-store-id'] || 'store_1';
-    try {
-        await pool.query('DELETE FROM product_families WHERE id = $1 AND store_id = $2', [id, storeId]);
-        res.json({ message: 'Deleted' });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
 
 // --- 7. Security (IMEI Check) ---
 app.post('/api/security/check-imei', async (req, res) => {
-    // ... (keep existing code, just context)
     const { imei } = req.body;
     // Simulate API Latency
     await new Promise(resolve => setTimeout(resolve, 1500));
-    // ... existing imei logic ...
-    // Note: I will just overwrite the whole block to be safe or use proper ranges. 
-    // Actually, I'll append the new code AFTER the security block to avoid messing with it.
-    // Wait, the user asked to ADD, so I will append.
-    // I need to return the EXISTING content for the match, then add the new stuff.
-    // Let's just REPLACE the end of the file or insert before the aggregator.
-    // BETTER: Insert BEFORE the Market Link Aggregator, keeping IMEI check intact.
+
+    // Validar IMEI (Luhn Algorithm simulated or length check)
 
     if (!imei || imei.length < 15) {
         return res.json({ status: 'INVALID', message: 'IMEI inválido (15 dígitos mín)' });

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
+import { generateDiagnosticCertificate } from '../utils/pdfGenerator';
 import { Monitor, Cpu, Keyboard, Wifi, Camera, Mic, Battery, Play, CheckCircle, XCircle, Grid, MousePointer, Activity, ShieldAlert, Lock, Zap } from 'lucide-react';
 
 
@@ -315,15 +316,27 @@ const LaptopDiagnostics = () => {
                                 <span className="text-white text-xs">{specs.storage || 'No especificado'}</span>
                             </div>
                             <div className="col-span-2">
-                                <span className="block text-slate-500 text-xs uppercase">Resolución</span>
-                                <span className="text-white text-xs">{specs.resolution}</span>
-                            </div>
-                            <div className="col-span-2">
                                 <span className="block text-slate-500 text-xs uppercase">Sistema Operativo</span>
                                 <span className="text-white text-xs">{specs.os}</span>
                             </div>
                         </div>
                     )}
+
+                    <button
+                        onClick={() => generateDiagnosticCertificate({
+                            sessionId: sessionId || 'LOCAL',
+                            results: Object.entries(results).map(([k, v]) => ({
+                                name: k,
+                                passed: (typeof v === 'object' && 'passed' in v) ? v.passed : v,
+                                skipped: (typeof v === 'object' && v.skipped),
+                                details: (typeof v === 'object' && v.details) ? v.details : ''
+                            })),
+                            deviceInfo: specs
+                        }, 'laptop')}
+                        className="mt-8 px-8 py-3 bg-white text-slate-900 border hover:bg-slate-100 font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 mx-auto"
+                    >
+                        <span className="text-xl">📄</span> Descargar Informe PDF
+                    </button>
                 </div>
             </div>
         );

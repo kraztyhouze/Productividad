@@ -1,25 +1,20 @@
 import React, { useState, useEffect } from 'react';
+import { useProductivity } from '../context/ProductivityContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ExternalLink, Smartphone, Monitor, Watch, Hammer, Gamepad2, CheckCircle, XCircle, Grid, QrCode, Download } from 'lucide-react';
 import { generateDiagnosticCertificate } from '../utils/pdfGenerator';
 
 const CATEGORIES = {
     phones: { name: 'Móviles/Tablets', margin: 0.40, icon: <Smartphone size={18} />, color: 'pink', checklist: ['IMEI/Red', 'Cosmético', 'Seguridad', 'Pantalla/Touch', 'Vibración/Sensores', 'Micrófono/Audio', 'Cámaras/Flash', 'GPS', 'Carga'] },
-    laptops: { name: 'Portátiles', margin: 0.40, icon: <Monitor size={18} />, color: 'cyan', checklist: ['Enciende', 'Cargador Original', 'Teclado Completo', 'Pantalla sin manchas', 'Webcam/Audio', 'Hardware OK'] },
-    consoles: { name: 'Consolas', margin: 0.35, icon: <Gamepad2 size={18} />, color: 'purple', checklist: ['Lee discos/cartuchos', 'Mando conecta', 'No baneada (Online)', 'Garantía precintos'] },
-    jewelry: { name: 'Joyería', margin: 0.30, icon: <Watch size={18} />, color: 'amber', checklist: ['Sello de contraste', 'Peso verificado', 'Piedras revisadas', 'Cierre funciona', 'Prueba Ácido/Imán'] },
-    tools: { name: 'Herramientas', margin: 0.50, icon: <Hammer size={18} />, color: 'orange', checklist: ['Enciende/Funciona', 'Cableado seguro', 'Accesorios incluidos', 'Sin óxido excesivo'] },
-    others: { name: 'Otros', margin: 0.50, icon: <Grid size={18} />, color: 'slate', checklist: ['Estado general bueno', 'Completo', 'Funciona correctamente'] }
+    laptops: { name: 'Portátiles', margin: 0.40, icon: <Monitor size={18} />, color: 'cyan', checklist: ['Enciende', 'Cargador Original', 'Teclado Completo', 'Pantalla sin manchas', 'Webcam/Audio', 'Hardware OK'] }
 };
 
-const GOLD_PRICES_BASE = {
-    24: 65.50, // € per gram
-    18: 49.10,
-    14: 38.20,
-    9: 24.50
-};
+
 
 const Market = () => {
+    // Context access for Gold Price
+    const { goldPrice: contextGoldPrice } = useProductivity(); // Expecting string or number from context
+
     const [mode, setMode] = useState('product'); // 'product' | 'gold'
     const [searchTerm, setSearchTerm] = useState('');
     const [results, setResults] = useState([]);
@@ -351,8 +346,24 @@ const Market = () => {
         const w = parseFloat(goldForm.weight) || 0;
         const k = parseInt(goldForm.karats) || 18;
         if (w <= 0) return;
-        const fluctuation = (Math.random() * 0.8) - 0.4;
-        const pricePerGram = GOLD_PRICES_BASE[k] + fluctuation;
+
+        // Base price comes from Productivity context (18k price)
+        const base18k = parseFloat(contextGoldPrice) || 0;
+
+        // Derive other karats based on 18k ratio if needed, or simple math
+        // 24k is pure (1.0), 18k is 0.75. So 24k ~ 18k / 0.75
+        // 14k is 0.5833 (14/24). 
+        // 9k is 0.375 (9/24).
+        // Let's use simple ratios relative to 18k (18/24 = 0.75)
+
+        let pricePerGram = 0;
+        if (base18k > 0) {
+            const price24k = base18k / 0.75;
+            if (k === 18) pricePerGram = base18k;
+            else if (k === 24) pricePerGram = price24k;
+            else pricePerGram = price24k * (k / 24);
+        }
+
         const total = w * pricePerGram;
         setGoldQuote({
             pricePerGram,
@@ -609,8 +620,8 @@ const Market = () => {
                                         className="mt-6 relative z-10"
                                     >
                                         <div className={`relative overflow-hidden rounded-2xl border p-6 ${appraisalResult.status === 'COMPRAR' ? 'bg-emerald-950/40 border-emerald-500/30' :
-                                                appraisalResult.status === 'RECHAZAR' || appraisalResult.status === 'PELIGRO' ? 'bg-red-950/40 border-red-500/30' :
-                                                    'bg-amber-950/40 border-amber-500/30'
+                                            appraisalResult.status === 'RECHAZAR' || appraisalResult.status === 'PELIGRO' ? 'bg-red-950/40 border-red-500/30' :
+                                                'bg-amber-950/40 border-amber-500/30'
                                             }`}>
 
                                             {/* Status Badge */}
@@ -650,8 +661,8 @@ const Market = () => {
 
                                             {/* Decorative Status Bar */}
                                             <div className={`absolute bottom-0 left-0 right-0 h-1 ${appraisalResult.status === 'COMPRAR' ? 'bg-emerald-500' :
-                                                    appraisalResult.status === 'RECHAZAR' ? 'bg-red-500' :
-                                                        'bg-amber-500'
+                                                appraisalResult.status === 'RECHAZAR' ? 'bg-red-500' :
+                                                    'bg-amber-500'
                                                 }`}></div>
                                         </div>
                                     </motion.div>
@@ -664,31 +675,107 @@ const Market = () => {
 
             {/* CONTENT: GOLD MODE */}
             {mode === 'gold' && (
-                <div className="max-w-md mx-auto w-full bg-[#0f172a] rounded-2xl p-6 border border-amber-500/20 shadow-2xl shadow-amber-900/20">
-                    <h2 className="text-xl font-bold text-amber-500 mb-6 flex items-center gap-2"><Watch /> Cotizador de Oro</h2>
-                    <div className="space-y-4">
-                        <div>
-                            <label className="text-xs font-bold text-slate-400 uppercase">Peso (gramos)</label>
-                            <input type="number" value={goldForm.weight} onChange={e => setGoldForm({ ...goldForm, weight: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white text-lg outline-none focus:border-amber-500" placeholder="0.00" />
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-slate-400 uppercase">Kilates</label>
-                            <div className="grid grid-cols-4 gap-2 mt-1">
-                                {[24, 18, 14, 9].map(k => (
-                                    <button key={k} onClick={() => setGoldForm({ ...goldForm, karats: k })} className={`py-2 rounded-lg font-bold border transition-all ${goldForm.karats == k ? 'bg-amber-500 text-black border-amber-500' : 'bg-slate-800 text-slate-400 border-white/5'}`}>{k}K</button>
-                                ))}
+                <div className="max-w-4xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                    {/* LEFT: CALCULATOR */}
+                    <div className="bg-[#0f172a] rounded-2xl p-6 border border-amber-500/20 shadow-2xl shadow-amber-900/20 flex flex-col">
+                        <h2 className="text-xl font-bold text-amber-500 mb-6 flex items-center gap-2"><Watch /> Cotizador de Oro</h2>
+
+                        {/* CURRENT REFERENCE PRICE */}
+                        <div className="mb-6 bg-slate-900/50 p-4 rounded-xl border border-white/5 flex items-center justify-between">
+                            <div>
+                                <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Precio Base (18k)</p>
+                                <p className="text-xs text-slate-500">Definido en Productividad</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-2xl font-black text-white">{parseFloat(contextGoldPrice).toFixed(2)} €/g</p>
                             </div>
                         </div>
-                        <button onClick={calculateGold} className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl shadow-lg shadow-amber-500/20 transition-all">CALCULAR VALOR</button>
-                        {goldQuote && (
-                            <div className="mt-4 bg-slate-900/50 p-4 rounded-xl border border-amber-500/30 text-center animate-in zoom-in">
-                                <p className="text-slate-400 text-xs mb-1">Valor Estimado ({goldForm.karats}K)</p>
-                                <p className="text-4xl font-black text-white">{goldQuote.total.toFixed(2)}€</p>
-                                <p className="text-amber-500 text-xs mt-2 font-mono">{goldQuote.pricePerGram.toFixed(2)} €/gr</p>
-                                <p className="text-[10px] text-slate-600 mt-4">Actualizado: {goldQuote.timestamp}</p>
+
+                        <div className="space-y-4 flex-1">
+                            <div>
+                                <label className="text-xs font-bold text-slate-400 uppercase">Peso (gramos)</label>
+                                <input type="number" value={goldForm.weight} onChange={e => setGoldForm({ ...goldForm, weight: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white text-lg outline-none focus:border-amber-500" placeholder="0.00" />
                             </div>
-                        )}
+                            <div>
+                                <label className="text-xs font-bold text-slate-400 uppercase">Kilates</label>
+                                <div className="grid grid-cols-4 gap-2 mt-1">
+                                    {[24, 18, 14, 9].map(k => (
+                                        <button key={k} onClick={() => setGoldForm({ ...goldForm, karats: k })} className={`py-2 rounded-lg font-bold border transition-all ${goldForm.karats == k ? 'bg-amber-500 text-black border-amber-500' : 'bg-slate-800 text-slate-400 border-white/5'}`}>{k}K</button>
+                                    ))}
+                                </div>
+                            </div>
+                            <button onClick={calculateGold} className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl shadow-lg shadow-amber-500/20 transition-all mt-4">CALCULAR VALOR</button>
+
+                            {goldQuote && (
+                                <div className="mt-4 bg-slate-900/50 p-4 rounded-xl border border-amber-500/30 text-center animate-in zoom-in">
+                                    <p className="text-slate-400 text-xs mb-1">Valor Estimado ({goldForm.karats}K)</p>
+                                    <p className="text-4xl font-black text-white">{goldQuote.total.toFixed(2)}€</p>
+                                    <p className="text-amber-500 text-xs mt-2 font-mono">{goldQuote.pricePerGram.toFixed(2)} €/gr</p>
+                                    <div className="mt-4 p-2 bg-amber-500/10 rounded border border-amber-500/20">
+                                        <p className="text-[10px] font-bold text-amber-200 uppercase tracking-wide">⚠️ Precio Mínimo Garantizado</p>
+                                        <p className="text-[9px] text-amber-400/80">Para oro limpio de 18 quilates sin mermas.</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
+
+                    {/* RIGHT: TEST PROTOCOL */}
+                    <div className="bg-[#1e293b]/80 backdrop-blur rounded-2xl p-6 border border-white/10 shadow-xl flex flex-col">
+                        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                            <CheckCircle size={18} className="text-green-500" /> Protocolo de Prueba
+                        </h3>
+                        <p className="text-xs text-slate-400 mb-4">Verificaciones obligatorias para evitar errores en la compra.</p>
+
+                        <div className="flex-1 bg-slate-900/50 rounded-xl overflow-hidden border border-white/5 p-4">
+                            {/* Placeholder content for now as requested */}
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="border-b border-white/10">
+                                        <th className="pb-2 text-[10px] font-bold text-slate-500 uppercase">Punto de Control</th>
+                                        <th className="pb-2 text-[10px] font-bold text-slate-500 uppercase text-right">Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="text-sm divide-y divide-white/5">
+                                    <tr className="group">
+                                        <td className="py-3 text-slate-300">Revisión visual (Color/Brillo)</td>
+                                        <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
+                                    </tr>
+                                    <tr className="group">
+                                        <td className="py-3 text-slate-300">Búsqueda de contrastes</td>
+                                        <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
+                                    </tr>
+                                    <tr className="group">
+                                        <td className="py-3 text-slate-300">Prueba del Imán (Hierro)</td>
+                                        <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
+                                    </tr>
+                                    <tr className="group">
+                                        <td className="py-3 text-slate-300">Prueba de la Piedra (Toque)</td>
+                                        <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
+                                    </tr>
+                                    <tr className="group">
+                                        <td className="py-3 text-slate-300">Reacción al Ácido (18k)</td>
+                                        <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
+                                    </tr>
+                                    <tr className="group">
+                                        <td className="py-3 text-slate-300">Revisión de cierres/muelles</td>
+                                        <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
+                                    </tr>
+                                    <tr className="group">
+                                        <td className="py-3 text-slate-300">Pesaje (Báscula calibrada)</td>
+                                        <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                                <p className="text-[10px] text-blue-300 leading-relaxed">
+                                    ℹ️ <strong>Nota:</strong> Si la pieza tiene piedras, restar el peso estimado antes de cotizar. Ante la duda, consultar con encargado.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             )}
         </div>

@@ -1,115 +1,183 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-export const generateDiagnosticCertificate = (session) => {
+export const generateDiagnosticCertificate = (session, type = 'mobile') => {
     if (!session || !session.results) return;
     const doc = new jsPDF();
 
     // Define Brand Colors
-    const PINK = [219, 39, 119];
-    const DARK = [15, 23, 42];
-    const GRAY = [100, 116, 139];
-    const GREEN = [22, 163, 74];
-    const RED = [220, 38, 38];
+    const PRIMARY = [6, 182, 212]; // Cyan-500
+    const DARK = [15, 23, 42];     // Slate-900
+    const GRAY = [100, 116, 139];  // Slate-500
+    const GREEN = [22, 163, 74];   // Green-600
+    const RED = [220, 38, 38];     // Red-600
 
-    // --- HEADER ---
+    // Header Branding
     doc.setFillColor(...DARK);
     doc.rect(0, 0, 210, 40, 'F');
 
-    // Title & Subtitle
+    // Title Section
     doc.setFont("helvetica", "bold");
     doc.setFontSize(26);
     doc.setTextColor(255, 255, 255);
-    doc.text("PhoneCheck AI", 14, 25);
+    const title = type === 'laptop' ? "PC Diagnostics" : "PhoneCheck AI";
+    doc.text(title, 14, 25);
 
     doc.setFontSize(10);
-    doc.setTextColor(...PINK);
-    doc.text("INFORME DE CERTIFICACIÓN DE DISPOSITIVO", 14, 32);
+    doc.setTextColor(...PRIMARY);
+    doc.text("CERTIFICADO DE ESTADO TÉCNICO", 14, 32);
 
-    // Employee Info
-    const emp = session.deviceInfo?.employee;
-    if (emp) {
-        doc.setTextColor(150, 150, 150);
-        doc.setFontSize(8);
-        doc.text(`TÉCNICO: ${emp.toUpperCase()}`, 14, 37);
-    }
-
-    // Date & Ref
+    // Reference Info (Top Right)
     doc.setFontSize(9);
     doc.setTextColor(200, 200, 200);
     const dateStr = new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString();
     doc.text(dateStr, 196, 20, { align: "right" });
-    doc.text(`REF: ${session.sessionId.toUpperCase().slice(0, 8)}`, 196, 26, { align: "right" });
 
-    // --- DEVICE INFO BOX ---
+    if (session.sessionId) {
+        doc.text(`REF: ${session.sessionId.toUpperCase().slice(0, 8)}`, 196, 26, { align: "right" });
+    }
+
+    // --- DEVICE SPECS BOX ---
     const info = session.deviceInfo || {};
-    doc.setFillColor(248, 250, 252);
-    doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(14, 50, 182, 35, 3, 3, 'FD');
 
-    doc.setFontSize(10);
-    doc.setTextColor(...GRAY);
-    doc.text("DISPOSITIVO", 20, 60);
-    doc.text("PLATAFORMA", 100, 60);
+    // Background for specs
+    doc.setFillColor(248, 250, 252); // Slate-50
+    doc.setDrawColor(226, 232, 240); // Slate-200
 
-    doc.setFontSize(12);
+    let specsHeight = 45;
+    let specsStartY = 50;
+
+    // Adjust box height based on content
+    if (type === 'laptop') specsHeight = 55;
+
+    doc.roundedRect(14, specsStartY, 182, specsHeight, 3, 3, 'FD');
+
     doc.setTextColor(...DARK);
+    doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text(info.model || "Desconocido", 20, 67);
-    doc.text(info.platform || "-", 100, 67);
+    doc.text("ESPECIFICACIONES DEL SISTEMA", 20, specsStartY + 10);
 
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...GRAY);
-    doc.text(info.userAgent ? "User-Agent Detectado" : "-", 20, 75);
-    if (info.screen) doc.text(`Pantalla: ${info.screen}`, 100, 75);
 
-    // --- SCORE / SUMMARY ---
+    // Dynamic Specs Grid
+    let specsData = [];
+
+    if (type === 'laptop') {
+        specsData = [
+            { label: "CPU", value: info.cpuModel || info.cpu || 'Genérico' },
+            { label: "RAM", value: info.ramTotal || info.ram || 'N/A' },
+            { label: "ALMACENAMIENTO", value: info.storage || 'No detectado' },
+            { label: "GRAFICA (GPU)", value: `${info.gpu || 'Integrada'} ${info.gpuDetails ? `(${info.gpuDetails})` : ''}` },
+            { label: "SISTEMA SEGURO", value: info.secureBoot ? 'Secure Boot Activado' : 'Estándar' },
+            { label: "SISTEMA OPERATIVO", value: info.os || 'Windows' },
+        ];
+    } else {
+        specsData = [
+            { label: "MODELO", value: info.model || "Desconocido" },
+            { label: "PLATAFORMA", value: info.platform || "-" },
+            { label: "PANTALLA", value: info.screen || "-" },
+            { label: "NAVEGADOR", value: info.userAgent ? "Detectado" : "-" }
+        ];
+    }
+
+    let col1X = 20;
+    let col2X = 110;
+    let currentY = specsStartY + 20;
+
+    specsData.forEach((item, index) => {
+        const isLeft = index % 2 === 0;
+        const xPos = isLeft ? col1X : col2X;
+
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...GRAY);
+        doc.text(item.label, xPos, currentY);
+
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...DARK);
+        doc.text(String(item.value).substring(0, 45), xPos, currentY + 5);
+
+        if (!isLeft) currentY += 12; // Advance row after second column
+    });
+
+
+    // --- SCORE STAMP ---
     const rs = Array.isArray(session.results) ? session.results : Object.values(session.results);
-    const failedCount = rs.filter(r => !r.passed).length;
-    const totalCount = rs.length;
-    const isClean = failedCount === 0 && totalCount > 0;
+    const failedCount = rs.filter(r => r.passed === false).length; // Explicit check, skipped is usually OK-ish
+    const skippedCount = rs.filter(r => r.skipped).length;
+    const passedCount = rs.filter(r => r.passed === true).length;
 
-    // Stamp
-    doc.setDrawColor(...(isClean ? GREEN : RED));
-    doc.setLineWidth(1);
-    doc.roundedRect(150, 55, 40, 25, 2, 2, 'D');
+    // Overall Status
+    let statusText = "APTO";
+    let statusColor = GREEN;
 
-    doc.setFontSize(14);
-    doc.setTextColor(...(isClean ? GREEN : RED));
+    if (failedCount > 0) {
+        statusText = "REVISAR";
+        statusColor = RED;
+    } else if (passedCount === 0 && skippedCount > 0) {
+        statusText = "INCOMPLETO";
+        statusColor = GRAY;
+    }
+
+    // Stamp Position (Top Right over header/box intersection)
+    const stampX = 160;
+    const stampY = 48; // Overlapping white area
+
+    // Circle background for stamp
+    doc.setFillColor(255, 255, 255);
+    doc.setCheckIcon = false;
+
+    doc.setDrawColor(...statusColor);
+    doc.setLineWidth(1.5);
+    doc.roundedRect(stampX, stampY, 36, 20, 2, 2, 'D');
+    doc.setFillColor(255, 255, 255);
+
+    doc.setFontSize(11);
+    doc.setTextColor(...statusColor);
     doc.setFont("helvetica", "bold");
-    doc.text(isClean ? "APTO" : "REVISAR", 170, 68, { align: "center" });
-    doc.setFontSize(8);
-    doc.text(isClean ? "100% FUNCIONAL" : `${failedCount} ERRORES`, 170, 74, { align: "center" });
+    doc.text(statusText, stampX + 18, stampY + 11, { align: "center" });
 
-    // --- TABLE ---
-    const rows = rs.map(r => [
-        r.name.toUpperCase(),
-        r.skipped ? 'SALTADO' : (r.passed ? 'CORRECTO' : 'FALLO'),
-        r.details || '-'
-    ]);
+    doc.setFontSize(7);
+    doc.text(`${failedCount} Fallos / ${passedCount} OK`, stampX + 18, stampY + 16, { align: "center" });
+
+
+    // --- RESULTS TABLE ---
+    const tableRows = rs.map(r => {
+        let status = 'CORRECTO';
+        if (r.skipped) status = 'SALTADO';
+        if (r.passed === false) status = 'FALLO';
+
+        return [
+            r.name.toUpperCase(),
+            status,
+            r.details || '-'
+        ];
+    });
 
     autoTable(doc, {
-        startY: 95,
-        head: [['COMPONENTE / TEST', 'ESTADO', 'DETALLES TÉCNICOS']],
-        body: rows,
+        startY: specsStartY + specsHeight + 15,
+        head: [['PRUEBA', 'ESTADO', 'NOTAS TÉCNICAS']],
+        body: tableRows,
         theme: 'grid',
+        styles: { fontSize: 9, cellPadding: 3 },
         headStyles: {
             fillColor: [...DARK],
             textColor: 255,
             fontStyle: 'bold',
             halign: 'left'
         },
-        bodyStyles: { textColor: 50 },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
         columnStyles: {
             0: { fontStyle: 'bold', width: 50 },
-            1: { fontStyle: 'bold', width: 40 },
+            1: { fontStyle: 'bold', width: 35 },
             2: { fontStyle: 'italic' }
         },
         didParseCell: function (data) {
             if (data.section === 'body' && data.column.index === 1) {
-                if (data.cell.raw === 'FALLO') data.cell.styles.textColor = [...RED];
-                else if (data.cell.raw === 'SALTADO') data.cell.styles.textColor = [234, 88, 12]; // Orange-600
+                const text = data.cell.raw;
+                if (text === 'FALLO') data.cell.styles.textColor = [...RED];
+                else if (text === 'SALTADO') data.cell.styles.textColor = [234, 88, 12]; // Orange
                 else data.cell.styles.textColor = [...GREEN];
             }
         }
@@ -121,8 +189,9 @@ export const generateDiagnosticCertificate = (session) => {
         doc.setPage(i);
         doc.setFontSize(8);
         doc.setTextColor(150);
-        doc.text(`Generado automáticamente por TikTak Market Suite - Página ${i} de ${pageCount}`, 105, 290, { align: "center" });
+        doc.text(`Generado por TikTak Suite 2.1 - ${new Date().getFullYear()}`, 105, 285, { align: "center" });
+        doc.text(`Página ${i} de ${pageCount}`, 105, 290, { align: "center" });
     }
 
-    doc.save(`Certificado_${session.sessionId.slice(0, 8)}.pdf`);
+    doc.save(`Diagnostico_${type.toUpperCase()}_${session.sessionId ? session.sessionId.slice(0, 8) : 'Manual'}.pdf`);
 };

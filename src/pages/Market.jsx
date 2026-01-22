@@ -28,7 +28,8 @@ const WATCH_INSPECTION_GUIDE = [
             { label: "Cambio de Fecha", desc: "'Snap' nítido y centrado a las 12." },
             { label: "El Bisel (Diver)", desc: "Sin juego atrás. Clics metálicos (120 en Rolex/Omega)." },
             { label: "Cronógrafo", desc: "Start/Stop suaves. Reseteo EXACTO a 0 (vital)." },
-            { label: "Luminiscencia", desc: "Brillo fuerte y uniforme tras 10s de luz." }
+            { label: "Luminiscencia", desc: "Brillo fuerte y uniforme tras 10s de luz." },
+            { label: "Cronocomparador (CRÍTICO)", desc: "Valores elevados sospechosos. ¡Comprobar amplitud y beat error!", isCritical: true }
         ]
     },
     {
@@ -37,7 +38,8 @@ const WATCH_INSPECTION_GUIDE = [
             { label: "Números de Serie", desc: "Coincide grabado (asas/rehaut) con tarjeta." },
             { label: "Grabados Láser", desc: "Profundos y limpios. No al ácido (superficiales)." },
             { label: "Peso (Oro/Platino)", desc: "Debe pesar. Copias chapadas son ligeras." },
-            { label: "Movimiento", desc: "Acabados espejo, sin plásticos en marcas top." }
+            { label: "Movimiento", desc: "Acabados espejo, sin plásticos en marcas top." },
+            { label: "MAQUINARIA (¡ABRIR!)", desc: "Abrir para verificar calibre. AVISAR RESPONSABLE.", isCritical: true, action: "open_notify" }
         ]
     },
     {
@@ -283,11 +285,27 @@ const Market = () => {
             criticalFailure = true;
         }
 
-        Object.entries(checklist).forEach(([key, val]) => {
-            if (val === false) { // Explicitly failed
-                conditionPenalty += 0.15; // 15% value reduction per failed item
-            }
-        });
+        if (category === 'watches') {
+            WATCH_INSPECTION_GUIDE.forEach(section => {
+                section.points.forEach(pt => {
+                    const key = `${section.title}:${pt.label}`;
+                    if (checklist[key] === false) {
+                        if (pt.isCritical) {
+                            criticalFailure = true;
+                            warnings.push(`FALLO CRÍTICO: ${pt.label}`);
+                        } else {
+                            conditionPenalty += 0.15;
+                        }
+                    }
+                });
+            });
+        } else {
+            Object.entries(checklist).forEach(([key, val]) => {
+                if (val === false) { // Explicitly failed
+                    conditionPenalty += 0.15; // 15% value reduction per failed item
+                }
+            });
+        }
 
         // Apply penalty to market value BEFORE margin
         marketValue = marketValue * (1 - conditionPenalty);
@@ -584,9 +602,10 @@ const Market = () => {
                                                             // If not initialized in state, defaulting to null via checklist logic might be tricky?
                                                             // Actually, let's allow dynamic keys for watches.
                                                             const status = checklist[key];
+                                                            const isCritical = pt.isCritical;
 
                                                             return (
-                                                                <div key={pIdx} className="flex justify-between items-start group p-2 hover:bg-white/5 rounded-lg transition-colors">
+                                                                <div key={pIdx} className={`flex justify-between items-start group p-2 hover:bg-white/5 rounded-lg transition-colors ${isCritical ? 'bg-red-500/5 border border-red-500/10' : ''}`}>
                                                                     <div className="flex-1 pr-4">
                                                                         <p className="text-xs font-bold text-slate-300">{pt.label}</p>
                                                                         <p className="text-[10px] text-slate-500 leading-tight mt-0.5">{pt.desc}</p>

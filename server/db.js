@@ -9,7 +9,15 @@ const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:pass
 export const pool = new Pool({
     connectionString,
     // SSL is required for Railway deployments, but we need to disable it for local dev if not set up
-    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
+    keepAlive: true, // Prevent Railway proxy from killing idle connections
+    connectionTimeoutMillis: 5000, // Fail fast if connection is bad
+});
+
+// Prevent app crash on idle client errors
+pool.on('error', (err, client) => {
+    console.error('Unexpected error on idle client', err);
+    // Don't exit the process, just log it. The pool will discard the client.
 });
 
 export const query = (text, params) => pool.query(text, params);

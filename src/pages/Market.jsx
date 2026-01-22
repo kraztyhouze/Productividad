@@ -6,8 +6,50 @@ import { generateDiagnosticCertificate } from '../utils/pdfGenerator';
 
 const CATEGORIES = {
     phones: { name: 'Móviles/Tablets', margin: 0.40, icon: <Smartphone size={18} />, color: 'pink', checklist: ['IMEI/Red', 'Cosmético', 'Seguridad', 'Pantalla/Touch', 'Vibración/Sensores', 'Micrófono/Audio', 'Cámaras/Flash', 'GPS', 'Carga'] },
-    laptops: { name: 'Portátiles', margin: 0.40, icon: <Monitor size={18} />, color: 'cyan', checklist: ['Enciende', 'Cargador Original', 'Teclado Completo', 'Pantalla sin manchas', 'Webcam/Audio', 'Hardware OK'] }
+    laptops: { name: 'Portátiles', margin: 0.40, icon: <Monitor size={18} />, color: 'cyan', checklist: ['Enciende', 'Cargador Original', 'Teclado Completo', 'Pantalla sin manchas', 'Webcam/Audio', 'Hardware OK'] },
+    watches: { name: 'Relojes', margin: 0.35, icon: <Watch size={18} />, color: 'amber', checklist: ['Inspección Visual', 'Mecánica', 'Autenticidad', 'Marca Específica'] }
 };
+
+const WATCH_INSPECTION_GUIDE = [
+    {
+        title: "1. Inspección Visual Externa (La \"Estética\")",
+        points: [
+            { label: "El Cristal (Zafiro vs Mineral)", desc: "Pasa la uña (rugoso = mordidas). Gota de agua (bola compacta = zafiro)." },
+            { label: "La Esfera (Dial)", desc: "Lupa: Sin polvo/pelusas. Tipografía nítida, sin sangrado." },
+            { label: "Las Agujas", desc: "Sin corrosión u oxidación (humedad)." },
+            { label: "La Caja y Asas", desc: "Bordes afilados = original. Bordes 'jabón' = pulido excesivo." },
+            { label: "El Brazalete (Armis)", desc: "Holgura: No debe caer 'triste'. Cierre: Clic sólido." }
+        ]
+    },
+    {
+        title: "2. Inspección Funcional (La \"Mecánica\")",
+        points: [
+            { label: "La Corona (Tacto)", desc: "Desenroscar suave. Cuerda resistencia 'mantequilla fría'." },
+            { label: "Cambio de Fecha", desc: "'Snap' nítido y centrado a las 12." },
+            { label: "El Bisel (Diver)", desc: "Sin juego atrás. Clics metálicos (120 en Rolex/Omega)." },
+            { label: "Cronógrafo", desc: "Start/Stop suaves. Reseteo EXACTO a 0 (vital)." },
+            { label: "Luminiscencia", desc: "Brillo fuerte y uniforme tras 10s de luz." }
+        ]
+    },
+    {
+        title: "3. Inspección de Autenticidad",
+        points: [
+            { label: "Números de Serie", desc: "Coincide grabado (asas/rehaut) con tarjeta." },
+            { label: "Grabados Láser", desc: "Profundos y limpios. No al ácido (superficiales)." },
+            { label: "Peso (Oro/Platino)", desc: "Debe pesar. Copias chapadas son ligeras." },
+            { label: "Movimiento", desc: "Acabados espejo, sin plásticos en marcas top." }
+        ]
+    },
+    {
+        title: "4. Detalles por Marca (Chivatos)",
+        points: [
+            { label: "ROLEX: Rehaut", desc: "ROLEXROLEX. X coincide con 1-4, R con 8-11." },
+            { label: "ROLEX: Corona Cristal", desc: "Micro-grabado a las 6. Casi invisible." },
+            { label: "OMEGA: Punto 90", desc: "Speedmaster antiguos: Punto SOBRE el 90." },
+            { label: "CARTIER: Firma Secreta", desc: "En el VII o X (micro texto en pata)." }
+        ]
+    }
+];
 
 
 
@@ -528,21 +570,64 @@ const Market = () => {
 
                                 {/* Manual Checklist */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                    {CATEGORIES[category].checklist.map((item, idx) => (
-                                        <motion.div
-                                            key={item}
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            transition={{ delay: idx * 0.05 }}
-                                            className="flex items-center justify-between bg-slate-900/80 p-3 rounded-xl border border-white/5 hover:border-white/10 transition-colors"
-                                        >
-                                            <span className="text-xs text-slate-300 font-medium truncate pr-2">{item}</span>
-                                            <div className="flex gap-1 shrink-0 p-0.5 bg-slate-950 rounded-lg">
-                                                <button onClick={() => handleChecklistChange(item, true)} className={`p-1.5 rounded-md transition-all ${checklist[item] === true ? 'bg-green-500 text-white shadow-lg shadow-green-900/50' : 'text-slate-600 hover:text-slate-400'}`}><CheckCircle size={14} /></button>
-                                                <button onClick={() => handleChecklistChange(item, false)} className={`p-1.5 rounded-md transition-all ${checklist[item] === false ? 'bg-red-500 text-white shadow-lg shadow-red-900/50' : 'text-slate-600 hover:text-slate-400'}`}><XCircle size={14} /></button>
-                                            </div>
-                                        </motion.div>
-                                    ))}
+                                    {category === 'watches' ? (
+                                        <div className="col-span-2 space-y-4">
+                                            {WATCH_INSPECTION_GUIDE.map((section, sIdx) => (
+                                                <div key={sIdx} className="bg-slate-900/50 rounded-xl p-3 border border-white/5">
+                                                    <h4 className="text-amber-500 font-bold text-xs uppercase mb-2 flex items-center gap-2">
+                                                        {section.title}
+                                                    </h4>
+                                                    <div className="space-y-1">
+                                                        {section.points.map((pt, pIdx) => {
+                                                            // Use a composite key for state: "SectionTitle:PointLabel"
+                                                            const key = `${section.title}:${pt.label}`;
+                                                            // If not initialized in state, defaulting to null via checklist logic might be tricky?
+                                                            // Actually, let's allow dynamic keys for watches.
+                                                            const status = checklist[key];
+
+                                                            return (
+                                                                <div key={pIdx} className="flex justify-between items-start group p-2 hover:bg-white/5 rounded-lg transition-colors">
+                                                                    <div className="flex-1 pr-4">
+                                                                        <p className="text-xs font-bold text-slate-300">{pt.label}</p>
+                                                                        <p className="text-[10px] text-slate-500 leading-tight mt-0.5">{pt.desc}</p>
+                                                                    </div>
+                                                                    <div className="flex gap-1 shrink-0">
+                                                                        <button
+                                                                            onClick={() => handleChecklistChange(key, true)}
+                                                                            className={`p-1.5 rounded transition-all ${status === true ? 'bg-green-500 text-black' : 'bg-slate-800 text-slate-600 hover:text-slate-400'}`}
+                                                                        >
+                                                                            <CheckCircle size={14} />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleChecklistChange(key, false)}
+                                                                            className={`p-1.5 rounded transition-all ${status === false ? 'bg-red-500 text-white' : 'bg-slate-800 text-slate-600 hover:text-slate-400'}`}
+                                                                        >
+                                                                            <XCircle size={14} />
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        CATEGORIES[category].checklist.map((item, idx) => (
+                                            <motion.div
+                                                key={item}
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: idx * 0.05 }}
+                                                className="flex items-center justify-between bg-slate-900/80 p-3 rounded-xl border border-white/5 hover:border-white/10 transition-colors"
+                                            >
+                                                <span className="text-xs text-slate-300 font-medium truncate pr-2">{item}</span>
+                                                <div className="flex gap-1 shrink-0 p-0.5 bg-slate-950 rounded-lg">
+                                                    <button onClick={() => handleChecklistChange(item, true)} className={`p-1.5 rounded-md transition-all ${checklist[item] === true ? 'bg-green-500 text-white shadow-lg shadow-green-900/50' : 'text-slate-600 hover:text-slate-400'}`}><CheckCircle size={14} /></button>
+                                                    <button onClick={() => handleChecklistChange(item, false)} className={`p-1.5 rounded-md transition-all ${checklist[item] === false ? 'bg-red-500 text-white shadow-lg shadow-red-900/50' : 'text-slate-600 hover:text-slate-400'}`}><XCircle size={14} /></button>
+                                                </div>
+                                            </motion.div>
+                                        )))}
                                 </div>
                             </div>
 

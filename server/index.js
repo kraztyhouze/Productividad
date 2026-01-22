@@ -832,109 +832,125 @@ app.get('/api/market/search', (req, res) => {
 });
 
 // --- 9. Gold Price Scraper (New) ---
-let goldPriceCache = { timestamp: 0, data: null };
+// --- 9. Gold Price Scraper (Background Service) ---
+let goldPriceCache = {
+    timestamp: 0,
+    data: { andorrano: 'Cargando...', quickgold: 'Cargando...' },
+    updating: false
+};
 
-app.get('/api/gold-prices', async (req, res) => {
-    // 1 hour cache
-    if (Date.now() - goldPriceCache.timestamp < 3600000 && goldPriceCache.data) {
-        return res.json(goldPriceCache.data);
-    }
+// Background Scraper Function
+async function updateGoldPrices() {
+    if (goldPriceCache.updating) return; // Prevent collecting overlaps
+    goldPriceCache.updating = true;
 
+    console.log('[GoldScraper] Starting background update...');
     let browser;
     try {
-        console.log('[GoldScraper] Starting scrape...');
         browser = await puppeteer.launch({
             headless: 'new',
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage', // Critical for Docker/Cloud
+                '--disable-dev-shm-usage',
                 '--disable-accelerated-2d-canvas',
-                '--disable-gpu'
+                '--disable-gpu',
+                '--block-new-web-contents'
             ]
         });
         const page = await browser.newPage();
 
+        // Optimizations: Block images/fonts
+        await page.setRequestInterception(true);
+        page.on('request', (req) => {
+            if (['image', 'stylesheet', 'font', 'media'].includes(req.resourceType())) {
+                req.abort();
+            } else {
+                req.continue();
+            }
+        });
+
         // 1. Andorrano
         let andorranoPrice = null;
         try {
-            await page.goto('https://www.andorrano-joyeria.com/vender-oro', { waitUntil: 'domcontentloaded', timeout: 30000 });
-            // Wait for data to load
-            await page.waitForSelector('.quilates:nth-of-type(4) .cotizacion', { timeout: 10000 });
-
+            await page.goto('https://www.andorrano-joyeria.com/vender-oro', { waitUntil: 'domcontentloaded', timeout: 45000 });
+            await page.waitForSelector('.quilates:nth-of-type(4) .cotizacion', { timeout: 15000 });
             andorranoPrice = await page.evaluate(() => {
-                try {
-                    const el = document.querySelector('.quilates:nth-of-type(4) .cotizacion');
-                    return el ? el.innerText.trim() : null;
-                } catch (e) { return null; }
+                const el = document.querySelector('.quilates:nth-of-type(4) .cotizacion');
+                return el ? el.innerText.trim() : null;
             });
-        } catch (e) { console.error('Andorrano fail', e.message); }
+        } catch (e) {
+            console.error('[GoldScraper] Andorrano error:', e.message);
+            // Keep old value if new scrape fails
+            andorranoPrice = goldPriceCache.data.andorrano !== 'Cargando...' ? goldPriceCache.data.andorrano : 'Error';
+        }
 
-        // 2. QuickGold (Optimized: Robust Text Search)
+        // 2. QuickGold
         let quickGoldPrice = null;
         try {
-            await page.goto('https://quickgold.es/vender-oro/compro-oro-sevilla/', { waitUntil: 'domcontentloaded', timeout: 30000 });
-
+            await page.goto('https://quickgold.es/vender-oro/compro-oro-sevilla/', { waitUntil: 'domcontentloaded', timeout: 45000 });
             quickGoldPrice = await page.evaluate(() => {
                 try {
-                    // Method: Find all paragraphs. Logic: Label "18K" is usually next to Price.
                     const allPs = Array.from(document.querySelectorAll('p'));
-
-                    // 1. Try to find the specific "18K" label
                     const label18k = allPs.find(p => p.innerText.includes('18K') || p.innerText.includes('18k'));
 
                     if (label18k) {
-                        // Strategy A: The price is in the NEXT sibling paragraph
                         let sibling = label18k.nextElementSibling;
                         if (sibling && sibling.innerText.match(/\d+[,.]\d+/)) {
                             const val = parseFloat(sibling.innerText.replace('€/g', '').replace(',', '.'));
-                            return (val - 0.35).toFixed(2); // Adjust for <100g
-                        }
-
-                        // Strategy B: The price is in the SAME container (parent) but different element
-                        if (label18k.parentElement) {
-                            const priceEl = Array.from(label18k.parentElement.querySelectorAll('p'))
-                                .find(p => p !== label18k && p.innerText.match(/\d+[,.]\d+/));
-                            if (priceEl) {
-                                const val = parseFloat(priceEl.innerText.replace('€/g', '').replace(',', '.'));
-                                return (val - 0.35).toFixed(2);
-                            }
+                            return (val - 0.35).toFixed(2);
                         }
                     }
-
-                    // Fallback: Look for the main big price regex if 18k label fails
-                    // Usually the biggest price on the page is 18k or 24k. 
-                    // Let's rely on the CSS class partial match for "precio" ONLY, not "18k"
-                    const priceElements = allPs.filter(p => p.className.includes('conversor_precio') && !p.className.includes('preciok'));
+                    // Fallback
+                    const priceElements = allPs.filter(p => p.className.includes('conversor_precio'));
                     for (const p of priceElements) {
                         if (p.innerText.match(/^\d+[,.]\d+/)) {
                             const val = parseFloat(p.innerText.replace('€/g', '').replace(',', '.'));
-                            // Sanity check: Gold 18k is roughly 40-100.
                             if (val > 40 && val < 100) return (val - 0.35).toFixed(2);
                         }
                     }
-
                     return null;
                 } catch (e) { return null; }
             });
+        } catch (e) {
+            console.error('[GoldScraper] QuickGold error:', e.message);
+            quickGoldPrice = goldPriceCache.data.quickgold !== 'Cargando...' ? goldPriceCache.data.quickgold : 'Error';
+        }
 
-        } catch (e) { console.error('QuickGold optimized fail', e.message); }
-
-        const result = {
-            andorrano: andorranoPrice || 'N/A',
-            quickgold: quickGoldPrice || 'N/A',
-            timestamp: Date.now()
+        goldPriceCache.data = {
+            andorrano: andorranoPrice || goldPriceCache.data.andorrano,
+            quickgold: quickGoldPrice || goldPriceCache.data.quickgold
         };
-
-        goldPriceCache = { timestamp: Date.now(), data: result };
-        res.json(result);
+        goldPriceCache.timestamp = Date.now();
+        console.log('[GoldScraper] Updated:', goldPriceCache.data);
 
     } catch (error) {
-        console.error('Scraper error:', error);
-        res.status(500).json({ error: 'Failed to scrape prices' });
+        console.error('[GoldScraper] Fatal error:', error);
     } finally {
         if (browser) await browser.close();
+        goldPriceCache.updating = false;
     }
+}
+
+// Initial Run (delayed 10s to let server start)
+setTimeout(updateGoldPrices, 10000);
+
+// Schedule: Every 60 minutes
+setInterval(updateGoldPrices, 60 * 60 * 1000);
+
+app.get('/api/gold-prices', (req, res) => {
+    // Always return cache instantly
+    res.json({
+        ...goldPriceCache.data,
+        timestamp: goldPriceCache.timestamp,
+        isStale: (Date.now() - goldPriceCache.timestamp) > 3600000 * 2 // Stale if older than 2 hours
+    });
+});
+
+app.post('/api/gold-prices/refresh', (req, res) => {
+    // Trigger manual update
+    updateGoldPrices(); // Do not await, verify status later
+    res.json({ message: 'Update started. Check back in 1 minute.' });
 });
 
 // 6. Admin Backup

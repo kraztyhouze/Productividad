@@ -26,7 +26,8 @@ const Productivity = () => {
         getUnclosedPastDays, dayIncidents, updateDayIncident,
         updateRecord, addManualRecord, deleteEmployeeDayData,
         productFamilies, addProductFamily, removeProductFamily,
-        addNoDealDetail, toggleClientSession
+        addNoDealDetail, toggleClientSession,
+        goldPrice, updateGoldPrice
     } = useProductivity();
 
     const { employees } = useTeam();
@@ -77,27 +78,7 @@ const Productivity = () => {
         return () => clearInterval(interval);
     }, []);
 
-    // Gold Price State (from Server)
-    const [goldPrice, setGoldPrice] = useState('77');
 
-    const fetchInternalGold = async () => {
-        try {
-            const storeId = localStorage.getItem('tiktak_current_store') || 'store_1';
-            const res = await fetch('/api/settings/gold', {
-                headers: { 'x-store-id': storeId }
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setGoldPrice(data.price);
-            }
-        } catch (e) { console.error("Error fetching internal gold price", e); }
-    };
-
-    useEffect(() => {
-        fetchInternalGold();
-        const interval = setInterval(fetchInternalGold, 30000); // Poll every 30s
-        return () => clearInterval(interval);
-    }, []);
 
     const handleGoldPriceUpdate = async () => {
         // Allow Managers, Supervisors, Responsibles
@@ -110,14 +91,7 @@ const Productivity = () => {
         const newPrice = prompt("Introduce el nuevo precio del oro (€/gr):", goldPrice);
         if (newPrice !== null && newPrice.trim() !== "" && !isNaN(newPrice)) {
             try {
-                const storeId = localStorage.getItem('tiktak_current_store') || 'store_1';
-                await fetch('/api/settings/gold', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-store-id': storeId },
-                    body: JSON.stringify({ price: newPrice })
-                });
-                setGoldPrice(newPrice); // Optimistic update
-                fetchInternalGold(); // Re-fetch to be sure
+                await updateGoldPrice(newPrice);
             } catch (e) {
                 alert("Error al guardar precio.");
             }

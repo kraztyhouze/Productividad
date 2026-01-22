@@ -13,6 +13,7 @@ export const ProductivityProvider = ({ children }) => {
     const [closedDays, setClosedDays] = useState([]);
     const [dayIncidents, setDayIncidents] = useState({});
     const [productFamilies, setProductFamilies] = useState([]);
+    const [goldPrice, setGoldPrice] = useState('0'); // Default to 0 or safe string
 
     // Helper for Multi-Store Headers
     const getHeaders = () => {
@@ -63,13 +64,44 @@ export const ProductivityProvider = ({ children }) => {
         // 2. Load new store data
         if (currentStore) {
             fetchData();
+            fetchInternalGold();
         }
     }, [currentStore]); // Dependencies: Re-run ONLY when store changes
+
+    // --- GOLD PRICE LOGIC ---
+    const fetchInternalGold = async () => {
+        try {
+            const res = await fetch('/api/settings/gold', {
+                headers: getHeaders()
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setGoldPrice(data.price);
+            }
+        } catch (e) { console.error("Error fetching internal gold price", e); }
+    };
+
+    const updateGoldPrice = async (newPrice) => {
+        try {
+            await fetch('/api/settings/gold', {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({ price: newPrice })
+            });
+            setGoldPrice(newPrice);
+        } catch (e) {
+            console.error("Error updating gold price", e);
+            throw e;
+        }
+    };
 
     // --- EFFECT: POLLING ---
     useEffect(() => {
         if (!currentStore) return;
-        const interval = setInterval(fetchData, 5000);
+        const interval = setInterval(() => {
+            fetchData();
+            fetchInternalGold();
+        }, 5000);
         return () => clearInterval(interval);
     }, [currentStore]);
 
@@ -373,7 +405,9 @@ export const ProductivityProvider = ({ children }) => {
                     await fetch(`/api/no-deals/${id}`, { method: 'DELETE', headers: getHeaders() });
                     fetchData(); // Sync states (both noDeals list and groups counts)
                 } catch (err) { console.error(err); }
-            }
+            },
+            goldPrice,
+            updateGoldPrice
         }}>
             {children}
         </ProductivityContext.Provider>

@@ -18,7 +18,11 @@ const VisualLocationsModal = ({ isOpen, onClose }) => {
     const [creationData, setCreationData] = useState({ prefix: '', count: 1, zone: 'Almacén' });
 
     useEffect(() => {
-        if (isOpen) fetchLocations();
+        if (isOpen) {
+            fetchLocations();
+            const interval = setInterval(fetchLocations, 3000); // Poll every 3 seconds for real-time updates
+            return () => clearInterval(interval);
+        }
     }, [isOpen]);
 
     const fetchLocations = async () => {

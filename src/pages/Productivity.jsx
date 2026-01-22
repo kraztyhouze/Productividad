@@ -8,6 +8,7 @@ import CloseDayModal from '../components/Productivity/CloseDayModal';
 import EditTimeModal from '../components/Productivity/EditTimeModal';
 import EditStatsModal from '../components/Productivity/EditStatsModal';
 import NoDealModal from '../components/Productivity/NoDealModal';
+import VisualLocationsModal from '../components/Productivity/VisualLocationsModal';
 
 
 const REJECTION_REASONS = [
@@ -39,6 +40,7 @@ const Productivity = () => {
     const [showManualModal, setShowManualModal] = useState(false);
     const [needInput, setNeedInput] = useState("");
     const [overstockInput, setOverstockInput] = useState("");
+    const [showLocationsModal, setShowLocationsModal] = useState(false);
 
     // Live Client State (Derived from Persistent Active Sessions)
     const activeClientModalState = useState(null);
@@ -658,6 +660,23 @@ const Productivity = () => {
                     </div>
                 </div>
             )}
+
+            {/* VISUAL LOCATIONS MODAL */}
+            <VisualLocationsModal
+                isOpen={showLocationsModal}
+                onClose={() => setShowLocationsModal(false)}
+            />
+
+            {/* FAB FOR LOCATIONS */}
+            <div className="fixed bottom-6 right-6 z-40">
+                <button
+                    onClick={() => setShowLocationsModal(true)}
+                    className="w-14 h-14 bg-gradient-to-r from-pink-600 to-amber-500 rounded-2xl shadow-2xl shadow-pink-600/30 flex items-center justify-center text-white hover:scale-110 active:scale-95 transition-all text-xl"
+                    title="Gestión Ubicaciones"
+                >
+                    📦
+                </button>
+            </div>
 
         </div>
     );

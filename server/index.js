@@ -772,6 +772,66 @@ app.get('/api/market/search', (req, res) => {
     res.json(results);
 });
 
+// --- 8. Mobile Diagnostics (Satellite App) ---
+// (Endpoints...)
+
+// --- NEW: Visual Locations Management ---
+app.get('/api/locations', async (req, res) => {
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    try {
+        const result = await pool.query('SELECT * FROM locations WHERE store_id = $1 ORDER BY name ASC', [storeId]);
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/locations/:id', async (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body; // 'libre', 'parcial', 'lleno'
+    // const storeId = req.headers['x-store-id'] || 'store_1';
+
+    try {
+        const result = await pool.query(
+            'UPDATE locations SET status = $1 WHERE id = $2 RETURNING *',
+            [status, id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/locations', async (req, res) => {
+    const { prefix, count, zone } = req.body;
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    const quantity = parseInt(count) || 1;
+
+    try {
+        const created = [];
+        for (let i = 1; i <= quantity; i++) {
+            let name = prefix;
+            if (quantity > 1) {
+                // If checking for existing counting is too complex, we assume simple generation A1, A2...
+                // If user puts "Estantería A", result is "Estantería A1"
+                // Ideally user puts "Estantería A " (with space) if they want space.
+                name = `${prefix}${i}`;
+            }
+
+            const result = await pool.query(
+                'INSERT INTO locations (name, status, zone, store_id) VALUES ($1, $2, $3, $4) RETURNING *',
+                [name, 'libre', zone || 'General', storeId]
+            );
+            created.push(result.rows[0]);
+        }
+        res.json(created);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/locations/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.query('DELETE FROM locations WHERE id = $1', [id]);
+        res.json({ message: 'Location deleted' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // --- 9. Gold Price Scraper (New) ---
 // --- 9. Gold Price Scraper (Background Service) ---
 let goldPriceCache = {

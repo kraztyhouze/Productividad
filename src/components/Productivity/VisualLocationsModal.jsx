@@ -15,12 +15,14 @@ const VisualLocationsModal = ({ isOpen, onClose, category }) => {
 
     // Creation State
     const [showCreateForm, setShowCreateForm] = useState(false);
-    const [creationData, setCreationData] = useState({ prefix: '', count: 1, zone: category || 'General' });
+    const [creationData, setCreationData] = useState({ prefix: '', count: 1, zone: category || '' });
 
-    // Update creation zone when category changes
+    // Update creation zone when category changes OR when form opens
     useEffect(() => {
-        if (category) setCreationData(prev => ({ ...prev, zone: category }));
-    }, [category]);
+        if (category) {
+            setCreationData({ prefix: '', count: 1, zone: category });
+        }
+    }, [category, showCreateForm]);
 
     useEffect(() => {
         if (isOpen) {

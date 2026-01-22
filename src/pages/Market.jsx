@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useProductivity } from '../context/ProductivityContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ExternalLink, Smartphone, Monitor, Watch, Hammer, Gamepad2, CheckCircle, XCircle, Grid, QrCode, Download } from 'lucide-react';
+import { Search, ExternalLink, Smartphone, Monitor, Watch, Hammer, Gamepad2, CheckCircle, XCircle, Grid, QrCode, Download, Info } from 'lucide-react';
 import { generateDiagnosticCertificate } from '../utils/pdfGenerator';
 
 const CATEGORIES = {
@@ -29,7 +29,7 @@ const WATCH_INSPECTION_GUIDE = [
             { label: "El Bisel (Diver)", desc: "Sin juego atrás. Clics metálicos (120 en Rolex/Omega)." },
             { label: "Cronógrafo", desc: "Start/Stop suaves. Reseteo EXACTO a 0 (vital)." },
             { label: "Luminiscencia", desc: "Brillo fuerte y uniforme tras 10s de luz." },
-            { label: "Cronocomparador (CRÍTICO)", desc: "Valores elevados sospechosos. ¡Comprobar amplitud y beat error!", isCritical: true }
+            { label: "Cronocomparador (CRÍTICO)", desc: "Valores elevados sospechosos. ¡Comprobar amplitud y beat error!", isCritical: true, hasInfo: true }
         ]
     },
     {
@@ -93,6 +93,7 @@ const Market = () => {
 
     // Diagnostics State
     const [diagnosticSession, setDiagnosticSession] = useState(null); // { sessionId, url, status, results }
+    const [showTimegrapherHelp, setShowTimegrapherHelp] = useState(false);
 
     // Reset checklist when category changes
     useEffect(() => {
@@ -611,6 +612,15 @@ const Market = () => {
                                                                         <p className="text-[10px] text-slate-500 leading-tight mt-0.5">{pt.desc}</p>
                                                                     </div>
                                                                     <div className="flex gap-1 shrink-0">
+                                                                        {pt.hasInfo && (
+                                                                            <button
+                                                                                onClick={() => setShowTimegrapherHelp(true)}
+                                                                                className="p-1.5 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 transition-colors mr-1"
+                                                                                title="+ Info"
+                                                                            >
+                                                                                <Info size={14} />
+                                                                            </button>
+                                                                        )}
                                                                         <button
                                                                             onClick={() => handleChecklistChange(key, true)}
                                                                             className={`p-1.5 rounded transition-all ${status === true ? 'bg-green-500 text-black' : 'bg-slate-800 text-slate-600 hover:text-slate-400'}`}
@@ -882,6 +892,145 @@ const Market = () => {
 
                 </div>
             )}
+
+            {/* TIMEGRAPHER HELP MODAL */}
+            <AnimatePresence>
+                {showTimegrapherHelp && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setShowTimegrapherHelp(false)}>
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            onClick={e => e.stopPropagation()}
+                            className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto custom-scrollbar flex flex-col"
+                        >
+                            {/* Header */}
+                            <div className="p-6 border-b border-slate-800 flex justify-between items-center sticky top-0 bg-slate-900/95 backdrop-blur z-10">
+                                <div>
+                                    <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                                        <Watch className="text-amber-500" />
+                                        Guía del Cronocomparador
+                                    </h2>
+                                    <p className="text-slate-400 text-sm mt-1">Cómo medir y entender los resultados</p>
+                                </div>
+                                <button onClick={() => setShowTimegrapherHelp(false)} className="bg-slate-800 hover:bg-slate-700 text-white p-2 rounded-lg transition-colors">
+                                    <XCircle size={20} />
+                                </button>
+                            </div>
+
+                            {/* Content */}
+                            <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                {/* COLUMN 1: USAGE */}
+                                <div className="space-y-6">
+                                    <div className="bg-blue-900/10 border border-blue-500/20 p-4 rounded-xl">
+                                        <h3 className="text-blue-400 font-bold text-lg mb-3 flex items-center gap-2">🛠️ 1. Ritual de Uso</h3>
+                                        <ul className="space-y-3 text-sm text-slate-300">
+                                            <li className="flex gap-3">
+                                                <span className="bg-blue-500/20 text-blue-400 font-bold px-2 py-0.5 rounded h-fit text-xs">A</span>
+                                                <div><strong className="text-white">Carga Máxima:</strong> Dale toda la cuerda al reloj. Sin carga = mala amplitud (falso negativo).</div>
+                                            </li>
+                                            <li className="flex gap-3">
+                                                <span className="bg-blue-500/20 text-blue-400 font-bold px-2 py-0.5 rounded h-fit text-xs">B</span>
+                                                <div><strong className="text-white">Silencio:</strong> No hablar ni golpear la mesa. El micrófono detecta todo.</div>
+                                            </li>
+                                            <li className="flex gap-3">
+                                                <span className="bg-blue-500/20 text-blue-400 font-bold px-2 py-0.5 rounded h-fit text-xs">C</span>
+                                                <div>
+                                                    <strong className="text-white">Lift Angle (Ángulo):</strong>
+                                                    <p className="mt-1 text-xs opacity-80">Por defecto: <span className="text-green-400 font-mono">52°</span> (Valido 80% casos).</p>
+                                                    <p className="text-xs opacity-80">Rolex Modernos (3135/3235): Cambiar a <span className="text-amber-400 font-mono">53°/55°</span>.</p>
+                                                </div>
+                                            </li>
+                                            <li className="flex gap-3">
+                                                <span className="bg-blue-500/20 text-blue-400 font-bold px-2 py-0.5 rounded h-fit text-xs">D</span>
+                                                <div>
+                                                    <strong className="text-white">Posiciones Clave:</strong>
+                                                    <div className="mt-2 grid grid-cols-2 gap-2">
+                                                        <div className="bg-slate-800 p-2 rounded text-center">
+                                                            <span className="block text-xs font-bold text-slate-400">Dial Up</span>
+                                                            <span className="text-[10px] opacity-60">Esfera Arriba</span>
+                                                        </div>
+                                                        <div className="bg-slate-800 p-2 rounded text-center">
+                                                            <span className="block text-xs font-bold text-slate-400">Crown Down</span>
+                                                            <span className="text-[10px] opacity-60">Corona Abajo</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+
+                                {/* COLUMN 2: INTERPRETATION */}
+                                <div className="space-y-6">
+                                    <h3 className="text-emerald-400 font-bold text-lg mb-1 flex items-center gap-2">📊 2. Interpretación</h3>
+
+                                    {/* RATE */}
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <h4 className="font-bold text-white text-sm">A. RATE (Desviación)</h4>
+                                            <span className="text-xs font-mono bg-slate-800 px-2 py-0.5 rounded text-slate-400">s/d</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-1 text-center text-xs">
+                                            <div className="bg-emerald-900/30 border border-emerald-500/30 p-2 rounded text-emerald-400">
+                                                <strong>Excelente</strong><br />-2 a +5
+                                            </div>
+                                            <div className="bg-slate-800 p-2 rounded text-slate-300">
+                                                <strong>Aceptable</strong><br />-10 a +15
+                                            </div>
+                                            <div className="bg-red-900/30 border border-red-500/30 p-2 rounded text-red-400">
+                                                <strong>Alerta</strong><br />&gt; +/- 20
+                                            </div>
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 italic">Si marca &gt;20s, necesita ajuste/limpieza.</p>
+                                    </div>
+
+                                    {/* AMPLITUDE */}
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <h4 className="font-bold text-white text-sm">B. AMPLITUDE (Salud Motor)</h4>
+                                            <span className="text-xs font-mono bg-slate-800 px-2 py-0.5 rounded text-slate-400">Grados (°)</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-1 text-center text-xs">
+                                            <div className="bg-emerald-900/30 border border-emerald-500/30 p-2 rounded text-emerald-400">
+                                                <strong>Fuerte</strong><br />270° - 310°
+                                            </div>
+                                            <div className="bg-yellow-900/20 border border-yellow-500/20 p-2 rounded text-yellow-400">
+                                                <strong>Baja</strong><br />&lt; 230°
+                                            </div>
+                                            <div className="bg-red-900/30 border border-red-500/30 p-2 rounded text-red-400">
+                                                <strong>Alta (Rebote)</strong><br />&gt; 330°
+                                            </div>
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 italic">Baja amplitud = Aceites secos = Necesita Service.</p>
+                                    </div>
+
+                                    {/* BEAT ERROR */}
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <h4 className="font-bold text-white text-sm">C. BEAT ERROR (Ritmo)</h4>
+                                            <span className="text-xs font-mono bg-slate-800 px-2 py-0.5 rounded text-slate-400">ms</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-1 text-center text-xs">
+                                            <div className="bg-emerald-900/30 border border-emerald-500/30 p-2 rounded text-emerald-400">
+                                                <strong>Perfecto</strong><br />0.0 - 0.2
+                                            </div>
+                                            <div className="bg-slate-800 p-2 rounded text-slate-300">
+                                                <strong>Aceptable</strong><br />Hasta 0.8
+                                            </div>
+                                            <div className="bg-red-900/30 border border-red-500/30 p-2 rounded text-red-400">
+                                                <strong>Cojo</strong><br />&gt; 1.0 ms
+                                            </div>
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 italic">Error alto requiere ajuste de relojero.</p>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

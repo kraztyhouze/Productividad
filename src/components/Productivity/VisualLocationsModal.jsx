@@ -8,35 +8,53 @@ const STATUS_CONFIG = {
     lleno: { color: 'bg-red-500/20 border-red-500/50 text-red-400', label: 'LLENO', dot: 'bg-red-500' }
 };
 
-const VisualLocationsModal = ({ isOpen, onClose }) => {
+const VisualLocationsModal = ({ isOpen, onClose, category }) => {
     const [locations, setLocations] = useState([]);
     const [loading, setLoading] = useState(false);
     const [editingId, setEditingId] = useState(null); // The ID of the card currently showing the change menu
 
     // Creation State
     const [showCreateForm, setShowCreateForm] = useState(false);
-    const [creationData, setCreationData] = useState({ prefix: '', count: 1, zone: 'Almacén' });
+    const [creationData, setCreationData] = useState({ prefix: '', count: 1, zone: category || 'General' });
+
+    // Update creation zone when category changes
+    useEffect(() => {
+        if (category) setCreationData(prev => ({ ...prev, zone: category }));
+    }, [category]);
 
     useEffect(() => {
         if (isOpen) {
-            fetchLocations();
-            const interval = setInterval(fetchLocations, 3000); // Poll every 3 seconds for real-time updates
+            fetchLocations(); // Initial load
+            const interval = setInterval(() => fetchLocations(true), 3000); // Poll silently
             return () => clearInterval(interval);
         }
     }, [isOpen]);
 
-    const fetchLocations = async () => {
-        setLoading(true);
+    const fetchLocations = async (isBackground = false) => {
+        if (!isBackground) setLoading(true);
         try {
             const res = await fetch('/api/locations');
             if (res.ok) {
                 const data = await res.json();
-                setLocations(data);
+
+                // Client-side Sorting: Status First (Libre > Parcial > Lleno), then Name
+                const statusPriority = { 'libre': 0, 'parcial': 1, 'lleno': 2 };
+
+                const sortedData = data.sort((a, b) => {
+                    const statusA = statusPriority[a.status] || 99;
+                    const statusB = statusPriority[b.status] || 99;
+
+                    if (statusA !== statusB) return statusA - statusB;
+                    // Secondary sort: Name (Numeric aware sorting for A1, A2, A10)
+                    return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+                });
+
+                setLocations(sortedData);
             }
         } catch (err) {
             console.error(err);
         } finally {
-            setLoading(false);
+            if (!isBackground) setLoading(false);
         }
     };
 
@@ -103,9 +121,9 @@ const VisualLocationsModal = ({ isOpen, onClose }) => {
                     <div>
                         <h2 className="text-3xl font-bold text-white flex items-center gap-3">
                             <Box className="text-pink-500" size={32} />
-                            Gestión Visual de Ubicaciones
+                            {category || 'Ubicaciones'}
                         </h2>
-                        <p className="text-slate-400 text-sm mt-1 ml-1">Control de ocupación en tiempo real</p>
+                        <p className="text-slate-400 text-sm mt-1 ml-1">Control de ocupación en {category?.toLowerCase()}</p>
                     </div>
                     <div className="flex gap-2">
                         <button
@@ -156,13 +174,12 @@ const VisualLocationsModal = ({ isOpen, onClose }) => {
                                     />
                                 </div>
                                 <div className="flex-1 min-w-[200px]">
-                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Zona</label>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Zona (Automática)</label>
                                     <input
                                         type="text"
-                                        placeholder="Ej: Almacén Principal"
                                         value={creationData.zone}
-                                        onChange={e => setCreationData({ ...creationData, zone: e.target.value })}
-                                        className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-blue-500 outline-none"
+                                        readOnly
+                                        className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl p-3 text-slate-400 outline-none cursor-not-allowed"
                                     />
                                 </div>
                                 <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white font-bold p-3 rounded-xl transition-colors min-w-[120px]">
@@ -184,14 +201,14 @@ const VisualLocationsModal = ({ isOpen, onClose }) => {
                         </div>
                     ) : (
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                            {locations.map((loc) => {
+                            {locations.filter(l => l.zone === category).map((loc) => {
                                 const style = STATUS_CONFIG[loc.status] || STATUS_CONFIG.libre;
                                 const isEditing = editingId === loc.id;
 
                                 return (
                                     <motion.div
-                                        layout
-                                        key={loc.id}
+                                        key={loc.id} // Ensure Key is stable
+                                        initial={false} // Prevent re-animation on simple updates
                                         className={`relative h-40 rounded-2xl border-2 p-4 flex flex-col justify-between cursor-pointer transition-all hover:scale-[1.02] shadow-lg ${style.color} ${style.color.includes('bg-') ? '' : 'bg-slate-800'}`} // Fallback bg if not in config
                                         onClick={() => setEditingId(isEditing ? null : loc.id)}
                                     >

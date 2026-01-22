@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useProductivity } from '../context/ProductivityContext';
 import { useTeam } from '../context/TeamContext';
 import { useAuth, ROLES } from '../context/AuthContext';
-import { ShoppingBag, Clock, RefreshCw, Trash2, UserPlus, Check, X, Watch, Pencil, BarChart2 } from 'lucide-react';
+import { ShoppingBag, Clock, RefreshCw, Trash2, UserPlus, Check, X, Watch, Pencil, BarChart2, Box } from 'lucide-react';
 import InfoPanel from '../components/Productivity/InfoPanel';
 import CloseDayModal from '../components/Productivity/CloseDayModal';
 import EditTimeModal from '../components/Productivity/EditTimeModal';
@@ -40,7 +40,10 @@ const Productivity = () => {
     const [showManualModal, setShowManualModal] = useState(false);
     const [needInput, setNeedInput] = useState("");
     const [overstockInput, setOverstockInput] = useState("");
-    const [showLocationsModal, setShowLocationsModal] = useState(false);
+
+    // Location Categories
+    const LOCATION_CATEGORIES = ['LETRAS', 'VOLÚMENES', 'PATINETES', 'ALMACEN / PARED', 'RESERVA'];
+    const [activeLocationCategory, setActiveLocationCategory] = useState(null); // null means closed
 
     // Live Client State (Derived from Persistent Active Sessions)
     const activeClientModalState = useState(null);
@@ -663,19 +666,32 @@ const Productivity = () => {
 
             {/* VISUAL LOCATIONS MODAL */}
             <VisualLocationsModal
-                isOpen={showLocationsModal}
-                onClose={() => setShowLocationsModal(false)}
+                isOpen={!!activeLocationCategory}
+                onClose={() => setActiveLocationCategory(null)}
+                category={activeLocationCategory}
             />
 
-            {/* FAB FOR LOCATIONS */}
-            <div className="fixed bottom-6 right-6 z-40">
-                <button
-                    onClick={() => setShowLocationsModal(true)}
-                    className="w-14 h-14 bg-gradient-to-r from-pink-600 to-amber-500 rounded-2xl shadow-2xl shadow-pink-600/30 flex items-center justify-center text-white hover:scale-110 active:scale-95 transition-all text-xl"
-                    title="Gestión Ubicaciones"
-                >
-                    📦
-                </button>
+            {/* LOCATION BUTTONS DOCK (Footer) */}
+            <div className="w-full flex justify-end shrink-0">
+                <div className="bg-[#0f172a]/90 backdrop-blur-md border border-orange-500/20 rounded-2xl p-3 pl-4 pr-3 shadow-[0_0_40px_-10px_rgba(249,115,22,0.1)] flex flex-col gap-3 group transition-all hover:border-orange-500/40">
+                    <div className="flex items-center gap-2 select-none">
+                        <div className="w-1.5 h-1.5 rounded-full bg-orange-500 shadow-[0_0_8px_currentColor] animate-pulse"></div>
+                        <span className="text-[10px] font-black text-orange-500 tracking-[0.2em] uppercase opacity-80 group-hover:opacity-100 transition-opacity">
+                            Ubicaciones VR
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {LOCATION_CATEGORIES.map(cat => (
+                            <button
+                                key={cat}
+                                onClick={() => setActiveLocationCategory(cat)}
+                                className="h-10 px-3 bg-slate-800 hover:bg-orange-500/10 border border-white/5 hover:border-orange-500/50 rounded-lg transition-all text-[10px] font-bold text-slate-400 hover:text-orange-400 uppercase tracking-wider flex items-center gap-2 hover:scale-105 active:scale-95"
+                            >
+                                {cat}
+                            </button>
+                        ))}
+                    </div>
+                </div>
             </div>
 
         </div>

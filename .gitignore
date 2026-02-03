@@ -125,3 +125,10 @@ database.sqlite-journal
 
 # Debug scraping files
 debug_*
+
+# Migration and backup files
+backup-railway/
+.env.railway.backup
+.env.supabase
+.supabase-url.txt
+

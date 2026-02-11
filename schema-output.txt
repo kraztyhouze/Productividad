@@ -1,0 +1,53 @@
+﻿[dotenv@17.2.3] injecting env (4) from .env -- tip: ­ƒøá´©Å  run anywhere with `dotenvx run -- yourcommand`
+
+­ƒôï ESQUEMA DE LA TABLA EMPLOYEES:
+
+Columnas:
+  - id (integer) NOT NULL nextval('employees_id_seq'::regclass)
+  - avatar (text) NULL 
+  - first_name (text) NULL 
+  - last_name (text) NULL 
+  - alias (text) NULL 
+  - email (text) NULL 
+  - role (text) NULL 
+  - contract_hours (real) NULL 
+  - contract_type (text) NULL 
+  - username (text) NULL 
+  - password (text) NULL 
+  - is_buyer (boolean) NULL false
+  - phone (text) NULL 
+  - address (text) NULL 
+  - order (integer) NULL 0
+  - store_id (text) NULL 'store_1'::text
+
+­ƒôî Constraints:
+  - employees_pkey (PRIMARY KEY): PRIMARY KEY (id)
+
+­ƒæÑ EMPLEADOS ACTUALES:
+
+Total: 24
+
+  1. Juan Manuel Hidalgo Ramirez (jmh) - store_1
+  2. Marco Noguero Jimenez (mno) - store_1
+  3. Francisco Mesa Molina (fm) - store_1
+  4. Alberto Olmo Conde (aoc) - store_1
+  5. Gonzalez Gonzalez Sosa (gonzalez) - store_1
+  6. Ruben Noguero Lobo (ruben) - store_1
+  7. Manuel Solier Vela (ms) - store_1
+  8. Jose Carlos Barrientos (jcb) - store_1
+  9. Alicia Pe├▒uela de Mula (ald) - store_1
+  10. Maria Belen Mateos (bmp) - store_1
+  11. Angel Rafael Moreno Lancha (rml) - store_1
+  12. Antonia Castro Mesa (antonia) - store_1
+  13. Angel Luna Perejon (alp) - store_1
+  14. Eva Maria Jimenez Peralta (evamaria) - store_1
+  15. Monica Gomez Nieves (monica) - store_1
+  16. Alejandro Guerra Rasero (agr) - store_1
+  17. Edixeil Paola Sandoval (edixeil) - store_1
+  18. Daniel Carrasco (daniel) - store_1
+  19. Puesto Compras (compras) - store_1
+  20. Michele Moscatelli (mi) - store_1
+  24. Admin Sistema (admin) - store_2
+  25. Admin Sistema (admin) - store_1
+  26. Admin Sevilla2 (admin_s2) - store_4
+  27. Test User (testuser) - store_2

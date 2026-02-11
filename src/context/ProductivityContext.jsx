@@ -253,6 +253,61 @@ export const ProductivityProvider = ({ children }) => {
         });
     };
 
+    const updateEmployeeShiftTime = async (employeeId, date, newTotalSeconds) => {
+        const idStr = String(employeeId);
+
+        // Find all records for this employee on this date
+        const employeeRecords = dailyRecords.filter(r =>
+            String(r.employeeId) === idStr && r.date === date
+        );
+
+        if (employeeRecords.length === 0) {
+            console.warn('No records found for employee on this date');
+            return;
+        }
+
+        // Calculate current total
+        const currentTotal = employeeRecords.reduce((sum, r) => sum + (r.durationSeconds || 0), 0);
+
+        if (currentTotal === 0) {
+            console.warn('Current total is 0, cannot proportionally adjust');
+            return;
+        }
+
+        // Calculate scaling factor
+        const scaleFactor = newTotalSeconds / currentTotal;
+
+        // Update all records proportionally
+        const updates = employeeRecords.map(record => ({
+            id: record.id,
+            newDuration: Math.round(record.durationSeconds * scaleFactor)
+        }));
+
+        // Optimistic UI update
+        setDailyRecords(prev => prev.map(r => {
+            const update = updates.find(u => u.id === r.id);
+            if (update) {
+                return { ...r, durationSeconds: update.newDuration };
+            }
+            return r;
+        }));
+
+        // Send updates to server
+        try {
+            await Promise.all(updates.map(({ id, newDuration }) =>
+                fetch(`/api/daily-records/${id}`, {
+                    method: 'PUT',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ durationSeconds: newDuration })
+                })
+            ));
+        } catch (err) {
+            console.error('Error updating shift time:', err);
+            // Revert on error
+            fetchData();
+        }
+    };
+
     const updateDayIncident = async (date, text) => {
         setDayIncidents(prev => ({ ...prev, [date]: text }));
         await fetch('/api/day-incidents', {
@@ -386,6 +441,7 @@ export const ProductivityProvider = ({ children }) => {
             updateRecord,
             deleteRecord,
             addManualRecord,
+            updateEmployeeShiftTime,
             getUnclosedPastDays,
             deleteEmployeeDayData,
             productFamilies,

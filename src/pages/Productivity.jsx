@@ -6,6 +6,7 @@ import { ShoppingBag, Clock, RefreshCw, Trash2, UserPlus, Check, X, Watch, Penci
 import InfoPanel from '../components/Productivity/InfoPanel';
 import CloseDayModal from '../components/Productivity/CloseDayModal';
 import EditTimeModal from '../components/Productivity/EditTimeModal';
+import EditShiftTimeModal from '../components/Productivity/EditShiftTimeModal';
 import EditStatsModal from '../components/Productivity/EditStatsModal';
 import NoDealModal from '../components/Productivity/NoDealModal';
 import VisualLocationsModal from '../components/Productivity/VisualLocationsModal';
@@ -28,7 +29,7 @@ const Productivity = () => {
         updateRecord, addManualRecord, deleteEmployeeDayData,
         productFamilies, addProductFamily, removeProductFamily,
         addNoDealDetail, toggleClientSession,
-        goldPrice, updateGoldPrice
+        goldPrice, updateGoldPrice, updateEmployeeShiftTime
     } = useProductivity();
 
     const { employees } = useTeam();
@@ -61,6 +62,7 @@ const Productivity = () => {
 
     // Editing State
     const [editingRecord, setEditingRecord] = useState(null);
+    const [editingShiftTime, setEditingShiftTime] = useState(null);
     const [editingStats, setEditingStats] = useState(null);
     const [noDealDetail, setNoDealDetail] = useState(null);
 
@@ -119,6 +121,7 @@ const Productivity = () => {
 
     const isManagerial = user?.role === ROLES.MANAGER;
     const canEditPanels = [ROLES.MANAGER, ROLES.RESPONSIBLE, ROLES.SUPERVISOR].includes(user?.role);
+    const canEditTimes = [ROLES.MANAGER, ROLES.SUPERVISOR].includes(user?.role);
     const isToday = selectedDate === new Date().toISOString().split('T')[0];
     const isDayClosed = closedDays.includes(selectedDate);
     const unclosedDays = getUnclosedPastDays();
@@ -511,12 +514,22 @@ const Productivity = () => {
                                                 >
                                                     <BarChart2 size={12} />
                                                 </button>
-                                                <button
-                                                    onClick={() => setEditingRecord({ empId: empId, durationSeconds: data.clientSeconds })}
-                                                    className="p-1 hover:bg-blue-500/20 text-slate-500 hover:text-blue-400 rounded" title="Editar Tiempo Compras"
-                                                >
-                                                    <Pencil size={12} />
-                                                </button>
+                                                {canEditTimes && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => setEditingShiftTime({ empId: parseInt(empId), employeeName: displayName, totalSeconds: stat.totalSeconds })}
+                                                            className="p-1 hover:bg-green-500/20 text-slate-500 hover:text-green-400 rounded" title="Editar Tiempo Turno"
+                                                        >
+                                                            <Clock size={12} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setEditingRecord({ empId: empId, durationSeconds: data.clientSeconds })}
+                                                            className="p-1 hover:bg-blue-500/20 text-slate-500 hover:text-blue-400 rounded" title="Editar Tiempo Compras"
+                                                        >
+                                                            <Pencil size={12} />
+                                                        </button>
+                                                    </>
+                                                )}
                                                 <button
                                                     onClick={() => {
                                                         if (confirm(`¿Eliminar todos los datos de ${displayName} para este día?`)) {
@@ -549,6 +562,20 @@ const Productivity = () => {
                             updateDailyGroups(editingRecord.empId, selectedDate, { clientSeconds: newSeconds });
                             setEditingRecord(null);
                         }
+                    }}
+                />
+            )}
+
+            {/* EDIT SHIFT TIME MODAL */}
+            {editingShiftTime && (
+                <EditShiftTimeModal
+                    employeeId={editingShiftTime.empId}
+                    employeeName={editingShiftTime.employeeName}
+                    currentSeconds={editingShiftTime.totalSeconds}
+                    onClose={() => setEditingShiftTime(null)}
+                    onSave={(newSeconds) => {
+                        updateEmployeeShiftTime(editingShiftTime.empId, selectedDate, newSeconds);
+                        setEditingShiftTime(null);
                     }}
                 />
             )}

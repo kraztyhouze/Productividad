@@ -5,6 +5,7 @@ const AuthContext = createContext(null);
 
 export const ROLES = {
     MANAGER: 'Gerente',
+    SUPERVISOR: 'Supervisor',
     RESPONSIBLE: 'Responsable',
     EMPLOYEE: 'Empleado',
 };

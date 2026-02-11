@@ -1,0 +1,54 @@
+﻿[dotenv@17.2.3] injecting env (4) from .env -- tip: ­ƒöÉ encrypt with Dotenvx: https://dotenvx.com
+
+­ƒº¬ PRUEBA DE QUERIES DEL SERVIDOR
+
+============================================================
+
+1´©ÅÔâú Test: GET /api/employees (store_1)
+
+Ô£à Encontrados: 21 empleados en store_1
+
+Primeros 5 empleados:
+  1. Admin Sistema (admin) - Gerente
+  2. Juan Manuel Hidalgo Ramirez (jmh) - Gerente
+  3. Marco Noguero Jimenez (mno) - Supervisor
+  4. Francisco Mesa Molina (fm) - Responsable
+  5. Alberto Olmo Conde (aoc) - Responsable
+
+
+2´©ÅÔâú Test: POST /api/login (usuario: jmh, store_1)
+
+Ô£à Usuario encontrado: Juan Manuel Hidalgo Ramirez
+   Role: Gerente
+   Store: store_1
+   Password hash: $2b$10$JsXTIHrtVGhjs...
+
+
+3´©ÅÔâú Test: Empleados por tienda
+
+   store_1: 21 empleados
+   store_2: 2 empleados
+   store_4: 1 empleados
+
+
+4´©ÅÔâú Test: GET /api/roles
+
+Ô£à Roles encontrados: 7
+   - Gerente
+   - Supervisor
+   - Responsable
+   - Prof Com/venta
+   - Limpiadora
+   - Ven Inicial
+   - Puesto Compras
+
+
+5´©ÅÔâú Test: Store Settings
+
+Ô£à Configuraciones: 2
+   - store_2: Precio oro = undefinedÔé¼/g
+   - store_1: Precio oro = undefinedÔé¼/g
+
+============================================================
+Ô£à TODAS LAS QUERIES DEL SERVIDOR FUNCIONAN CORRECTAMENTE
+

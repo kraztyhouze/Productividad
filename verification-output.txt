@@ -1,0 +1,30 @@
+﻿[dotenv@17.2.3] injecting env (4) from .env -- tip: ­ƒæÑ sync secrets across teammates & machines: https://dotenvx.com/ops
+
+­ƒôè VERIFICACI├ôN COMPLETA DE DATOS
+
+================================================================================
+
+­ƒôª DATOS EN SUPABASE vs BACKUP:
+
+Ô£à employees            Supabase:   24 | Backup:   24 
+Ô£à roles                Supabase:    7 | Backup:    7 
+Ô£à store_settings       Supabase:    2 | Backup:    2 
+Ô£à tasks                Supabase:    0 | Backup:    0 
+Ô£à comments             Supabase:    0 | Backup:    0 
+Ô£à product_families     Supabase:    3 | Backup:    3 
+Ô£à active_sessions      Supabase:    0 | Backup:    0 
+Ô£à daily_records        Supabase:  114 | Backup:  113 (+1)
+Ô£à daily_groups         Supabase:   36 | Backup:   36 
+Ô£à closed_days          Supabase:    7 | Backup:    7 
+Ô£à day_incidents        Supabase:    9 | Backup:    9 
+Ô£à no_deal_details      Supabase:   72 | Backup:   72 
+ÔØî locations            Error: relation "locations" does not exist
+
+================================================================================
+
+­ƒÆí Leyenda:
+  Ô£à = Datos correctos (Supabase >= Backup)
+  ÔÜá´©Å  = Faltan datos (Supabase < Backup)
+  (+N) = N registros m├ís que en el backup
+  (-N) = N registros menos que en el backup
+

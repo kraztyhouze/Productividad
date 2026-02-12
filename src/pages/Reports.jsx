@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { useProductivity } from '../context/ProductivityContext';
 import { useTeam } from '../context/TeamContext';
 import { useAuth, ROLES } from '../context/AuthContext';
+import { useStore } from '../context/StoreContext';
 import { BarChart, FileText, Filter, Download, Trash2, Loader, Search, Gem, Package, FileSpreadsheet } from 'lucide-react';
 
 const Reports = () => {
     const { dailyRecords, dailyGroups, activeSessions, deleteNoDeal } = useProductivity();
     const { employees } = useTeam();
     const { user } = useAuth();
+    const { currentStore } = useStore();
 
     const isManagerial = user?.role === ROLES.MANAGER;
 
@@ -99,12 +101,17 @@ const Reports = () => {
     // Fetch No Deals
     React.useEffect(() => {
         if (reportType === 'no-deals') {
-            fetch(`/api/no-deals?start=${startDate}&end=${endDate}`)
+            const storeId = currentStore || 'store_1';
+            fetch(`/api/no-deals?start=${startDate}&end=${endDate}`, {
+                headers: {
+                    'x-store-id': storeId
+                }
+            })
                 .then(res => res.json())
                 .then(data => setNoDealsData(data))
                 .catch(err => console.error(err));
         }
-    }, [reportType, startDate, endDate]);
+    }, [reportType, startDate, endDate, currentStore]);
 
     const formatDuration = (seconds) => {
         const h = Math.floor(seconds / 3600);

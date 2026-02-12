@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useProductivity } from '../context/ProductivityContext';
 import { useTeam } from '../context/TeamContext';
 import { useAuth, ROLES } from '../context/AuthContext';
+import { useStore } from '../context/StoreContext';
 import { ShoppingBag, Clock, RefreshCw, Trash2, UserPlus, Check, X, Watch, Pencil, BarChart2, Box, Save, Settings } from 'lucide-react';
 import InfoPanel from '../components/Productivity/InfoPanel';
 import CloseDayModal from '../components/Productivity/CloseDayModal';
@@ -34,6 +35,7 @@ const Productivity = () => {
 
     const { employees } = useTeam();
     const { user } = useAuth();
+    const { currentStore } = useStore();
 
     const [currentTime, setCurrentTime] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -72,17 +74,24 @@ const Productivity = () => {
 
     // Fetch Closing Hours
     useEffect(() => {
-        fetch('/api/settings/closing-hours')
+        const storeId = currentStore || 'store_1';
+        fetch('/api/settings/closing-hours', {
+            headers: { 'x-store-id': storeId }
+        })
             .then(res => res.json())
             .then(data => setClosingHours({ midday: data.midday_close || '', night: data.night_close || '' }))
             .catch(err => console.error("Error fetching closing hours", err));
-    }, []);
+    }, [currentStore]);
 
     const handleSaveClosingHours = async () => {
         try {
+            const storeId = currentStore || 'store_1';
             await fetch('/api/settings/closing-hours', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-store-id': storeId
+                },
                 body: JSON.stringify({ midday_close: closingHours.midday, night_close: closingHours.night })
             });
             alert('Horarios de cierre automático actualizados.');

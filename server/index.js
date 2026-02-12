@@ -616,7 +616,10 @@ app.get('/api/no-deals', async (req, res) => {
         query += ' ORDER BY created_at DESC';
         const result = await pool.query(query, params);
         res.json(result.rows);
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) {
+        console.error('[GET /api/no-deals] Error:', err);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 app.post('/api/no-deals', async (req, res) => {
@@ -628,7 +631,10 @@ app.post('/api/no-deals', async (req, res) => {
             [date, employee_id, reason, brand, model, price_asked, price_offered, price_sale, notes, storeId, type, customer_name, customer_phone, grams, price_per_gram]
         );
         res.json(result.rows[0]);
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) {
+        console.error('[POST /api/no-deals] Error:', err);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 app.delete('/api/no-deals/:id', async (req, res) => {

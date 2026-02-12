@@ -6,7 +6,7 @@ const NoDealModal = ({
     onSave,
     employeeId,
     reasonRaw
-}) =& gt; {
+}) => {
     // Type Selection
     const [type, setType] = useState('jewelry'); // 'jewelry' or 'other'
 
@@ -28,7 +28,7 @@ const NoDealModal = ({
     const [priceOfferedOther, setPriceOfferedOther] = useState('');
     const [priceSale, setPriceSale] = useState('');
 
-    const handleSubmit = () =& gt; {
+    const handleSubmit = () => {
         // Validation for jewelry type
         if (type === 'jewelry') {
             if (!customerName.trim() || !customerPhone.trim()) {
@@ -72,217 +72,214 @@ const NoDealModal = ({
     };
 
     return (
-        & lt;div className = "fixed inset-0 bg-black/80 backdrop-blur-sm z-[70] flex items-center justify-center p-4" & gt;
-            & lt;div className = "bg-[#1e293b] border border-red-500/30 rounded-3xl p-6 max-w-lg w-full shadow-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar" & gt;
-                & lt;button onClick = { onClose } className = "absolute top-4 right-4 text-slate-500 hover:text-white z-10" & gt;
-                    & lt;X size = { 20} /& gt;
-                & lt;/button&gt;
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+            <div className="bg-[#1e293b] border border-red-500/30 rounded-3xl p-6 max-w-lg w-full shadow-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar">
+                <button onClick={onClose} className="absolute top-4 right-4 text-slate-500 hover:text-white z-10">
+                    <X size={20} />
+                </button>
 
-                & lt;h3 className = "text-xl font-bold text-red-400 mb-1" & gt;Detalles "No Trato" & lt;/h3&gt;
-                & lt;p className = "text-xs text-slate-400 mb-6" & gt; Motivo: { reasonRaw }& lt;/p&gt;
+                <h3 className="text-xl font-bold text-red-400 mb-1">Detalles "No Trato"</h3>
+                <p className="text-xs text-slate-400 mb-6">Motivo: {reasonRaw}</p>
 
-    {/* Type Selection */ }
-                & lt;div className = "mb-6" & gt;
-                    & lt;label className = "text-[10px] text-slate-500 font-bold uppercase block mb-2" & gt;Tipo de No Compra & lt;/label&gt;
-                    & lt;div className = "grid grid-cols-2 gap-3" & gt;
-                        & lt; button
-    onClick = {() =& gt; setType('jewelry')
-}
-className = {`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${type === 'jewelry'
-        ? 'bg-amber-500/20 border-amber-500 text-amber-400'
-        : 'bg-slate-800 border-white/10 text-slate-400 hover:border-amber-500/50'
-    }`}
-                        & gt;
-                            & lt;Gem size = { 24} /& gt;
-                            & lt;span className = "font-bold text-sm" & gt; Joyería & lt;/span&gt;
-                        & lt;/button&gt;
-                        & lt; button
-onClick = {() =& gt; setType('other')}
-className = {`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${type === 'other'
-        ? 'bg-blue-500/20 border-blue-500 text-blue-400'
-        : 'bg-slate-800 border-white/10 text-slate-400 hover:border-blue-500/50'
-    }`}
-                        & gt;
-                            & lt;Package size = { 24} /& gt;
-                            & lt;span className = "font-bold text-sm" & gt; Otros & lt;/span&gt;
-                        & lt;/button&gt;
-                    & lt;/div&gt;
-                & lt;/div&gt;
+                {/* Type Selection */}
+                <div className="mb-6">
+                    <label className="text-[10px] text-slate-500 font-bold uppercase block mb-2">Tipo de No Compra</label>
+                    <div className="grid grid-cols-2 gap-3">
+                        <button
+                            onClick={() => setType('jewelry')}
+                            className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${type === 'jewelry'
+                                ? 'bg-amber-500/20 border-amber-500 text-amber-400'
+                                : 'bg-slate-800 border-white/10 text-slate-400 hover:border-amber-500/50'
+                                }`}
+                        >
+                            <Gem size={24} />
+                            <span className="font-bold text-sm">Joyería</span>
+                        </button>
+                        <button
+                            onClick={() => setType('other')}
+                            className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${type === 'other'
+                                ? 'bg-blue-500/20 border-blue-500 text-blue-400'
+                                : 'bg-slate-800 border-white/10 text-slate-400 hover:border-blue-500/50'
+                                }`}
+                        >
+                            <Package size={24} />
+                            <span className="font-bold text-sm">Otros</span>
+                        </button>
+                    </div>
+                </div>
 
-{/* Conditional Fields Based on Type */ }
-{
-    type === 'jewelry' ? (
-                    & lt;div className = "space-y-3" & gt;
-    {/* Required Fields */ }
-                        & lt;div className = "grid grid-cols-2 gap-3" & gt;
-                            & lt; div & gt;
-                                & lt;label className = "text-[10px] text-amber-500 font-bold uppercase block mb-1" & gt;
+                {/* Conditional Fields Based on Type */}
+                {type === 'jewelry' ? (
+                    <div className="space-y-3">
+                        {/* Required Fields */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="text-[10px] text-amber-500 font-bold uppercase block mb-1">
                                     Nombre Cliente *
-                                & lt;/label&gt;
-                                & lt; input
-    type = "text"
-    value = { customerName }
-    onChange = { e =& gt; setCustomerName(e.target.value) }
-    className = "w-full bg-slate-900 border border-amber-500/50 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none"
-    placeholder = "Nombre completo"
-    required
-        /& gt;
-                            & lt;/div&gt;
-                            & lt; div & gt;
-                                & lt;label className = "text-[10px] text-amber-500 font-bold uppercase block mb-1" & gt;
-    Teléfono *
-                                & lt;/label&gt;
-                                & lt; input
-    type = "tel"
-    value = { customerPhone }
-    onChange = { e =& gt; setCustomerPhone(e.target.value) }
-    className = "w-full bg-slate-900 border border-amber-500/50 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none"
-    placeholder = "600123456"
-    required
-        /& gt;
-                            & lt;/div&gt;
-                        & lt;/div&gt;
+                                </label>
+                                <input
+                                    type="text"
+                                    value={customerName}
+                                    onChange={e => setCustomerName(e.target.value)}
+                                    className="w-full bg-slate-900 border border-amber-500/50 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none"
+                                    placeholder="Nombre completo"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] text-amber-500 font-bold uppercase block mb-1">
+                                    Teléfono *
+                                </label>
+                                <input
+                                    type="tel"
+                                    value={customerPhone}
+                                    onChange={e => setCustomerPhone(e.target.value)}
+                                    className="w-full bg-slate-900 border border-amber-500/50 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none"
+                                    placeholder="600123456"
+                                    required
+                                />
+                            </div>
+                        </div>
 
-    {/* Optional Fields */ }
-                        & lt;div className = "grid grid-cols-2 gap-3" & gt;
-                            & lt; div & gt;
-                                & lt;label className = "text-[10px] text-slate-500 font-bold uppercase block mb-1" & gt;Importe Solicitado & lt;/label&gt;
-                                & lt; input
-    type = "text"
-    value = { priceAsked }
-    onChange = { e =& gt; setPriceAsked(e.target.value) }
-    className = "w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none"
-    placeholder = "€"
-        /& gt;
-                            & lt;/div&gt;
-                            & lt; div & gt;
-                                & lt;label className = "text-[10px] text-slate-500 font-bold uppercase block mb-1" & gt;Importe Ofrecido & lt;/label&gt;
-                                & lt; input
-    type = "text"
-    value = { priceOffered }
-    onChange = { e =& gt; setPriceOffered(e.target.value) }
-    className = "w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none"
-    placeholder = "€"
-        /& gt;
-                            & lt;/div&gt;
-                        & lt;/div&gt;
+                        {/* Optional Fields */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Importe Solicitado</label>
+                                <input
+                                    type="text"
+                                    value={priceAsked}
+                                    onChange={e => setPriceAsked(e.target.value)}
+                                    className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none"
+                                    placeholder="€"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Importe Ofrecido</label>
+                                <input
+                                    type="text"
+                                    value={priceOffered}
+                                    onChange={e => setPriceOffered(e.target.value)}
+                                    className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none"
+                                    placeholder="€"
+                                />
+                            </div>
+                        </div>
 
-                        & lt;div className = "grid grid-cols-2 gap-3" & gt;
-                            & lt; div & gt;
-                                & lt;label className = "text-[10px] text-slate-500 font-bold uppercase block mb-1" & gt; Gramos & lt;/label&gt;
-                                & lt; input
-    type = "text"
-    value = { grams }
-    onChange = { e =& gt; setGrams(e.target.value) }
-    className = "w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none"
-    placeholder = "gr"
-        /& gt;
-                            & lt;/div&gt;
-                            & lt; div & gt;
-                                & lt;label className = "text-[10px] text-slate-500 font-bold uppercase block mb-1" & gt; Precio €/gr&lt;/label & gt;
-                                & lt; input
-    type = "text"
-    value = { pricePerGram }
-    onChange = { e =& gt; setPricePerGram(e.target.value) }
-    className = "w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none"
-    placeholder = "€/gr"
-        /& gt;
-                            & lt;/div&gt;
-                        & lt;/div&gt;
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Gramos</label>
+                                <input
+                                    type="text"
+                                    value={grams}
+                                    onChange={e => setGrams(e.target.value)}
+                                    className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none"
+                                    placeholder="gr"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Precio €/gr</label>
+                                <input
+                                    type="text"
+                                    value={pricePerGram}
+                                    onChange={e => setPricePerGram(e.target.value)}
+                                    className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none"
+                                    placeholder="€/gr"
+                                />
+                            </div>
+                        </div>
 
-                        & lt; div & gt;
-                            & lt;label className = "text-[10px] text-slate-500 font-bold uppercase block mb-1" & gt; Motivo / Notas & lt;/label&gt;
-                            & lt; textarea
-    value = { notes }
-    onChange = { e =& gt; setNotes(e.target.value) }
-    className = "w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none h-20 resize-none"
-    placeholder = "Detalles adicionales..."
-        /& gt;
-                        & lt;/div&gt;
-                    & lt;/div&gt;
+                        <div>
+                            <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Motivo / Notas</label>
+                            <textarea
+                                value={notes}
+                                onChange={e => setNotes(e.target.value)}
+                                className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none h-20 resize-none"
+                                placeholder="Detalles adicionales..."
+                            />
+                        </div>
+                    </div>
                 ) : (
-                    & lt;div className = "space-y-3" & gt;
-    {/* All Optional for "Other" */ }
-                        & lt;div className = "grid grid-cols-2 gap-3" & gt;
-                            & lt; div & gt;
-                                & lt;label className = "text-[10px] text-slate-500 font-bold uppercase block mb-1" & gt; Marca & lt;/label&gt;
-                                & lt; input
-    type = "text"
-    value = { brand }
-    onChange = { e =& gt; setBrand(e.target.value) }
-    className = "w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"
-    placeholder = "Ej: Apple"
-        /& gt;
-                            & lt;/div&gt;
-                            & lt; div & gt;
-                                & lt;label className = "text-[10px] text-slate-500 font-bold uppercase block mb-1" & gt; Modelo & lt;/label&gt;
-                                & lt; input
-    type = "text"
-    value = { model }
-    onChange = { e =& gt; setModel(e.target.value) }
-    className = "w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"
-    placeholder = "Ej: iPhone 13"
-        /& gt;
-                            & lt;/div&gt;
-                        & lt;/div&gt;
+                    <div className="space-y-3">
+                        {/* All Optional for "Other" */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Marca</label>
+                                <input
+                                    type="text"
+                                    value={brand}
+                                    onChange={e => setBrand(e.target.value)}
+                                    className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"
+                                    placeholder="Ej: Apple"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Modelo</label>
+                                <input
+                                    type="text"
+                                    value={model}
+                                    onChange={e => setModel(e.target.value)}
+                                    className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"
+                                    placeholder="Ej: iPhone 13"
+                                />
+                            </div>
+                        </div>
 
-                        & lt;div className = "grid grid-cols-3 gap-3" & gt;
-                            & lt; div & gt;
-                                & lt;label className = "text-[10px] text-slate-500 font-bold uppercase block mb-1" & gt;Pide Cliente & lt;/label&gt;
-                                & lt; input
-    type = "text"
-    value = { priceAskedOther }
-    onChange = { e =& gt; setPriceAskedOther(e.target.value) }
-    className = "w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"
-    placeholder = "€"
-        /& gt;
-                            & lt;/div&gt;
-                            & lt; div & gt;
-                                & lt;label className = "text-[10px] text-slate-500 font-bold uppercase block mb-1" & gt;Oferta Empl.& lt;/label&gt;
-                                & lt; input
-    type = "text"
-    value = { priceOfferedOther }
-    onChange = { e =& gt; setPriceOfferedOther(e.target.value) }
-    className = "w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"
-    placeholder = "€"
-        /& gt;
-                            & lt;/div&gt;
-                            & lt; div & gt;
-                                & lt;label className = "text-[10px] text-slate-500 font-bold uppercase block mb-1" & gt;PVP Futuro & lt;/label&gt;
-                                & lt; input
-    type = "text"
-    value = { priceSale }
-    onChange = { e =& gt; setPriceSale(e.target.value) }
-    className = "w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"
-    placeholder = "€"
-        /& gt;
-                            & lt;/div&gt;
-                        & lt;/div&gt;
+                        <div className="grid grid-cols-3 gap-3">
+                            <div>
+                                <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Pide Cliente</label>
+                                <input
+                                    type="text"
+                                    value={priceAskedOther}
+                                    onChange={e => setPriceAskedOther(e.target.value)}
+                                    className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"
+                                    placeholder="€"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Oferta Empl.</label>
+                                <input
+                                    type="text"
+                                    value={priceOfferedOther}
+                                    onChange={e => setPriceOfferedOther(e.target.value)}
+                                    className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"
+                                    placeholder="€"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">PVP Futuro</label>
+                                <input
+                                    type="text"
+                                    value={priceSale}
+                                    onChange={e => setPriceSale(e.target.value)}
+                                    className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"
+                                    placeholder="€"
+                                />
+                            </div>
+                        </div>
 
-                        & lt; div & gt;
-                            & lt;label className = "text-[10px] text-slate-500 font-bold uppercase block mb-1" & gt; Motivo / Notas & lt;/label&gt;
-                            & lt; textarea
-    value = { notes }
-    onChange = { e =& gt; setNotes(e.target.value) }
-    className = "w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none h-20 resize-none"
-    placeholder = "Detalles adicionales..."
-        /& gt;
-                        & lt;/div&gt;
-                    & lt;/div&gt;
-                )
-}
+                        <div>
+                            <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Motivo / Notas</label>
+                            <textarea
+                                value={notes}
+                                onChange={e => setNotes(e.target.value)}
+                                className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none h-20 resize-none"
+                                placeholder="Detalles adicionales..."
+                            />
+                        </div>
+                    </div>
+                )}
 
-                & lt;div className = "mt-6 flex gap-3" & gt;
-                    & lt;button onClick = { onClose } className = "flex-1 py-3 text-slate-500 hover:text-white font-bold text-sm" & gt; Omitir & lt;/button&gt;
-                    & lt; button
-onClick = { handleSubmit }
-className = {`flex-1 py-3 ${type === 'jewelry' ? 'bg-amber-500 hover:bg-amber-400' : 'bg-blue-500 hover:bg-blue-400'} text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 transition-colors`}
-                    & gt;
-                        & lt;Save size = { 18} /& gt; Guardar
-    & lt;/button&gt;
-                & lt;/div&gt;
-            & lt;/div&gt;
-        & lt;/div&gt;
+                <div className="mt-6 flex gap-3">
+                    <button onClick={onClose} className="flex-1 py-3 text-slate-500 hover:text-white font-bold text-sm">Omitir</button>
+                    <button
+                        onClick={handleSubmit}
+                        className={`flex-1 py-3 ${type === 'jewelry' ? 'bg-amber-500 hover:bg-amber-400' : 'bg-blue-500 hover:bg-blue-400'} text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 transition-colors`}
+                    >
+                        <Save size={18} /> Guardar
+                    </button>
+                </div>
+            </div>
+        </div>
     );
 };
 

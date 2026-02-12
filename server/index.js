@@ -48,6 +48,17 @@ async function migratePasswords() {
 
 // --- API Routes ---
 
+// Schema Migration (Auto-Run)
+(async () => {
+    try {
+        await pool.query('ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS midday_close TEXT');
+        await pool.query('ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS night_close TEXT');
+        console.log('Schema updated: closing-hours columns ensured.');
+    } catch (e) {
+        console.log('Schema check skipped:', e.message);
+    }
+})();
+
 // 0. Auth (Login) - Secure Server-Side Check
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
@@ -208,6 +219,31 @@ app.post('/api/settings/gold', async (req, res) => {
         );
         res.json({ success: true, price });
     } catch (err) { res.status(500).json({ error: err.message }) }
+});
+
+// Closing Hours Settings
+app.get('/api/settings/closing-hours', async (req, res) => {
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    try {
+        const result = await pool.query('SELECT midday_close, night_close FROM store_settings WHERE store_id = $1', [storeId]);
+        if (result.rows.length > 0) {
+            res.json(result.rows[0]);
+        } else {
+            res.json({ midday_close: '', night_close: '' });
+        }
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/settings/closing-hours', async (req, res) => {
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    const { midday_close, night_close } = req.body;
+    try {
+        await pool.query(
+            'INSERT INTO store_settings (store_id, midday_close, night_close) VALUES ($1, $2, $3) ON CONFLICT (store_id) DO UPDATE SET midday_close = $2, night_close = $3, updated_at = CURRENT_TIMESTAMP',
+            [storeId, midday_close, night_close]
+        );
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // 2. Roles

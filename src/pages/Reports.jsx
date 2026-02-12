@@ -37,29 +37,62 @@ const Reports = () => {
 
     const exportJewelryCSV = () => {
         const jewelryData = noDealsData.filter(i => i.type === 'jewelry');
-        const headers = ['Fecha', 'Cliente', 'Teléfono', 'Precio/gr', 'Oferta Total', 'Gramos', 'Empleado', 'Notas'];
-        const csvContent = [
-            headers.join(','),
-            ...jewelryData.map(item => {
-                const emp = employees.find(e => e.id === item.employee_id);
-                const notesClean = (item.notes || '') + (item.reason ? ` - ${item.reason}` : '');
-                return [
-                    item.date,
-                    `"${item.customer_name || ''}"`,
-                    `"${item.customer_phone || ''}"`,
-                    item.price_per_gram || '',
-                    item.price_offered || '',
-                    item.grams || '',
-                    `"${emp?.alias || emp?.first_name || item.employee_id}"`,
-                    `"${notesClean.replace(/"/g, '""')}"`
-                ].join(',');
-            })
-        ].join('\n');
 
-        const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
+        // Professional Excel HTML Table (XLS)
+        let tableHTML = `
+            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+            <head>
+                <meta charset="UTF-8">
+                <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Informe Joyería</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+                <style>
+                    table { border-collapse: collapse; width: 100%; font-family: sans-serif; }
+                    th { background-color: #f3f4f6; color: #1f2937; border: 1px solid #d1d5db; padding: 10px; text-align: left; font-weight: bold; }
+                    td { border: 1px solid #e5e7eb; padding: 8px; vertical-align: middle; }
+                    .num { mso-number-format:"\#\,\#\#0\.00"; text-align: right; }
+                    .text { mso-number-format:"\@"; }
+                </style>
+            </head>
+            <body>
+                <table>
+                    <thead>
+                        <tr style="background-color: #e2e8f0;">
+                            <th>Fecha</th>
+                            <th>Cliente</th>
+                            <th>Teléfono</th>
+                            <th>Precio/gr (€)</th>
+                            <th>Oferta Total (€)</th>
+                            <th>Gramos</th>
+                            <th>Empleado</th>
+                            <th>Notas / Razón</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        jewelryData.forEach(item => {
+            const emp = employees.find(e => e.id === item.employee_id);
+            const notesClean = (item.notes || '') + (item.reason ? ` - ${item.reason}` : '');
+
+            tableHTML += `
+                <tr>
+                    <td class="text">${item.date}</td>
+                    <td class="text">${item.customer_name || ''}</td>
+                    <td class="text">${item.customer_phone || ''}</td>
+                    <td class="num">${(item.price_per_gram || '').toString().replace('.', ',')}</td>
+                    <td class="num">${(item.price_offered || '').toString().replace('.', ',')}</td>
+                    <td class="num">${(item.grams || '').toString().replace('.', ',')}</td>
+                    <td>${emp?.alias || emp?.first_name || item.employee_id}</td>
+                    <td>${notesClean}</td>
+                </tr>
+            `;
+        });
+
+        tableHTML += `</tbody></table></body></html>`;
+
+        const blob = new Blob([tableHTML], { type: 'application/vnd.ms-excel' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        link.download = `no_compras_joyeria_${new Date().toISOString().split('T')[0]}.csv`;
+        link.download = `no_compras_joyeria_${new Date().toISOString().split('T')[0]}.xls`;
         link.click();
     };
 

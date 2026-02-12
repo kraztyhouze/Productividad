@@ -46,8 +46,6 @@ async function migratePasswords() {
 
 // --- API Routes ---
 
-// --- API Routes ---
-
 // Schema Migration (Auto-Run)
 (async () => {
     try {
@@ -105,7 +103,6 @@ app.post('/api/login', async (req, res) => {
 // 1. Employees (Secured: No Passwords returned)
 app.get('/api/employees', async (req, res) => {
     const storeId = req.headers['x-store-id'] || 'store_1';
-    // console.log(`[DEBUG] GET /employees - Requesting Store: ${storeId}`);
     try {
         // EXCLUDED password from SELECT
         const result = await pool.query(`
@@ -883,7 +880,6 @@ app.delete('/api/locations/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- 9. Gold Price Scraper (New) ---
 // --- 9. Gold Price Scraper (Background Service) ---
 let goldPriceCache = {
     timestamp: 0,

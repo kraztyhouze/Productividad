@@ -4,7 +4,7 @@ const { Pool } = pg;
 
 // Use DATABASE_URL from environment (Railway provides this)
 // Fallback to a local connection string if needed (for dev)
-const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/productivity';
+const connectionString = process.env.DATABASE_URL;
 
 export const pool = new Pool({
     connectionString,
@@ -226,7 +226,7 @@ export async function initDb() {
                         username, password, is_buyer, phone, address, avatar, store_id, "order"
                     ) VALUES (
                         'Admin', 'Sistema', 'ADMIN', 'admin@tiktak.com', 'Gerente', 40, 'Indefinido',
-                        'admin', 'admin', true, '000000000', 'Sistema', 'A', $1, 0
+                        'admin', '$2b$10$GZO1kQILa/9FhRHcd8A.J.A1cNncDS0U13sxFYw.93EAA/ELL9gSK', true, '000000000', 'Sistema', 'A', $1, 0
                     )
                 `, [storeId]);
             }
@@ -251,6 +251,31 @@ export async function initDb() {
             INSERT INTO store_settings (store_id, gold_price) VALUES ($1, 77.00)
             ON CONFLICT (store_id) DO NOTHING
         `, [storeId]);
+        }
+
+        // 6. Locations (Visual Store Map)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS locations(
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                status TEXT CHECK(status IN('libre', 'parcial', 'lleno')) DEFAULT 'libre',
+                zone TEXT,
+                store_id TEXT DEFAULT 'store_1'
+            );
+        `);
+        await client.query(`ALTER TABLE locations ADD COLUMN IF NOT EXISTS store_id TEXT DEFAULT 'store_1'; `);
+
+        // Seed locations if empty for store_1
+        const locationsCheck = await client.query("SELECT COUNT(*) FROM locations WHERE store_id = 'store_1'");
+        if (parseInt(locationsCheck.rows[0].count) === 0) {
+            console.log('Seeding initial locations for store_1...');
+            const seeds = [];
+            for (let i = 1; i <= 5; i++) seeds.push(`('Estantería A${i}', 'libre', 'Almacén A', 'store_1')`);
+            for (let i = 1; i <= 5; i++) seeds.push(`('Cajón B${i}', 'libre', 'Almacén B', 'store_1')`);
+
+            // Construct multi-row insert string safely
+            const values = seeds.join(', ');
+            await client.query(`INSERT INTO locations(name, status, zone, store_id) VALUES ${values} `);
         }
 
         console.log("Database tables initialized (PostgreSQL)");

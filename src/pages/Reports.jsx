@@ -3,7 +3,8 @@ import { useProductivity } from '../context/ProductivityContext';
 import { useTeam } from '../context/TeamContext';
 import { useAuth, ROLES } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
-import { BarChart, FileText, Filter, Download, Trash2, Loader, Search, Gem, Package, FileSpreadsheet } from 'lucide-react';
+import { BarChart, FileText, Filter, Download, Trash2, Loader, Search, Gem, Package, FileSpreadsheet, Calendar as CalendarIcon, ChevronDown } from 'lucide-react';
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays, subWeeks, subMonths } from 'date-fns';
 
 const Reports = () => {
     const { dailyRecords, dailyGroups, activeSessions, deleteNoDeal } = useProductivity();
@@ -25,10 +26,10 @@ const Reports = () => {
     // ... rest of component logic ...
 
     // Date Range State
-    // Default to current month
+    // Default to current month (Local Time)
     const today = new Date();
-    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-    const currentDay = today.toISOString().split('T')[0];
+    const firstDayOfMonth = format(startOfMonth(today), 'yyyy-MM-dd');
+    const currentDay = format(today, 'yyyy-MM-dd');
 
     const [startDate, setStartDate] = useState(firstDayOfMonth);
     const [endDate, setEndDate] = useState(currentDay);
@@ -36,6 +37,46 @@ const Reports = () => {
     const [noDealsData, setNoDealsData] = useState([]);
     const [noDealsTab, setNoDealsTab] = useState('jewelry');
     const [searchTerm, setSearchTerm] = useState('');
+
+
+
+    // --- DATE PRESET LOGIC ---
+    const [showPresets, setShowPresets] = useState(false);
+    const presets = [
+        { label: 'Hoy', value: 'today' },
+        { label: 'Ayer', value: 'yesterday' },
+        { label: 'Esta Semana', value: 'thisWeek' },
+        { label: 'Semana Pasada', value: 'lastWeek' },
+        { label: 'Este Mes', value: 'thisMonth' },
+        { label: 'Mes Pasado', value: 'lastMonth' },
+    ];
+
+    const handlePreset = (preset) => {
+        const today = new Date();
+        let start, end;
+        switch (preset) {
+            case 'today':
+                start = today; end = today; break;
+            case 'yesterday':
+                start = subDays(today, 1); end = subDays(today, 1); break;
+            case 'thisWeek':
+                start = startOfWeek(today, { weekStartsOn: 1 }); end = today; break;
+            case 'lastWeek':
+                start = startOfWeek(subWeeks(today, 1), { weekStartsOn: 1 });
+                end = endOfWeek(subWeeks(today, 1), { weekStartsOn: 1 });
+                break;
+            case 'thisMonth':
+                start = startOfMonth(today); end = today; break;
+            case 'lastMonth':
+                start = startOfMonth(subMonths(today, 1));
+                end = endOfMonth(subMonths(today, 1));
+                break;
+            default: return;
+        }
+        setStartDate(format(start, 'yyyy-MM-dd'));
+        setEndDate(format(end, 'yyyy-MM-dd'));
+        setShowPresets(false);
+    };
 
     const exportJewelryCSV = () => {
         const jewelryData = noDealsData.filter(i => i.type === 'jewelry');
@@ -189,7 +230,7 @@ const Reports = () => {
 
     return (
         <div className="space-y-6 pb-10">
-            <header className="flex justify-between items-end">
+            <header className="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-6">
                 <div>
                     <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
                         <FileText className="text-pink-500" size={32} />
@@ -198,30 +239,64 @@ const Reports = () => {
                     <p className="text-slate-400 font-medium ml-1 mt-1 text-sm">Analiza el rendimiento del equipo por rangos de fecha.</p>
                 </div>
 
-                {/* DATE RANGE PICKER */}
-                <div className="bg-[#1e293b]/60 backdrop-blur-md p-1.5 rounded-2xl border border-white/5 flex items-center gap-4 shadow-lg">
-                    <div className="flex items-center gap-2 pl-2">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Desde</span>
-                        <input
-                            type="date"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            className="bg-transparent border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:border-pink-500 outline-none transition-colors font-mono"
-                        />
+                {/* ADVANCED DATE PICKER */}
+                <div className="flex flex-col sm:flex-row gap-4 bg-[#1e293b]/80 backdrop-blur-md p-2 rounded-2xl border border-white/5 shadow-xl relative z-20">
+
+                    {/* Presets Dropdown */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowPresets(!showPresets)}
+                            className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all border border-white/5 active:scale-95 w-full sm:w-auto justify-between"
+                        >
+                            <span className="flex items-center gap-2">
+                                <CalendarIcon size={14} className="text-pink-500" />
+                                <span>Rangos Rápidos</span>
+                            </span>
+                            <ChevronDown size={14} className={`transition-transform duration-300 ${showPresets ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {showPresets && (
+                            <>
+                                <div className="fixed inset-0 z-10" onClick={() => setShowPresets(false)}></div>
+                                <div className="absolute top-full left-0 mt-2 w-48 bg-slate-800 border border-white/10 rounded-xl shadow-2xl p-2 z-20 flex flex-col gap-1 anim-pop">
+                                    {presets.map(p => (
+                                        <button
+                                            key={p.value}
+                                            onClick={() => handlePreset(p.value)}
+                                            className="text-left px-3 py-2 hover:bg-white/5 rounded-lg text-xs font-medium text-slate-300 hover:text-white transition-colors"
+                                        >
+                                            {p.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </>
+                        )}
                     </div>
-                    <div className="w-px h-6 bg-white/10"></div>
-                    <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Hasta</span>
-                        <input
-                            type="date"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            className="bg-transparent border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:border-pink-500 outline-none transition-colors font-mono"
-                        />
+
+                    <div className="w-px h-8 bg-white/10 hidden sm:block"></div>
+
+                    {/* Date Inputs */}
+                    <div className="flex items-center gap-2 bg-slate-900/50 rounded-xl px-3 py-1 border border-white/5">
+                        <div className="flex flex-col">
+                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider ml-1">Desde</span>
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="bg-transparent text-white text-xs font-mono focus:outline-none [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:opacity-50 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                            />
+                        </div>
+                        <div className="text-slate-600">→</div>
+                        <div className="flex flex-col">
+                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider ml-1">Hasta</span>
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="bg-transparent text-white text-xs font-mono focus:outline-none [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:opacity-50 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                            />
+                        </div>
                     </div>
-                    <button className="bg-pink-600 hover:bg-pink-500 text-white p-2 rounded-xl transition-all shadow-lg shadow-pink-600/20">
-                        <Filter size={16} />
-                    </button>
                 </div>
             </header>
 

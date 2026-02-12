@@ -4,6 +4,7 @@ import { useTeam } from '../context/TeamContext';
 import { useAuth, ROLES } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
 import { ShoppingBag, Clock, RefreshCw, Trash2, UserPlus, Check, X, Watch, Pencil, BarChart2, Box, Save, Settings } from 'lucide-react';
+import { format } from 'date-fns';
 import InfoPanel from '../components/Productivity/InfoPanel';
 import CloseDayModal from '../components/Productivity/CloseDayModal';
 import EditTimeModal from '../components/Productivity/EditTimeModal';
@@ -38,7 +39,8 @@ const Productivity = () => {
     const { currentStore } = useStore();
 
     const [currentTime, setCurrentTime] = useState(new Date());
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    // Fix: Use local date instead of UTC to avoid "yesterday" issues late at night
+    const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [showCloseModal, setShowCloseModal] = useState(false);
     const [showManualModal, setShowManualModal] = useState(false);
     const [needInput, setNeedInput] = useState("");

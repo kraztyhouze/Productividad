@@ -525,6 +525,15 @@ app.post('/api/daily-groups', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.delete('/api/daily-groups/:key', async (req, res) => {
+    const { key } = req.params;
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    try {
+        await pool.query('DELETE FROM daily_groups WHERE key=$1 AND store_id=$2', [key, storeId]);
+        res.json({ message: 'Groups deleted' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Day Incidents
 app.get('/api/day-incidents', async (req, res) => {
     const storeId = req.headers['x-store-id'] || 'store_1';

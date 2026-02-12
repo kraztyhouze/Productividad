@@ -14,14 +14,7 @@ import NoDealModal from '../components/Productivity/NoDealModal';
 import VisualLocationsModal from '../components/Productivity/VisualLocationsModal';
 
 
-const REJECTION_REASONS = [
-    "Precio pide muy alto",
-    "Artículo roto / mal estado",
-    "No compramos este artículo",
-    "Cliente indeciso",
-    "Sin documentación / IMEI Blacklist",
-    "Otro"
-];
+// REJECTION_REASONS removed as per request to simplify flow
 
 const Productivity = () => {
     const {
@@ -744,7 +737,7 @@ const Productivity = () => {
                                     <RefreshCw size={24} className="group-hover:scale-125 transition-transform" />
                                     <span>Recuperable</span>
                                 </button>
-                                <button onClick={() => setActiveClientModal(activeClientModal + '_REJECT')} className="bg-slate-700 hover:bg-red-600 text-white p-4 rounded-xl font-bold transition-all flex flex-col items-center gap-2 group">
+                                <button onClick={() => endClient(activeClientModal, 'noDeal', '')} className="bg-slate-700 hover:bg-red-600 text-white p-4 rounded-xl font-bold transition-all flex flex-col items-center gap-2 group">
                                     <X size={24} className="group-hover:scale-125 transition-transform" />
                                     <span>No Trato / Rechazo</span>
                                 </button>
@@ -758,28 +751,7 @@ const Productivity = () => {
                 )
             }
 
-            {/* REJECTION REASON MODAL */}
-            {
-                activeClientModal && typeof activeClientModal === 'string' && activeClientModal.includes('_REJECT') && (
-                    <div className="absolute inset-0 z-[60] bg-black/90 flex justify-center items-center p-4">
-                        <div className="bg-[#1e293b] w-full max-w-md rounded-3xl p-6 border border-red-500/30 shadow-2xl">
-                            <h3 className="text-xl font-bold text-white mb-6 text-center">Motivo del Rechazo</h3>
-                            <div className="flex flex-col gap-3">
-                                {REJECTION_REASONS.map(reason => (
-                                    <button
-                                        key={reason}
-                                        onClick={() => endClient(parseInt(activeClientModal), 'noDeal', reason)}
-                                        className="p-3 bg-slate-800 hover:bg-red-500/20 hover:text-red-400 border border-white/5 rounded-xl text-left text-sm font-medium transition-colors"
-                                    >
-                                        {reason}
-                                    </button>
-                                ))}
-                            </div>
-                            <button onClick={() => setActiveClientModal(null)} className="mt-4 w-full py-3 text-slate-500 hover:text-white text-sm">Cancelar / Cerrar</button>
-                        </div>
-                    </div>
-                )
-            }
+
 
             {/* VISUAL LOCATIONS MODAL */}
             <VisualLocationsModal

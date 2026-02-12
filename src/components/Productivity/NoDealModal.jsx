@@ -79,7 +79,8 @@ const NoDealModal = ({
                 </button>
 
                 <h3 className="text-xl font-bold text-red-400 mb-1">Detalles "No Trato"</h3>
-                <p className="text-xs text-slate-400 mb-6">Motivo: {reasonRaw}</p>
+                {reasonRaw && <p className="text-xs text-slate-400 mb-6">Motivo Original: {reasonRaw}</p>}
+                {!reasonRaw && <p className="text-xs text-slate-400 mb-6 font-medium">Por favor, rellena los detalles de la no compra.</p>}
 
                 {/* Type Selection */}
                 <div className="mb-6">

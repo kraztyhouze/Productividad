@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useProductivity } from '../context/ProductivityContext';
 import { useTeam } from '../context/TeamContext';
 import { useAuth, ROLES } from '../context/AuthContext';
-import { BarChart, FileText, Filter, Download, Trash2, Loader } from 'lucide-react';
+import { BarChart, FileText, Filter, Download, Trash2, Loader, Search, Gem, Package, FileSpreadsheet } from 'lucide-react';
 
 const Reports = () => {
     const { dailyRecords, dailyGroups, activeSessions, deleteNoDeal } = useProductivity();
@@ -32,6 +32,36 @@ const Reports = () => {
     const [endDate, setEndDate] = useState(currentDay);
     const [reportType, setReportType] = useState('performance'); // 'performance' | 'no-deals'
     const [noDealsData, setNoDealsData] = useState([]);
+    const [noDealsTab, setNoDealsTab] = useState('jewelry');
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const exportJewelryCSV = () => {
+        const jewelryData = noDealsData.filter(i => i.type === 'jewelry');
+        const headers = ['Fecha', 'Cliente', 'Teléfono', 'Precio/gr', 'Oferta Total', 'Gramos', 'Empleado', 'Notas'];
+        const csvContent = [
+            headers.join(','),
+            ...jewelryData.map(item => {
+                const emp = employees.find(e => e.id === item.employee_id);
+                const notesClean = (item.notes || '') + (item.reason ? ` - ${item.reason}` : '');
+                return [
+                    item.date,
+                    `"${item.customer_name || ''}"`,
+                    `"${item.customer_phone || ''}"`,
+                    item.price_per_gram || '',
+                    item.price_offered || '',
+                    item.grams || '',
+                    `"${emp?.alias || emp?.first_name || item.employee_id}"`,
+                    `"${notesClean.replace(/"/g, '""')}"`
+                ].join(',');
+            })
+        ].join('\n');
+
+        const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `no_compras_joyeria_${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+    };
 
     // Fetch No Deals
     React.useEffect(() => {
@@ -264,61 +294,153 @@ const Reports = () => {
                     </div>
                 ) : (
                     // NO DEALS TABLE
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="text-[11px] font-bold text-slate-500 uppercase border-b border-white/5 bg-slate-900/20">
-                                    <th className="pb-4 pl-6 pt-4">Fecha</th>
-                                    <th className="pb-4 pt-4">Empleado</th>
-                                    <th className="pb-4 pt-4">Razón</th>
-                                    <th className="pb-4 pt-4">Marca/Modelo</th>
-                                    <th className="pb-4 pt-4 text-right">Pide</th>
-                                    <th className="pb-4 pt-4 text-right">Oferta</th>
-                                    <th className="pb-4 pt-4 text-right pr-6">PVP Futuro</th>
-                                    {isManagerial && <th className="pb-4 pt-4 text-right">Acciones</th>}
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/5 text-sm">
-                                {noDealsData.map(item => {
-                                    const emp = employees.find(e => e.id === item.employee_id);
-                                    return (
-                                        <tr key={item.id} className="group hover:bg-pink-500/5 transition-colors">
-                                            <td className="py-4 pl-6 font-mono text-slate-400">{item.date}</td>
-                                            <td className="py-4 font-bold text-slate-200">{emp?.alias || emp?.first_name || item.employee_id}</td>
-                                            <td className="py-4 text-red-400">{item.reason}</td>
-                                            <td className="py-4 text-slate-300">
-                                                {item.brand} {item.model}
-                                                {item.notes && <div className="text-[10px] text-slate-500 italic mt-1">{item.notes}</div>}
-                                            </td>
-                                            <td className="py-4 text-right font-mono text-slate-400">{item.price_asked ? `${item.price_asked}€` : '-'}</td>
-                                            <td className="py-4 text-right font-mono text-slate-400">{item.price_offered ? `${item.price_offered}€` : '-'}</td>
-                                            <td className="py-4 text-right pr-6 font-mono text-slate-400">{item.price_sale ? `${item.price_sale}€` : '-'}</td>
-                                            {isManagerial && (
-                                                <td className="py-4 text-right">
-                                                    <button
-                                                        onClick={async () => {
-                                                            if (confirm('¿Eliminar registro de No Trato?')) {
-                                                                await deleteNoDeal(item.id);
-                                                                setNoDealsData(prev => prev.filter(i => i.id !== item.id));
-                                                            }
-                                                        }}
-                                                        className="p-2 hover:bg-red-500/20 text-slate-500 hover:text-red-400 rounded-lg transition-colors"
-                                                        title="Eliminar Registro"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                </td>
-                                            )}
-                                        </tr>
-                                    );
-                                })}
-                                {noDealsData.length === 0 && (
-                                    <tr>
-                                        <td colSpan="7" className="py-12 text-center text-slate-600 italic">No hay registros de "No Trato" con detalles.</td>
-                                    </tr>
+                    <div className="space-y-6">
+                        {/* Tabs & Search */}
+                        <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-slate-900/30 p-2 rounded-2xl">
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setNoDealsTab('jewelry')}
+                                    className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all ${noDealsTab === 'jewelry' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+                                >
+                                    <Gem size={16} /> Joyería
+                                </button>
+                                <button
+                                    onClick={() => setNoDealsTab('other')}
+                                    className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all ${noDealsTab === 'other' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+                                >
+                                    <Package size={16} /> Otros
+                                    <span className="bg-slate-800 px-1.5 py-0.5 rounded-md text-[10px] text-slate-400 border border-white/5">
+                                        {noDealsData.filter(i => i.type !== 'jewelry').length}
+                                    </span>
+                                </button>
+                            </div>
+
+                            <div className="flex gap-3 w-full md:w-auto">
+                                <div className="relative flex-1 md:w-64">
+                                    <Search className="absolute left-3 top-2.5 text-slate-500" size={16} />
+                                    <input
+                                        type="text"
+                                        placeholder="Buscar cliente, modelo..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="w-full bg-slate-900/50 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-sm text-white focus:border-pink-500 outline-none placeholder:text-slate-600"
+                                    />
+                                </div>
+                                {noDealsTab === 'jewelry' && (
+                                    <button
+                                        onClick={exportJewelryCSV}
+                                        className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold text-xs flex items-center gap-2 transition-all shadow-lg shadow-green-600/20 border border-green-400/20"
+                                    >
+                                        <FileSpreadsheet size={16} /> Excel
+                                    </button>
                                 )}
-                            </tbody>
-                        </table>
+                            </div>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    {noDealsTab === 'jewelry' ? (
+                                        <tr className="text-[10px] font-bold text-slate-500 uppercase border-b border-white/5 bg-slate-900/20">
+                                            <th className="pb-4 pl-6 pt-4">Fecha / Empleado</th>
+                                            <th className="pb-4 pt-4 text-amber-500">Cliente</th>
+                                            <th className="pb-4 pt-4 text-right">Precio/gr</th>
+                                            <th className="pb-4 pt-4 text-right">Gramos</th>
+                                            <th className="pb-4 pt-4 text-right">Oferta</th>
+                                            <th className="pb-4 pt-4">Notas</th>
+                                            {isManagerial && <th className="pb-4 pt-4 text-center">Acciones</th>}
+                                        </tr>
+                                    ) : (
+                                        <tr className="text-[10px] font-bold text-slate-500 uppercase border-b border-white/5 bg-slate-900/20">
+                                            <th className="pb-4 pl-6 pt-4">Fecha / Empleado</th>
+                                            <th className="pb-4 pt-4 text-blue-400">Producto</th>
+                                            <th className="pb-4 pt-4 text-right">Pide</th>
+                                            <th className="pb-4 pt-4 text-right">Oferta</th>
+                                            <th className="pb-4 pt-4">Notas</th>
+                                            {isManagerial && <th className="pb-4 pt-4 text-center">Acciones</th>}
+                                        </tr>
+                                    )}
+                                </thead>
+                                <tbody className="divide-y divide-white/5 text-sm">
+                                    {noDealsData
+                                        .filter(item => {
+                                            const type = item.type || 'other';
+                                            if (type !== noDealsTab) return false;
+
+                                            if (!searchTerm) return true;
+                                            const s = searchTerm.toLowerCase();
+                                            return (
+                                                (item.customer_name?.toLowerCase().includes(s)) ||
+                                                (item.customer_phone?.toLowerCase().includes(s)) ||
+                                                (item.brand?.toLowerCase().includes(s)) ||
+                                                (item.model?.toLowerCase().includes(s)) ||
+                                                (item.notes?.toLowerCase().includes(s)) ||
+                                                (item.reason?.toLowerCase().includes(s))
+                                            );
+                                        })
+                                        .map(item => {
+                                            const emp = employees.find(e => e.id === item.employee_id);
+                                            return (
+                                                <tr key={item.id} className="group hover:bg-pink-500/5 transition-colors">
+                                                    <td className="py-4 pl-6">
+                                                        <div className="font-mono text-slate-400 text-xs">{item.date}</div>
+                                                        <div className="font-bold text-slate-200 text-xs mt-1">{emp?.alias || '?'}</div>
+                                                    </td>
+
+                                                    {noDealsTab === 'jewelry' ? (
+                                                        <>
+                                                            <td className="py-4">
+                                                                <div className="font-bold text-slate-200">{item.customer_name || 'Anónimo'}</div>
+                                                                <div className="text-xs text-amber-500/70 font-mono">{item.customer_phone}</div>
+                                                            </td>
+                                                            <td className="py-4 text-right font-mono text-slate-400">{item.price_per_gram ? `${item.price_per_gram}€` : '-'}</td>
+                                                            <td className="py-4 text-right font-mono text-slate-400">{item.grams ? `${item.grams}gr` : '-'}</td>
+                                                            <td className="py-4 text-right font-bold text-white font-mono">{item.price_offered ? `${item.price_offered}€` : '-'}</td>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <td className="py-4">
+                                                                <div className="font-bold text-slate-200">{item.brand} {item.model}</div>
+                                                                {item.price_sale && <div className="text-xs text-green-400 font-mono mt-1">PVP Futuro: {item.price_sale}€</div>}
+                                                            </td>
+                                                            <td className="py-4 text-right font-mono text-slate-400">{item.price_asked ? `${item.price_asked}€` : '-'}</td>
+                                                            <td className="py-4 text-right font-bold text-white font-mono">{item.price_offered ? `${item.price_offered}€` : '-'}</td>
+                                                        </>
+                                                    )}
+
+                                                    <td className="py-4 text-slate-400 text-xs max-w-[200px] truncate">
+                                                        <span className="text-red-400 font-bold block mb-1">{item.reason}</span>
+                                                        {item.notes}
+                                                    </td>
+
+                                                    {isManagerial && (
+                                                        <td className="py-4 text-center">
+                                                            <button
+                                                                onClick={async () => {
+                                                                    if (confirm('¿Eliminar registro?')) {
+                                                                        await deleteNoDeal(item.id);
+                                                                        setNoDealsData(prev => prev.filter(i => i.id !== item.id));
+                                                                    }
+                                                                }}
+                                                                className="p-2 hover:bg-red-500/20 text-slate-500 hover:text-red-400 rounded-lg transition-colors"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </td>
+                                                    )}
+                                                </tr>
+                                            );
+                                        })}
+                                    {noDealsData.filter(i => (i.type || 'other') === noDealsTab).length === 0 && (
+                                        <tr>
+                                            <td colSpan="8" className="py-12 text-center text-slate-600 italic">
+                                                No hay registros en esta categoría.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 )}
             </div>

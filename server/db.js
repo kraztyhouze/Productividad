@@ -189,10 +189,20 @@ export async function initDb() {
             price_sale TEXT,
             notes TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            store_id TEXT DEFAULT 'store_1'
+            store_id TEXT DEFAULT 'store_1',
+            type TEXT DEFAULT 'other',
+            customer_name TEXT,
+            customer_phone TEXT,
+            grams TEXT,
+            price_per_gram TEXT
         );
     `);
         await client.query(`ALTER TABLE no_deal_details ADD COLUMN IF NOT EXISTS store_id TEXT DEFAULT 'store_1';`);
+        await client.query(`ALTER TABLE no_deal_details ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'other';`);
+        await client.query(`ALTER TABLE no_deal_details ADD COLUMN IF NOT EXISTS customer_name TEXT;`);
+        await client.query(`ALTER TABLE no_deal_details ADD COLUMN IF NOT EXISTS customer_phone TEXT;`);
+        await client.query(`ALTER TABLE no_deal_details ADD COLUMN IF NOT EXISTS grams TEXT;`);
+        await client.query(`ALTER TABLE no_deal_details ADD COLUMN IF NOT EXISTS price_per_gram TEXT;`);
         // --- CRITICAL MIGRATION: Fix Unique Constraint for Multi-Store ---
         try {
             // 1. Drop the old global unique constraint if it exists
@@ -227,9 +237,13 @@ export async function initDb() {
         CREATE TABLE IF NOT EXISTS store_settings (
             store_id TEXT PRIMARY KEY,
             gold_price NUMERIC DEFAULT 77.00,
+            midday_close TEXT,
+            night_close TEXT,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     `);
+        await client.query(`ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS midday_close TEXT;`);
+        await client.query(`ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS night_close TEXT;`);
 
         // Ensure default settings exist for known stores
         for (const storeId of stores) {

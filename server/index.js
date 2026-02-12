@@ -575,12 +575,12 @@ app.get('/api/no-deals', async (req, res) => {
 });
 
 app.post('/api/no-deals', async (req, res) => {
-    const { date, employee_id, reason, brand, model, price_asked, price_offered, price_sale, notes } = req.body;
+    const { date, employee_id, reason, brand, model, price_asked, price_offered, price_sale, notes, type, customer_name, customer_phone, grams, price_per_gram } = req.body;
     const storeId = req.headers['x-store-id'] || 'store_1';
     try {
         const result = await pool.query(
-            'INSERT INTO no_deal_details (date, employee_id, reason, brand, model, price_asked, price_offered, price_sale, notes, store_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
-            [date, employee_id, reason, brand, model, price_asked, price_offered, price_sale, notes, storeId]
+            'INSERT INTO no_deal_details (date, employee_id, reason, brand, model, price_asked, price_offered, price_sale, notes, store_id, type, customer_name, customer_phone, grams, price_per_gram) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *',
+            [date, employee_id, reason, brand, model, price_asked, price_offered, price_sale, notes, storeId, type, customer_name, customer_phone, grams, price_per_gram]
         );
         res.json(result.rows[0]);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1014,6 +1014,127 @@ app.get(/.*/, (req, res) => {
         res.status(404).send('Application not built. Run "npm run build" first.');
     }
 });
+
+// --- AUTO CLOSE SESSIONS ---
+
+// Endpoint to Get Settings
+app.get('/api/settings/closing-hours', async (req, res) => {
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    try {
+        const result = await pool.query('SELECT midday_close, night_close FROM store_settings WHERE store_id = $1', [storeId]);
+        res.json(result.rows[0] || { midday_close: '', night_close: '' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Endpoint to Update Settings
+app.post('/api/settings/closing-hours', async (req, res) => {
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    const { midday_close, night_close } = req.body;
+    try {
+        await pool.query(
+            'INSERT INTO store_settings (store_id, midday_close, night_close) VALUES ($1, $2, $3) ON CONFLICT (store_id) DO UPDATE SET midday_close = $2, night_close = $3',
+            [storeId, midday_close, night_close]
+        );
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Background Auto-Closer
+async function closeStoreSessions(storeId) {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 1. Get Active Sessions
+        const result = await client.query('SELECT * FROM active_sessions WHERE store_id = $1', [storeId]);
+        const sessions = result.rows;
+
+        if (sessions.length === 0) {
+            await client.query('ROLLBACK');
+            return;
+        }
+
+        console.log(`[AutoClose] Closing ${sessions.length} sessions for store ${storeId}...`);
+
+        // Use Spain Time for Records
+        const now = new Date();
+        const today = now.toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' }); // YYYY-MM-DD
+        const endTimeStr = now.toISOString();
+
+        for (const session of sessions) {
+            // Calculate Duration
+            const start = new Date(session.start_time).getTime();
+            const end = now.getTime();
+            const durationSeconds = Math.round((end - start) / 1000);
+
+            // Handle Client Time (if active)
+            if (session.client_start_time) {
+                const clientStart = new Date(session.client_start_time).getTime();
+                const clientDuration = Math.round((end - clientStart) / 1000);
+
+                // Add to Daily Groups (accumulate client time)
+                const key = `${session.employee_id}-${today}`;
+
+                await client.query(`
+                    INSERT INTO daily_groups (key, client_seconds, store_id) 
+                    VALUES ($1, $2, $3)
+                    ON CONFLICT (key) DO UPDATE SET client_seconds = daily_groups.client_seconds + $2
+                `, [key, clientDuration, storeId]);
+            }
+
+            // Create Daily Record (Closed Session)
+            // Use big random ID to avoid collision (better than serial for dispersed inserts)
+            const recordId = Date.now() + Math.floor(Math.random() * 10000);
+
+            await client.query(`
+                INSERT INTO daily_records (id, employee_id, employee_name, start_time, end_time, duration_seconds, date, groups_count, store_id)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8)
+            `, [
+                recordId,
+                session.employee_id,
+                session.employee_name,
+                session.start_time,
+                endTimeStr,
+                durationSeconds,
+                today,
+                storeId
+            ]);
+
+            // Delete Active Session
+            await client.query('DELETE FROM active_sessions WHERE employee_id = $1 AND store_id = $2', [session.employee_id, storeId]);
+        }
+
+        await client.query('COMMIT');
+        console.log(`[AutoClose] Success for ${storeId}.`);
+    } catch (e) {
+        await client.query('ROLLBACK');
+        console.error(`[AutoClose] Error closing sessions for ${storeId}:`, e);
+    } finally {
+        client.release();
+    }
+}
+
+// Check every minute
+setInterval(async () => {
+    try {
+        const settings = await pool.query('SELECT store_id, midday_close, night_close FROM store_settings');
+
+        // Format Current Time HH:MM in Europe/Madrid
+        const currentTime = new Date().toLocaleTimeString('es-ES', {
+            timeZone: 'Europe/Madrid',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        for (const row of settings.rows) {
+            if (row.midday_close === currentTime || row.night_close === currentTime) {
+                await closeStoreSessions(row.store_id);
+            }
+        }
+    } catch (e) {
+        console.error('[AutoCloseLoop] Error:', e);
+    }
+}, 60000);
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);

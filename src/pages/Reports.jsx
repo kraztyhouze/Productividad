@@ -228,6 +228,179 @@ const Reports = () => {
     // Sort by Total Groups desc
     const sortedEmpIds = Object.keys(stats).sort((a, b) => stats[b].totalGroups - stats[a].totalGroups);
 
+
+    // --- NO DEALS RENDER ---
+    const renderNoDeals = () => {
+        // Filter Data
+        const filteredData = noDealsData.filter(item => {
+            const type = item.type || 'other';
+            if (type !== noDealsTab) return false;
+
+            if (!searchTerm) return true;
+            const s = searchTerm.toLowerCase();
+            return (
+                (item.customer_name?.toLowerCase().includes(s)) ||
+                (item.customer_phone?.toLowerCase().includes(s)) ||
+                (item.brand?.toLowerCase().includes(s)) ||
+                (item.model?.toLowerCase().includes(s)) ||
+                (item.notes?.toLowerCase().includes(s)) ||
+                (item.reason?.toLowerCase().includes(s))
+            );
+        });
+
+        return (
+            <div className="space-y-6">
+                {/* Controls Bar */}
+                <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-slate-900/30 p-2 rounded-2xl border border-white/5">
+                    <div className="flex gap-2 p-1 bg-slate-950/50 rounded-xl">
+                        <button
+                            onClick={() => setNoDealsTab('jewelry')}
+                            className={`px-6 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-all border ${noDealsTab === 'jewelry' ? 'bg-amber-500/10 border-amber-500/50 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.15)]' : 'border-transparent text-slate-500 hover:text-white hover:bg-white/5'}`}
+                        >
+                            <Gem size={14} /> Joyería
+                        </button>
+                        <button
+                            onClick={() => setNoDealsTab('other')}
+                            className={`px-6 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-all border ${noDealsTab === 'other' ? 'bg-blue-500/10 border-blue-500/50 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.15)]' : 'border-transparent text-slate-500 hover:text-white hover:bg-white/5'}`}
+                        >
+                            <Package size={14} /> Otros
+                            <span className="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-slate-400 border border-white/5 min-w-[20px] text-center">
+                                {noDealsData.filter(i => (i.type || 'other') !== 'jewelry').length}
+                            </span>
+                        </button>
+                    </div>
+
+                    <div className="flex gap-3 w-full md:w-auto">
+                        <div className="relative flex-1 md:w-72 group">
+                            <Search className="absolute left-3 top-2.5 text-slate-500 group-focus-within:text-pink-500 transition-colors" size={16} />
+                            <input
+                                type="text"
+                                placeholder={noDealsTab === 'jewelry' ? "Buscar cliente, teléfono..." : "Buscar producto, modelo..."}
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full bg-slate-950/50 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-xs font-medium text-white focus:border-pink-500/50 focus:bg-slate-900 focus:ring-1 focus:ring-pink-500/20 outline-none placeholder:text-slate-600 transition-all"
+                            />
+                        </div>
+                        {noDealsTab === 'jewelry' && (
+                            <button
+                                onClick={exportJewelryCSV}
+                                className="px-4 py-2 bg-green-600/10 hover:bg-green-600/20 text-green-400 border border-green-600/30 rounded-xl font-bold text-xs flex items-center gap-2 transition-all hover:scale-105 active:scale-95"
+                            >
+                                <FileSpreadsheet size={16} /> <span className="hidden sm:inline">Exportar Excel</span>
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {/* Grid Layout */}
+                <div className="grid grid-cols-1 gap-4">
+                    {filteredData.map(item => {
+                        const emp = employees.find(e => e.id === item.employee_id);
+                        return (
+                            <div key={item.id} className="group relative bg-[#1e293b]/40 hover:bg-[#1e293b]/60 backdrop-blur-md rounded-2xl border border-white/5 hover:border-white/10 p-5 transition-all shadow-sm hover:shadow-xl">
+                                <div className="flex flex-col md:flex-row gap-6">
+
+                                    {/* Left Column: Core Info */}
+                                    <div className="w-full md:w-64 flex flex-col justify-between shrink-0 border-b md:border-b-0 md:border-r border-white/5 pb-4 md:pb-0 md:pr-6">
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <div className="px-2 py-1 rounded-md bg-slate-800 text-[10px] font-mono text-slate-400 border border-white/5">
+                                                    {format(new Date(item.date), 'dd MMM yyyy')}
+                                                </div>
+                                                <div className="px-2 py-1 rounded-md bg-slate-800 text-[10px] font-bold text-slate-300 border border-white/5 flex items-center gap-1">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-pink-500"></div>
+                                                    {emp?.alias || 'Empleado'}
+                                                </div>
+                                            </div>
+
+                                            {noDealsTab === 'jewelry' ? (
+                                                <div className="space-y-1">
+                                                    <h3 className="text-lg font-bold text-white tracking-tight">{item.customer_name || 'Cliente Anónimo'}</h3>
+                                                    <p className="text-xs font-mono text-amber-500 flex items-center gap-1.5">
+                                                        <span className="w-1 h-1 rounded-full bg-amber-500"></span>
+                                                        {item.customer_phone || 'Sin Teléfono'}
+                                                    </p>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-1">
+                                                    <h3 className="text-lg font-bold text-white tracking-tight">{item.brand} <span className="text-slate-400 font-normal">{item.model}</span></h3>
+                                                    {item.price_sale && (
+                                                        <p className="text-xs font-mono text-green-400">PVP Futuro: {item.price_sale}€</p>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Financials Mini-Grid */}
+                                        <div className="grid grid-cols-2 gap-2 mt-4">
+                                            <div className="bg-black/20 rounded-lg p-2 border border-white/5">
+                                                <span className="text-[9px] uppercase text-slate-500 font-bold block mb-0.5">Ofertado</span>
+                                                <span className="text-sm font-mono font-bold text-white">{item.price_offered || 0}€</span>
+                                            </div>
+                                            <div className="bg-black/20 rounded-lg p-2 border border-white/5">
+                                                <span className="text-[9px] uppercase text-slate-500 font-bold block mb-0.5">
+                                                    {noDealsTab === 'jewelry' ? 'Gramos' : 'Pedía'}
+                                                </span>
+                                                <span className="text-sm font-mono font-bold text-slate-300">
+                                                    {noDealsTab === 'jewelry' ? `${item.grams || 0}g` : `${item.price_asked || 0}€`}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Right Column: Reasoning & Notes */}
+                                    <div className="flex-1 flex flex-col relative min-w-0">
+                                        <div className="mb-3">
+                                            <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-1 block">Motivo de no compra</span>
+                                            <div className="inline-block px-3 py-1 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-xs font-bold">
+                                                {item.reason || 'No especificado'}
+                                            </div>
+                                        </div>
+
+                                        <div className="flex-1 bg-black/20 rounded-xl p-3 border border-white/5 relative group-hover:border-white/10 transition-colors">
+                                            <span className="text-[9px] uppercase font-bold text-slate-600 absolute top-3 right-3 select-none">Notas Internas</span>
+                                            <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap pt-4 pr-16 pb-1">
+                                                {item.notes || <span className="text-slate-600 italic">Sin notas adicionales...</span>}
+                                            </p>
+                                        </div>
+
+                                        {/* Delete Action (Top Right Floating) */}
+                                        {isManagerial && (
+                                            <div className="absolute top-0 right-0">
+                                                <button
+                                                    onClick={async () => {
+                                                        if (confirm('¿Eliminar registro?')) {
+                                                            await deleteNoDeal(item.id);
+                                                            setNoDealsData(prev => prev.filter(i => i.id !== item.id));
+                                                        }
+                                                    }}
+                                                    className="p-2 bg-slate-800 hover:bg-red-500/20 border border-white/5 hover:border-red-500/30 text-slate-400 hover:text-red-400 rounded-lg transition-all opacity-0 group-hover:opacity-100 transform translate-x-2 -translate-y-2"
+                                                    title="Eliminar Registro"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )
+                    })}
+
+                    {filteredData.length === 0 && (
+                        <div className="flex flex-col items-center justify-center p-12 bg-[#1e293b]/20 border border-dashed border-white/10 rounded-3xl">
+                            <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-4">
+                                <Search className="text-slate-600" size={24} />
+                            </div>
+                            <h3 className="text-slate-300 font-bold mb-1">No se encontraron resultados</h3>
+                            <p className="text-slate-500 text-sm">{searchTerm ? `Sin coincidencias para "${searchTerm}"` : 'No hay registros en este periodo'}</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div className="space-y-6 pb-10">
             <header className="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-6">
@@ -321,12 +494,14 @@ const Reports = () => {
                 <div className="flex justify-between items-center mb-8">
                     <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
                         <BarChart size={24} className="text-pink-500" />
-                        Resultados del Periodo
+                        {reportType === 'performance' ? 'Rendimiento' : 'No Compras'}
                         <span className="text-xs font-normal text-slate-500 ml-2 font-mono">({startDate} — {endDate})</span>
                     </h2>
-                    <button className="flex items-center gap-2 px-4 py-2.5 bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white font-bold rounded-xl transition-all text-xs border border-white/5 hover:border-white/10">
-                        <Download size={16} /> Exportar CSV
-                    </button>
+                    {reportType === 'performance' && (
+                        <button className="flex items-center gap-2 px-4 py-2.5 bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white font-bold rounded-xl transition-all text-xs border border-white/5 hover:border-white/10">
+                            <Download size={16} /> Exportar CSV
+                        </button>
+                    )}
                 </div>
 
                 {reportType === 'performance' ? (
@@ -408,155 +583,8 @@ const Reports = () => {
                         </table>
                     </div>
                 ) : (
-                    // NO DEALS TABLE
-                    <div className="space-y-6">
-                        {/* Tabs & Search */}
-                        <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-slate-900/30 p-2 rounded-2xl">
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => setNoDealsTab('jewelry')}
-                                    className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all ${noDealsTab === 'jewelry' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
-                                >
-                                    <Gem size={16} /> Joyería
-                                </button>
-                                <button
-                                    onClick={() => setNoDealsTab('other')}
-                                    className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all ${noDealsTab === 'other' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
-                                >
-                                    <Package size={16} /> Otros
-                                    <span className="bg-slate-800 px-1.5 py-0.5 rounded-md text-[10px] text-slate-400 border border-white/5">
-                                        {noDealsData.filter(i => i.type !== 'jewelry').length}
-                                    </span>
-                                </button>
-                            </div>
-
-                            <div className="flex gap-3 w-full md:w-auto">
-                                <div className="relative flex-1 md:w-64">
-                                    <Search className="absolute left-3 top-2.5 text-slate-500" size={16} />
-                                    <input
-                                        type="text"
-                                        placeholder="Buscar cliente, modelo..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="w-full bg-slate-900/50 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-sm text-white focus:border-pink-500 outline-none placeholder:text-slate-600"
-                                    />
-                                </div>
-                                {noDealsTab === 'jewelry' && (
-                                    <button
-                                        onClick={exportJewelryCSV}
-                                        className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold text-xs flex items-center gap-2 transition-all shadow-lg shadow-green-600/20 border border-green-400/20"
-                                    >
-                                        <FileSpreadsheet size={16} /> Excel
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    {noDealsTab === 'jewelry' ? (
-                                        <tr className="text-[10px] font-bold text-slate-500 uppercase border-b border-white/5 bg-slate-900/20">
-                                            <th className="pb-4 pl-6 pt-4">Fecha / Empleado</th>
-                                            <th className="pb-4 pt-4 text-amber-500">Cliente</th>
-                                            <th className="pb-4 pt-4 text-right">Precio/gr</th>
-                                            <th className="pb-4 pt-4 text-right">Gramos</th>
-                                            <th className="pb-4 pt-4 text-right">Oferta</th>
-                                            <th className="pb-4 pt-4">Notas</th>
-                                            {isManagerial && <th className="pb-4 pt-4 text-center">Acciones</th>}
-                                        </tr>
-                                    ) : (
-                                        <tr className="text-[10px] font-bold text-slate-500 uppercase border-b border-white/5 bg-slate-900/20">
-                                            <th className="pb-4 pl-6 pt-4">Fecha / Empleado</th>
-                                            <th className="pb-4 pt-4 text-blue-400">Producto</th>
-                                            <th className="pb-4 pt-4 text-right">Pide</th>
-                                            <th className="pb-4 pt-4 text-right">Oferta</th>
-                                            <th className="pb-4 pt-4">Notas</th>
-                                            {isManagerial && <th className="pb-4 pt-4 text-center">Acciones</th>}
-                                        </tr>
-                                    )}
-                                </thead>
-                                <tbody className="divide-y divide-white/5 text-sm">
-                                    {noDealsData
-                                        .filter(item => {
-                                            const type = item.type || 'other';
-                                            if (type !== noDealsTab) return false;
-
-                                            if (!searchTerm) return true;
-                                            const s = searchTerm.toLowerCase();
-                                            return (
-                                                (item.customer_name?.toLowerCase().includes(s)) ||
-                                                (item.customer_phone?.toLowerCase().includes(s)) ||
-                                                (item.brand?.toLowerCase().includes(s)) ||
-                                                (item.model?.toLowerCase().includes(s)) ||
-                                                (item.notes?.toLowerCase().includes(s)) ||
-                                                (item.reason?.toLowerCase().includes(s))
-                                            );
-                                        })
-                                        .map(item => {
-                                            const emp = employees.find(e => e.id === item.employee_id);
-                                            return (
-                                                <tr key={item.id} className="group hover:bg-pink-500/5 transition-colors">
-                                                    <td className="py-4 pl-6">
-                                                        <div className="font-mono text-slate-400 text-xs">{item.date}</div>
-                                                        <div className="font-bold text-slate-200 text-xs mt-1">{emp?.alias || '?'}</div>
-                                                    </td>
-
-                                                    {noDealsTab === 'jewelry' ? (
-                                                        <>
-                                                            <td className="py-4">
-                                                                <div className="font-bold text-slate-200">{item.customer_name || 'Anónimo'}</div>
-                                                                <div className="text-xs text-amber-500/70 font-mono">{item.customer_phone}</div>
-                                                            </td>
-                                                            <td className="py-4 text-right font-mono text-slate-400">{item.price_per_gram ? `${item.price_per_gram}€` : '-'}</td>
-                                                            <td className="py-4 text-right font-mono text-slate-400">{item.grams ? `${item.grams}gr` : '-'}</td>
-                                                            <td className="py-4 text-right font-bold text-white font-mono">{item.price_offered ? `${item.price_offered}€` : '-'}</td>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <td className="py-4">
-                                                                <div className="font-bold text-slate-200">{item.brand} {item.model}</div>
-                                                                {item.price_sale && <div className="text-xs text-green-400 font-mono mt-1">PVP Futuro: {item.price_sale}€</div>}
-                                                            </td>
-                                                            <td className="py-4 text-right font-mono text-slate-400">{item.price_asked ? `${item.price_asked}€` : '-'}</td>
-                                                            <td className="py-4 text-right font-bold text-white font-mono">{item.price_offered ? `${item.price_offered}€` : '-'}</td>
-                                                        </>
-                                                    )}
-
-                                                    <td className="py-4 text-slate-400 text-xs max-w-[200px] truncate">
-                                                        <span className="text-red-400 font-bold block mb-1">{item.reason}</span>
-                                                        {item.notes}
-                                                    </td>
-
-                                                    {isManagerial && (
-                                                        <td className="py-4 text-center">
-                                                            <button
-                                                                onClick={async () => {
-                                                                    if (confirm('¿Eliminar registro?')) {
-                                                                        await deleteNoDeal(item.id);
-                                                                        setNoDealsData(prev => prev.filter(i => i.id !== item.id));
-                                                                    }
-                                                                }}
-                                                                className="p-2 hover:bg-red-500/20 text-slate-500 hover:text-red-400 rounded-lg transition-colors"
-                                                            >
-                                                                <Trash2 size={16} />
-                                                            </button>
-                                                        </td>
-                                                    )}
-                                                </tr>
-                                            );
-                                        })}
-                                    {noDealsData.filter(i => (i.type || 'other') === noDealsTab).length === 0 && (
-                                        <tr>
-                                            <td colSpan="8" className="py-12 text-center text-slate-600 italic">
-                                                No hay registros en esta categoría.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                    // NO DEALS TABLE REPLACEMENT
+                    renderNoDeals()
                 )}
             </div>
         </div>

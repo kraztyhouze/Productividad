@@ -139,6 +139,67 @@ const Reports = () => {
         link.click();
     };
 
+    const exportOtherCSV = () => {
+        const otherData = noDealsData.filter(i => (i.type || 'other') !== 'jewelry');
+
+        // Professional Excel HTML Table (XLS)
+        let tableHTML = `
+            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+            <head>
+                <meta charset="UTF-8">
+                <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Informe Otros</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+                <style>
+                    table { border-collapse: collapse; width: 100%; font-family: sans-serif; }
+                    th { background-color: #f3f4f6; color: #1f2937; border: 1px solid #d1d5db; padding: 10px; text-align: left; font-weight: bold; }
+                    td { border: 1px solid #e5e7eb; padding: 8px; vertical-align: middle; }
+                    .num { mso-number-format:"\#\,\#\#0\.00"; text-align: right; }
+                    .text { mso-number-format:"\@"; }
+                </style>
+            </head>
+            <body>
+                <table>
+                    <thead>
+                        <tr style="background-color: #e2e8f0;">
+                            <th>Fecha</th>
+                            <th>Marca</th>
+                            <th>Modelo</th>
+                            <th>Cliente Pide (€)</th>
+                            <th>PVP Futuro (€)</th>
+                            <th>Oferta Total (€)</th>
+                            <th>Empleado</th>
+                            <th>Notas / Razón</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        otherData.forEach(item => {
+            const emp = employees.find(e => e.id === item.employee_id);
+            const notesClean = (item.notes || '') + (item.reason ? ` - ${item.reason}` : '');
+
+            tableHTML += `
+                <tr>
+                    <td class="text">${item.date}</td>
+                    <td class="text">${item.brand || ''}</td>
+                    <td class="text">${item.model || ''}</td>
+                    <td class="num">${(item.price_asked || '').toString().replace('.', ',')}</td>
+                    <td class="num">${(item.price_sale || '').toString().replace('.', ',')}</td>
+                    <td class="num">${(item.price_offered || '').toString().replace('.', ',')}</td>
+                    <td>${emp?.alias || emp?.first_name || item.employee_id}</td>
+                    <td>${notesClean}</td>
+                </tr>
+            `;
+        });
+
+        tableHTML += `</tbody></table></body></html>`;
+
+        const blob = new Blob([tableHTML], { type: 'application/vnd.ms-excel' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `no_compras_otros_${new Date().toISOString().split('T')[0]}.xls`;
+        link.click();
+    };
+
     // Fetch No Deals
     React.useEffect(() => {
         if (reportType === 'no-deals') {
@@ -285,6 +346,14 @@ const Reports = () => {
                             <button
                                 onClick={exportJewelryCSV}
                                 className="px-4 py-2 bg-green-600/10 hover:bg-green-600/20 text-green-400 border border-green-600/30 rounded-xl font-bold text-xs flex items-center gap-2 transition-all hover:scale-105 active:scale-95"
+                            >
+                                <FileSpreadsheet size={16} /> <span className="hidden sm:inline">Exportar Excel</span>
+                            </button>
+                        )}
+                        {noDealsTab === 'other' && (
+                            <button
+                                onClick={exportOtherCSV}
+                                className="px-4 py-2 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-600/30 rounded-xl font-bold text-xs flex items-center gap-2 transition-all hover:scale-105 active:scale-95"
                             >
                                 <FileSpreadsheet size={16} /> <span className="hidden sm:inline">Exportar Excel</span>
                             </button>

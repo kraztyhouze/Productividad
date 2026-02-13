@@ -223,7 +223,7 @@ const Reports = () => {
 
     // --- AGGREGATION LOGIC ---
     const getAggregatedStats = () => {
-        const stats = {}; // { employeeId: { totalSeconds: 0, standard: 0, jewelry: 0, recoverable: 0, totalGroups: 0, daysActive: 0 } }
+        const stats = {}; // { employeeId: { totalSeconds: 0, standard: 0, jewelry: 0, recoverable: 0, totalGroups: 0, daysActive: 0, clientSeconds: 0, noDeal: 0 } }
 
         // Filter records by date range
         const filteredRecords = dailyRecords.filter(r => r.date >= startDate && r.date <= endDate);
@@ -233,7 +233,8 @@ const Reports = () => {
                 stats[r.employeeId] = {
                     totalSeconds: 0,
                     standard: 0, jewelry: 0, recoverable: 0, totalGroups: 0,
-                    daysActive: new Set()
+                    daysActive: new Set(),
+                    clientSeconds: 0, noDeal: 0
                 };
             }
             stats[r.employeeId].totalSeconds += r.durationSeconds;
@@ -246,17 +247,30 @@ const Reports = () => {
             const empId = parseInt(empIdStr);
             if (date >= startDate && date <= endDate) {
                 if (!stats[empId]) {
-                    stats[empId] = { totalSeconds: 0, standard: 0, jewelry: 0, recoverable: 0, totalGroups: 0, daysActive: new Set() };
+                    stats[empId] = {
+                        totalSeconds: 0,
+                        standard: 0, jewelry: 0, recoverable: 0, totalGroups: 0,
+                        daysActive: new Set(),
+                        clientSeconds: 0, noDeal: 0
+                    };
                 }
 
                 const raw = dailyGroups[key];
                 const val = typeof raw === 'number'
-                    ? { standard: raw, jewelry: 0, recoverable: 0 }
-                    : { standard: raw.standard || 0, jewelry: raw.jewelry || 0, recoverable: raw.recoverable || 0 };
+                    ? { standard: raw, jewelry: 0, recoverable: 0, clientSeconds: 0, noDeal: 0 }
+                    : {
+                        standard: raw.standard || 0,
+                        jewelry: raw.jewelry || 0,
+                        recoverable: raw.recoverable || 0,
+                        clientSeconds: raw.clientSeconds || 0,
+                        noDeal: raw.noDeal || 0
+                    };
 
                 stats[empId].standard += val.standard;
                 stats[empId].jewelry += val.jewelry;
                 stats[empId].recoverable += val.recoverable;
+                stats[empId].clientSeconds += val.clientSeconds;
+                stats[empId].noDeal += val.noDeal;
 
                 // Recalculate total just to be sure
                 stats[empId].totalGroups += (val.standard + val.jewelry + val.recoverable);
@@ -277,7 +291,8 @@ const Reports = () => {
                 stats[empId] = {
                     totalSeconds: 0,
                     standard: 0, jewelry: 0, recoverable: 0, totalGroups: 0,
-                    daysActive: new Set([todayStr])
+                    daysActive: new Set([todayStr]),
+                    clientSeconds: 0, noDeal: 0
                 };
             }
             const duration = (new Date() - new Date(session.startTime)) / 1000;
@@ -580,20 +595,49 @@ const Reports = () => {
                                 <tr className="text-[11px] font-bold text-slate-500 uppercase border-b border-white/5 bg-slate-900/20">
                                     <th className="pb-4 pl-6 pt-4">Empleado</th>
                                     <th className="pb-4 pt-4 text-center">Días Activos</th>
-                                    <th className="pb-4 pt-4 text-center">Tiempo (H)</th>
+                                    <th className="pb-4 pt-4 text-center">Tiempo Turno</th>
+                                    <th className="pb-4 pt-4 text-center text-blue-400">T. Compras</th>
                                     <th className="pb-4 pt-4 text-center text-slate-400" title="Grupos General">Gen</th>
                                     <th className="pb-4 pt-4 text-center text-slate-400" title="Grupos Joyería">Joy</th>
                                     <th className="pb-4 pt-4 text-center text-slate-400" title="Venta Recuperable">Rec</th>
+                                    <th className="pb-4 pt-4 text-center text-red-500">NO</th>
                                     <th className="pb-4 pt-4 text-center text-pink-500">Total Grupos</th>
-                                    <th className="pb-4 pt-4 text-right pr-6">Media (G/H)</th>
+                                    <th className="pb-4 pt-4 text-right text-indigo-400" title="% Tiempo en Compras">% Efic.</th>
+                                    <th className="pb-4 pt-4 text-right text-yellow-500" title="% Venta Joyería">% Joya</th>
+                                    <th className="pb-4 pt-4 text-right text-amber-500" title="Grupos / Hora (Tiempo Compras)">Gr/h (C)</th>
+                                    <th className="pb-4 pt-4 text-right text-slate-400" title="Grupos / Hora (Tiempo Turno)">Gr/h (T)</th>
+                                    <th className="pb-4 pt-4 text-right">Hit Rate</th>
+                                    <th className="pb-4 pt-4 text-right pr-6">T. Medio/Cli</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-white/5">
                                 {sortedEmpIds.map(empId => {
                                     const data = stats[empId];
                                     const emp = employees.find(e => e.id === parseInt(empId));
-                                    const hours = data.totalSeconds / 3600;
-                                    const gph = hours > 0 ? (data.totalGroups / hours).toFixed(2) : '0.00';
+
+                                    // Calculations
+                                    const shiftHours = data.totalSeconds / 3600;
+                                    const buyingHours = data.clientSeconds / 3600;
+
+                                    // Productivity Metrics
+                                    // 1. Velocity (Gr/h)
+                                    const gphBuying = buyingHours > 0 ? (data.totalGroups / buyingHours).toFixed(1) : '0.0';
+                                    const gphShift = shiftHours > 0 ? (data.totalGroups / shiftHours).toFixed(1) : '0.0';
+
+                                    // 2. Efficiency (% Time utilized for shopping)
+                                    const efficiency = data.totalSeconds > 0 ? ((data.clientSeconds / data.totalSeconds) * 100).toFixed(0) : 0;
+
+                                    // 3. Quality Mix (% Jewelry Sales)
+                                    const jewelryMix = data.totalGroups > 0 ? ((data.jewelry / data.totalGroups) * 100).toFixed(0) : 0;
+
+                                    // 4. Hit Rate (Success Rate)
+                                    const totalInteractions = data.totalGroups + data.noDeal;
+                                    const hitRate = totalInteractions > 0 ? ((data.totalGroups / totalInteractions) * 100).toFixed(0) : 0;
+
+                                    // 5. Avg Time per Client
+                                    const avgTime = totalInteractions > 0 ? (data.clientSeconds / totalInteractions) : 0;
+                                    const avgTimeMin = Math.floor(avgTime / 60);
+                                    const avgTimeSec = Math.floor(avgTime % 60);
 
                                     return (
                                         <tr key={empId} className="group hover:bg-pink-500/5 transition-colors">
@@ -612,38 +656,50 @@ const Reports = () => {
                                                 {data.daysActive.size}
                                             </td>
                                             <td className="py-4 text-center font-mono text-slate-400 text-sm">
-                                                {hours.toFixed(1)}
+                                                {formatDuration(data.totalSeconds)}
+                                            </td>
+                                            <td className="py-4 text-center font-mono text-blue-400 font-bold text-sm">
+                                                {formatDuration(data.clientSeconds)}
                                             </td>
 
-                                            {/* Detailed Groups */}
-                                            <td className="py-4 text-center font-mono text-slate-500 text-sm">
-                                                {data.standard}
-                                            </td>
-                                            <td className="py-4 text-center font-mono text-slate-500 text-sm">
-                                                {data.jewelry}
-                                            </td>
-                                            <td className="py-4 text-center font-mono text-slate-500 text-sm">
-                                                {data.recoverable}
-                                            </td>
+                                            <td className="py-4 text-center font-mono text-slate-500 text-sm">{data.standard}</td>
+                                            <td className="py-4 text-center font-mono text-slate-500 text-sm">{data.jewelry}</td>
+                                            <td className="py-4 text-center font-mono text-slate-500 text-sm">{data.recoverable}</td>
+                                            <td className="py-4 text-center font-mono text-red-500 font-bold text-sm">{data.noDeal}</td>
 
                                             <td className="py-4 text-center">
-                                                <span className="bg-pink-500/10 text-pink-500 px-3 py-1 rounded-lg font-bold font-mono text-sm border border-pink-500/20">
+                                                <span className="bg-pink-500/10 text-pink-500 px-3 py-1 rounded-lg font-bold font-mono text-lg border border-pink-500/20">
                                                     {data.totalGroups}
                                                 </span>
                                             </td>
-                                            <td className="py-4 text-right pr-6">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <span className={`text-lg font-bold font-mono ${parseFloat(gph) > 10 ? 'text-white' : 'text-slate-500'}`}>
-                                                        {gph}
-                                                    </span>
-                                                </div>
+
+                                            <td className="py-4 text-right font-mono font-bold text-indigo-400">
+                                                {efficiency}%
+                                            </td>
+                                            <td className="py-4 text-right font-mono font-bold text-yellow-500">
+                                                {jewelryMix}%
+                                            </td>
+
+                                            <td className="py-4 text-right font-mono font-bold text-amber-500">
+                                                {gphBuying}
+                                            </td>
+                                            <td className="py-4 text-right font-mono font-bold text-slate-400">
+                                                {gphShift}
+                                            </td>
+
+                                            <td className="py-4 text-right font-mono">
+                                                <span className={`${hitRate < 50 ? 'text-red-500' : hitRate > 80 ? 'text-green-500' : 'text-amber-500'}`}>{hitRate}%</span>
+                                            </td>
+
+                                            <td className="py-4 text-right pr-6 font-mono text-slate-400">
+                                                {avgTimeMin}m {avgTimeSec}s
                                             </td>
                                         </tr>
                                     )
                                 })}
                                 {sortedEmpIds.length === 0 && (
                                     <tr>
-                                        <td colSpan="8" className="py-12 text-center text-slate-600 italic text-sm">
+                                        <td colSpan="14" className="py-12 text-center text-slate-600 italic text-sm">
                                             No hay datos para el rango de fechas seleccionado.
                                         </td>
                                     </tr>

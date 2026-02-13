@@ -81,7 +81,7 @@ TikTak 2.1/
 ├── server/
 │   ├── index.js                   ← Servidor Express
 │   ├── db.js                      ← Configuración PostgreSQL
-│   ├── telegramBot.js             ← Bot de Telegram
+
 │   └── supabase-setup.sql         ← SQL manual (opcional)
 └── src/
     ├── pages/                     ← Páginas de la aplicación
@@ -127,7 +127,7 @@ DATABASE_URL=postgresql://postgres:[PASSWORD]@db.[REF].supabase.co:5432/postgres
 - ✅ **Market**: Búsqueda de productos y valoraciones
 - ✅ **Diagnósticos**: Pruebas de móviles y portátiles
 - ✅ **Reportes**: Generación de PDFs
-- ✅ **Telegram Bot**: Notificaciones automáticas
+
 
 ---
 

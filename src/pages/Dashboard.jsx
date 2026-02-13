@@ -2,329 +2,425 @@ import React, { useState, useEffect } from 'react';
 import { useProductivity } from '../context/ProductivityContext';
 import { useTeam } from '../context/TeamContext';
 import { useAuth } from '../context/AuthContext';
-import { Calendar, TrendingUp, BarChart as LucideBarChart, Clock } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, ComposedChart, Line, CartesianGrid, Legend } from 'recharts';
+import {
+    TrendingUp, Users, Clock, ShoppingBag,
+    Activity, Gem, Package, RefreshCw,
+    ArrowUpRight, ArrowDownRight, Calendar
+} from 'lucide-react';
+import {
+    AreaChart, Area, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer,
+    PieChart, Pie, Cell, Legend
+} from 'recharts';
 
 const Dashboard = () => {
-    const { dailyRecords, closedDays, dailyGroups, activeSessions } = useProductivity();
+    const { dailyRecords, dailyGroups, activeSessions, closedDays } = useProductivity();
     const { employees } = useTeam();
     const { user } = useAuth();
 
     const [currentTime, setCurrentTime] = useState(new Date());
-    // Mock Weather Data (Sevilla)
-    const [weather] = useState({ temp: 24, condition: 'Soleado' });
 
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
         return () => clearInterval(timer);
     }, []);
 
-    // --- DATE HELPERS ---
-    const today = new Date();
-    const currentYear = today.getFullYear();
-    const currentMonth = today.getMonth();
+    // --- DATA AGGREGATION HELPERS ---
+    const todayStr = new Date().toISOString().split('T')[0];
 
-    // Yesterday
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    // 1. Calculate Today's Metrics
+    let todayGroups = 0;
+    let todayJewelry = 0;
+    let todayStandard = 0;
+    let todayRecoverable = 0;
+    let todayClientSeconds = 0; // Time spending shopping
+    let todayShiftSeconds = 0;  // Total clocked time
+    let todayNoDeals = 0;       // Missed opportunities
 
-    // Month Start
-    const firstDayOfMonth = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
-    const currentDateStr = today.toISOString().split('T')[0];
-
-    // Month Name
-    const monthName = today.toLocaleString('es-ES', { month: 'long' });
-    const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-
-    // --- YESTERDAY STATS ---
-    const isYesterdayClosed = closedDays.includes(yesterdayStr);
-    let yesterdayTotalGroups = 0;
-    const yesterdayEmpStats = {}; // { empId: { time: 0, groups: 0, name: '' } }
-
-    // 1. Time from records match yesterday
-    dailyRecords.forEach(r => {
-        if (r.date === yesterdayStr) {
-            if (!yesterdayEmpStats[r.employeeId]) yesterdayEmpStats[r.employeeId] = { time: 0, groups: 0, name: r.employeeName };
-            yesterdayEmpStats[r.employeeId].time += r.durationSeconds;
-        }
-    });
-
-    // 2. Groups from dailyGroups match yesterday
+    // From Daily Groups (Completed Transactions)
     Object.keys(dailyGroups).forEach(key => {
         const [empIdStr, date] = key.split(/-(.+)/);
-        if (date === yesterdayStr) {
-            const empId = parseInt(empIdStr);
-            if (!yesterdayEmpStats[empId]) yesterdayEmpStats[empId] = { time: 0, groups: 0, name: 'Desconocido' };
-
+        if (date === todayStr) {
             const raw = dailyGroups[key];
-            let total = 0;
-            if (typeof raw === 'number') {
-                total = raw;
-            } else {
-                total = (raw.standard || 0) + (raw.jewelry || 0) + (raw.recoverable || 0);
-            }
-            yesterdayEmpStats[empId].groups += total;
-            yesterdayTotalGroups += total;
+            const data = typeof raw === 'number'
+                ? { standard: raw, jewelry: 0, recoverable: 0, clientSeconds: 0, noDeal: 0 }
+                : {
+                    standard: raw.standard || 0,
+                    jewelry: raw.jewelry || 0,
+                    recoverable: raw.recoverable || 0,
+                    clientSeconds: raw.clientSeconds || 0,
+                    noDeal: raw.noDeal || 0
+                };
+
+            todayGroups += (data.standard + data.jewelry + data.recoverable);
+            todayJewelry += data.jewelry;
+            todayStandard += data.standard;
+            todayRecoverable += data.recoverable;
+            todayClientSeconds += data.clientSeconds;
+            todayNoDeals += data.noDeal;
         }
     });
 
-    const sortedYesterdayEmps = Object.values(yesterdayEmpStats).sort((a, b) => b.groups - a.groups);
-
-
-    // --- MONTHLY STATS ---
-    const getMonthlyStats = () => {
-        const stats = {}; // { empId: { time, standard, jewelry, recoverable, total, days } }
-
-        // Aggregate Time
-        dailyRecords.forEach(r => {
-            if (r.date >= firstDayOfMonth && r.date <= currentDateStr) {
-                if (!stats[r.employeeId]) stats[r.employeeId] = { time: 0, standard: 0, jewelry: 0, recoverable: 0, total: 0, days: new Set(), name: r.employeeName };
-                stats[r.employeeId].time += r.durationSeconds;
-                stats[r.employeeId].days.add(r.date);
-            }
-        });
-
-        // Aggregate Groups
-        Object.keys(dailyGroups).forEach(key => {
-            const [empIdStr, date] = key.split(/-(.+)/);
-            if (date >= firstDayOfMonth && date <= currentDateStr) {
-                const empId = parseInt(empIdStr);
-                if (!stats[empId]) stats[empId] = { time: 0, standard: 0, jewelry: 0, recoverable: 0, total: 0, days: new Set(), name: '?' };
-
-                const raw = dailyGroups[key];
-                const val = typeof raw === 'number'
-                    ? { standard: raw, jewelry: 0, recoverable: 0 }
-                    : { standard: raw.standard || 0, jewelry: raw.jewelry || 0, recoverable: raw.recoverable || 0 };
-
-                stats[empId].standard += val.standard;
-                stats[empId].jewelry += val.jewelry;
-                stats[empId].recoverable += val.recoverable;
-                stats[empId].total += (val.standard + val.jewelry + val.recoverable);
-            }
-        });
-
-        return stats;
-    };
-
-    const monthlyStats = getMonthlyStats();
-    const sortedMonthlyEmps = Object.keys(monthlyStats)
-        .map(id => ({ ...monthlyStats[id], id }))
-        .sort((a, b) => b.total - a.total);
-
-
-    // --- LAST 7 DAYS & TODAY STATS ---
-    const last7Days = [];
-    for (let i = 6; i >= 0; i--) {
-        const d = new Date(today);
-        d.setDate(d.getDate() - i);
-        const dateStr = d.toISOString().split('T')[0];
-
-        let groups = 0;
-        Object.keys(dailyGroups).forEach(key => {
-            const [_, kDate] = key.split(/-(.+)/);
-            if (kDate === dateStr) {
-                const raw = dailyGroups[key];
-                groups += typeof raw === 'number' ? raw : ((raw.standard || 0) + (raw.jewelry || 0) + (raw.recoverable || 0));
-            }
-        });
-        last7Days.push({ date: dateStr.split('-').slice(1).join('/'), groups, fullDate: dateStr });
-    }
-
-    // --- TODAY STATS (Charts) ---
-    // We need: Today's Total Groups, Today's Total Hours, and per Employee
-    const todayStats = {};
-    let todayTotalGroups = 0;
-
-    // 1. Groups (Persistent)
-    Object.keys(dailyGroups).forEach(key => {
-        const [empIdStr, date] = key.split(/-(.+)/);
-        if (date === currentDateStr) {
-            const empId = parseInt(empIdStr);
-            if (!todayStats[empId]) todayStats[empId] = { groups: 0, seconds: 0, id: empId };
-
-            const raw = dailyGroups[key];
-            const total = typeof raw === 'number' ? raw : ((raw.standard || 0) + (raw.jewelry || 0) + (raw.recoverable || 0));
-            todayStats[empId].groups += total;
-            todayTotalGroups += total;
-        }
-    });
-
-    // 2. Seconds (Historical + Active)
+    // From Daily Records (Shift Time - Finished)
     dailyRecords.forEach(r => {
-        if (r.date === currentDateStr) {
-            if (!todayStats[r.employeeId]) todayStats[r.employeeId] = { groups: 0, seconds: 0, id: r.employeeId };
-            todayStats[r.employeeId].seconds += r.durationSeconds;
+        if (r.date === todayStr) {
+            todayShiftSeconds += r.durationSeconds;
         }
     });
-    // Active Sessions (Live)
+
+    // From Active Sessions (Live Data)
     if (activeSessions) {
         activeSessions.forEach(s => {
-            const empId = parseInt(s.employeeId);
-            if (!todayStats[empId]) todayStats[empId] = { groups: 0, seconds: 0, id: empId };
             const duration = (currentTime - new Date(s.startTime)) / 1000;
-            todayStats[empId].seconds += duration;
+            todayShiftSeconds += duration;
+
+            if (s.clientStartTime) {
+                const clientDuration = (currentTime - new Date(s.clientStartTime)) / 1000;
+                todayClientSeconds += clientDuration;
+            }
         });
     }
 
-    // Prepare Chart Data
-    // (Import moved to top)
+    // Derived Metrics
+    const efficiency = todayShiftSeconds > 0 ? ((todayClientSeconds / todayShiftSeconds) * 100).toFixed(1) : 0;
+    const jewelryMix = todayGroups > 0 ? ((todayJewelry / todayGroups) * 100).toFixed(1) : 0;
+    const groupsPerHour = todayClientSeconds > 0 ? (todayGroups / (todayClientSeconds / 3600)).toFixed(2) : "0.0";
 
-    const todayChartData = Object.values(todayStats).map(stat => {
-        const emp = employees.find(e => e.id === stat.id);
-        const hours = stat.seconds / 3600;
-        const gph = hours > 0.1 ? (stat.groups / hours) : 0;
-        return {
-            name: emp ? (emp.alias || emp.firstName) : `Emp ${stat.id}`,
-            groups: stat.groups,
-            hours: parseFloat(hours.toFixed(1)),
-            gph: parseFloat(gph.toFixed(1))
-        };
-    }).sort((a, b) => b.groups - a.groups);
+    // New Quality Metrics
+    const totalInteractions = todayGroups + todayNoDeals;
+    const hitRate = totalInteractions > 0 ? ((todayGroups / totalInteractions) * 100).toFixed(1) : 0;
+    const recoverableRate = todayGroups > 0 ? ((todayRecoverable / todayGroups) * 100).toFixed(1) : 0;
 
-    const totalHoursToday = todayChartData.reduce((acc, curr) => acc + curr.hours, 0);
-    const globalGPH = totalHoursToday > 0 ? (todayTotalGroups / totalHoursToday).toFixed(2) : "0.00";
+    // 2. Weekly Trend Data
+    const last7Days = [];
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0];
+        const dayLabel = d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' });
+
+        let dayGroups = 0;
+        Object.keys(dailyGroups).forEach(key => {
+            if (key.endsWith(`-${dateStr}`)) {
+                const raw = dailyGroups[key];
+                const val = typeof raw === 'number'
+                    ? raw
+                    : ((raw.standard || 0) + (raw.jewelry || 0) + (raw.recoverable || 0));
+                dayGroups += val;
+            }
+        });
+        last7Days.push({ date: dateStr, label: dayLabel, groups: dayGroups });
+    }
+
+    // 3. Category Data (Donut)
+    const categoryData = [
+        { name: 'General', value: todayStandard, color: '#94a3b8' }, // Slate 400
+        { name: 'Joyería', value: todayJewelry, color: '#f59e0b' }, // Amber 500
+        { name: 'Recuperable', value: todayRecoverable, color: '#3b82f6' }, // Blue 500
+    ].filter(d => d.value > 0);
+
+    // 4. Leaderboard (Groups Today)
+    const activeEmpIds = new Set(activeSessions?.map(s => parseInt(s.employeeId)) || []);
+
+    // We want all employees who have activity today OR are currently active
+    const leaderboard = employees
+        .filter(emp => emp.isBuyer)
+        .map(emp => {
+            // Calculate specific groups for this employee today
+            let empGroups = 0;
+            const key = `${emp.id}-${todayStr}`;
+            const raw = dailyGroups[key];
+            if (raw) {
+                empGroups = typeof raw === 'number' ? raw : ((raw.standard || 0) + (raw.jewelry || 0) + (raw.recoverable || 0));
+            }
+            return { ...emp, groups: empGroups };
+        })
+        .filter(emp => emp.groups > 0 || activeEmpIds.has(emp.id)) // Only show if they have done something or are here
+        .sort((a, b) => b.groups - a.groups)
+        .slice(0, 5); // Top 5
+
+
+    // --- COMPONENTS ---
+
+    const KPICard = ({ title, value, subValue, icon: Icon, colorClass, gradient }) => (
+        <div className={`relative overflow-hidden rounded-2xl p-5 border border-white/5 shadow-xl group hover:scale-[1.02] transition-transform bg-[#1e293b]/60 backdrop-blur-xl`}>
+            <div className={`absolute inset-0 opacity-10 ${gradient}`}></div>
+            <div className="relative z-10 flex justify-between items-start">
+                <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">{title}</p>
+                    <h3 className="text-3xl font-black text-white">{value}</h3>
+                    {subValue && <p className={`text-xs font-mono mt-1 ${colorClass}`}>{subValue}</p>}
+                </div>
+                <div className={`p-3 rounded-xl bg-white/5 ${colorClass}`}>
+                    <Icon size={24} />
+                </div>
+            </div>
+        </div>
+    );
 
     return (
-        <div className="space-y-8 pb-10">
-            {/* HERO SECTION */}
-            <div className="relative overflow-hidden rounded-[2rem] bg-[#1e293b]/60 backdrop-blur-xl p-8 text-white border border-white/5 shadow-2xl">
-                <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-pink-600/10 rounded-full blur-[80px] translate-x-1/3 -translate-y-1/3 pointer-events-none"></div>
-
-                <div className="relative z-10 flex flex-col xl:flex-row justify-between xl:items-end gap-8">
-                    <div>
-                        <h1 className="text-4xl font-extrabold tracking-tight mb-2">Panel de Control</h1>
-                        <p className="text-slate-400 font-medium">
-                            Hola <span className="text-pink-400 font-bold">{user?.name?.split(' ')[0]}</span>. Aquí tienes el pulso de hoy.
-                        </p>
-                    </div>
-
-                    <div className="flex gap-4">
-                        <div className="bg-slate-900/50 p-4 rounded-2xl border border-white/5 min-w-[140px]">
-                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Total Hoy</p>
-                            <p className="text-3xl font-black text-white">{todayTotalGroups} <span className="text-sm font-normal text-slate-500">grupos</span></p>
-                        </div>
-                        <div className="bg-slate-900/50 p-4 rounded-2xl border border-white/5 min-w-[140px]">
-                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Ritmo Global</p>
-                            <p className="text-3xl font-black text-amber-500">{globalGPH} <span className="text-sm font-normal text-slate-500">G/h</span></p>
-                        </div>
-                    </div>
+        <div className="space-y-6 pb-12 animate-in fade-in duration-500">
+            {/* HEADER */}
+            <div className="flex flex-col md:flex-row justify-between items-end gap-4">
+                <div>
+                    <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-2">
+                        <Activity className="text-pink-500" />
+                        Dashboard
+                    </h1>
+                    <p className="text-slate-400 text-sm font-medium mt-1">
+                        Resumen en tiempo real del <span className="text-slate-200 font-bold">{todayStr}</span>
+                    </p>
+                </div>
+                <div className="flex items-center gap-2 bg-[#1e293b]/50 px-4 py-2 rounded-xl border border-white/5 shadow-lg">
+                    <Clock size={16} className="text-slate-400" />
+                    <span className="font-mono text-xl font-bold text-white">
+                        {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
                 </div>
             </div>
 
-            {/* SECTION 1: LIVE ACTIVITY & CHARTS */}
+            {/* KPI GRID */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <KPICard
+                    title="Total Compras"
+                    value={todayGroups}
+                    subValue={`${groupsPerHour} G/h (Ritmo)`}
+                    icon={ShoppingBag}
+                    colorClass="text-pink-500"
+                    gradient="bg-gradient-to-br from-pink-500 to-purple-600"
+                />
+                <KPICard
+                    title="Tiempo Comprando"
+                    value={`${Math.floor(todayClientSeconds / 3600)}h ${Math.floor((todayClientSeconds % 3600) / 60)}m`}
+                    subValue="Acumulado Hoy"
+                    icon={Clock}
+                    colorClass="text-blue-400"
+                    gradient="bg-gradient-to-br from-blue-500 to-cyan-600"
+                />
+                <KPICard
+                    title="Eficacia Global"
+                    value={`${efficiency}%`}
+                    subValue="% Tiempo productivo"
+                    icon={TrendingUp}
+                    colorClass="text-emerald-400"
+                    gradient="bg-gradient-to-br from-emerald-500 to-teal-600"
+                />
+                <KPICard
+                    title="Mix Compras Joyería"
+                    value={`${jewelryMix}%`}
+                    subValue={`${todayJewelry} grupos joya`}
+                    icon={Gem}
+                    colorClass="text-amber-400"
+                    gradient="bg-gradient-to-br from-amber-500 to-orange-600"
+                />
+            </div>
+
+            {/* MAIN CONTENT SPLIT */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
-                {/* COL 1: LIVE ATTENDING + LAST 7 DAYS */}
-                <div className="xl:col-span-1 flex flex-col gap-6">
-                    {/* Live Attending */}
-                    <div className="bg-[#1e293b]/50 backdrop-blur-md rounded-3xl p-6 border border-white/5">
-                        <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                            <Clock size={20} className="text-green-500 animate-pulse" /> En Directo (Comprando)
-                        </h2>
-                        <div className="flex flex-col gap-3">
-                            {(() => {
-                                const activeBuying = activeSessions?.filter(s => s.clientStartTime) || [];
-                                if (activeBuying.length === 0) return <div className="text-center py-8 text-slate-500 text-sm border border-dashed border-slate-700 rounded-xl">Sin actividad de compra ahora.</div>
+                {/* LEFT COLUMN (2/3) - CHARTS */}
+                <div className="xl:col-span-2 flex flex-col gap-6">
 
-                                return activeBuying.map(s => {
-                                    const start = new Date(s.clientStartTime).getTime();
-                                    const mins = Math.floor((currentTime - start) / 60000);
-                                    // Find current G/H for live indicator
-                                    const empStats = todayChartData.find(d => d.name === s.employeeName) || { gph: 0 };
-
-                                    return (
-                                        <div key={s.employeeId} className="bg-slate-800 p-4 rounded-2xl flex items-center justify-between border border-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.1)]">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-lg bg-green-500/20 text-green-500 flex items-center justify-center font-bold">
-                                                    {s.employeeName.charAt(0)}
-                                                </div>
-                                                <div>
-                                                    <p className="font-bold text-white text-sm">{s.employeeName}</p>
-                                                    <p className="text-[10px] text-green-400 font-mono animate-pulse">{mins} min activo</p>
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-[10px] text-slate-500 uppercase font-bold">Ritmo</p>
-                                                <p className="text-lg font-mono font-bold text-white">{empStats.gph} G/h</p>
-                                            </div>
-                                        </div>
-                                    );
-                                });
-                            })()}
+                    {/* WEEKLY TREND CHART */}
+                    <div className="bg-[#1e293b]/40 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl relative overflow-hidden group min-h-[300px]">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                <Calendar size={18} className="text-slate-400" />
+                                Tendencia de Compras (Semanal)
+                            </h3>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] uppercase font-bold text-slate-500">Grupos Diarios</span>
+                            </div>
                         </div>
-                    </div>
 
-                    {/* Last 7 Days Chart */}
-                    <div className="bg-[#1e293b]/50 backdrop-blur-md rounded-3xl p-6 border border-white/5 flex-1 min-h-[300px]">
-                        <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                            <TrendingUp size={20} className="text-pink-500" /> Últimos 7 Días
-                        </h2>
-                        <div className="h-64 w-full">
+                        <div className="w-full h-[250px]">
                             <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart data={last7Days}>
                                     <defs>
                                         <linearGradient id="colorGroups" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#ec4899" stopOpacity={0.3} />
+                                            <stop offset="5%" stopColor="#ec4899" stopOpacity={0.4} />
                                             <stop offset="95%" stopColor="#ec4899" stopOpacity={0} />
                                         </linearGradient>
                                     </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} vertical={false} />
-                                    <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                                    <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                                    <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#fff' }} itemStyle={{ color: '#fff' }} />
-                                    <Area type="monotone" dataKey="groups" stroke="#ec4899" strokeWidth={3} fillOpacity={1} fill="url(#colorGroups)" />
+                                    <XAxis
+                                        dataKey="label"
+                                        stroke="#475569"
+                                        fontSize={12}
+                                        tickLine={false}
+                                        axisLine={false}
+                                        dy={10}
+                                    />
+                                    <YAxis
+                                        stroke="#475569"
+                                        fontSize={12}
+                                        tickLine={false}
+                                        axisLine={false}
+                                        dx={-10}
+                                    />
+                                    <RechartsTooltip
+                                        contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', color: '#fff' }}
+                                        itemStyle={{ color: '#ec4899', fontWeight: 'bold' }}
+                                        cursor={{ stroke: '#334155', strokeDasharray: '4 4' }}
+                                    />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="groups"
+                                        stroke="#ec4899"
+                                        strokeWidth={4}
+                                        fillOpacity={1}
+                                        fill="url(#colorGroups)"
+                                        activeDot={{ r: 6, strokeWidth: 0, fill: '#fff' }}
+                                        animationDuration={1500}
+                                    />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
+
+                    {/* CATEGORY ROW */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* DONUT CHART (Category Distribution) */}
+                        <div className="bg-[#1e293b]/40 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl relative min-h-[300px] flex flex-col">
+                            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Distribución Hoy</h3>
+                            <div className="flex-1 flex items-center justify-center relative">
+                                {todayGroups === 0 ? (
+                                    <div className="text-slate-600 text-xs italic">Sin datos hoy</div>
+                                ) : (
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie
+                                                data={categoryData}
+                                                cx="50%"
+                                                cy="50%"
+                                                innerRadius={60}
+                                                outerRadius={80}
+                                                paddingAngle={5}
+                                                dataKey="value"
+                                                stroke="none"
+                                            >
+                                                {categoryData.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                                ))}
+                                            </Pie>
+                                            <RechartsTooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px' }} />
+                                            <Legend
+                                                verticalAlign="bottom"
+                                                align="center"
+                                                iconType="circle"
+                                                formatter={(value) => <span className="text-slate-300 text-xs font-bold ml-1">{value}</span>}
+                                            />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                )}
+                                {/* Center Label */}
+                                {todayGroups > 0 && (
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-8">
+                                        <span className="text-2xl font-black text-white">{todayGroups}</span>
+                                        <span className="text-[10px] text-slate-500 uppercase">Total</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* MINI STATS / INSIGHTS */}
+                        <div className="flex flex-col gap-4">
+                            <div className="bg-[#1e293b]/40 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl flex-1 flex flex-col justify-center gap-4">
+                                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-2">Métricas de Calidad</h3>
+
+                                <div className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/5">
+                                    <div className="p-3 bg-red-500/20 text-red-500 rounded-xl">
+                                        <TrendingUp size={20} />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-slate-400 mb-0.5">Ratio Conversión</p>
+                                        <p className="font-bold text-white text-lg">
+                                            {hitRate}% <span className="text-xs font-normal text-slate-500">Hit Rate</span>
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/5">
+                                    <div className="p-3 bg-blue-500/20 text-blue-500 rounded-xl">
+                                        <RefreshCw size={20} />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-slate-400 mb-0.5">% Recuperable</p>
+                                        <p className="font-bold text-white text-lg">
+                                            {recoverableRate}% <span className="text-xs font-normal text-slate-500">Volverán</span>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
 
-                {/* COL 2 & 3: TODAY'S PRODUCTIVITY CHARTS */}
-                <div className="xl:col-span-2 bg-[#1e293b]/50 backdrop-blur-md rounded-3xl p-6 border border-white/5 flex flex-col">
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                            <LucideBarChart size={24} className="text-amber-500" /> Productividad Hoy (Individual)
-                        </h2>
-                        <div className="flex gap-2">
-                            <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                                <span className="w-3 h-3 bg-pink-500 rounded-sm"></span> Grupos
-                            </div>
-                            <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                                <span className="w-3 h-3 bg-amber-500 rounded-full"></span> Tiempo (h)
-                            </div>
+                {/* RIGHT COLUMN (1/3) - LIVE & RANKING */}
+                <div className="flex flex-col gap-6">
+
+                    {/* LIVE ACTIVITY */}
+                    <div className="bg-[#1e293b]/60 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl">
+                        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Compras en Curso
+                        </h3>
+
+                        <div className="space-y-3 min-h-[100px]">
+                            {activeSessions && activeSessions.filter(s => s.clientStartTime).length > 0 ? (
+                                activeSessions.filter(s => s.clientStartTime).map(s => {
+                                    const mins = Math.floor((currentTime - new Date(s.clientStartTime)) / 60000);
+                                    return (
+                                        <div key={s.employeeId} className="flex items-center gap-4 p-3 bg-slate-800 rounded-2xl border border-white/5 shadow-lg animate-in slide-in-from-right duration-300">
+                                            <div className="w-10 h-10 rounded-xl bg-slate-700 flex items-center justify-center font-bold text-white border border-white/10">
+                                                {s.employeeName.charAt(0)}
+                                            </div>
+                                            <div className="flex-1">
+                                                <p className="font-bold text-white text-sm">{s.employeeName}</p>
+                                                <p className="text-xs text-green-400 font-mono">Comprando · {mins}m</p>
+                                            </div>
+                                            <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_10px_currentColor]"></div>
+                                        </div>
+                                    )
+                                })
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-8 text-center opacity-40">
+                                    <ShoppingBag size={32} className="mb-2" />
+                                    <p className="text-xs">Sin compras activas...</p>
+                                </div>
+                            )}
                         </div>
                     </div>
 
-                    <div className="flex-1 w-full min-h-[350px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <ComposedChart data={todayChartData} layout="vertical" margin={{ top: 0, right: 30, left: 20, bottom: 0 }}>
-                                <CartesianGrid stroke="#334155" opacity={0.3} horizontal={false} />
-                                <XAxis type="number" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                                <YAxis dataKey="name" type="category" stroke="#e2e8f0" fontSize={11} width={100} tickLine={false} axisLine={false} fontWeight={600} />
-                                <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#fff' }} />
-                                <Bar dataKey="groups" name="Grupos" barSize={20} fill="#ec4899" radius={[0, 4, 4, 0]} />
-                                <Line dataKey="hours" name="Horas" type="monotone" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b' }} />
-                            </ComposedChart>
-                        </ResponsiveContainer>
+                    {/* DAILY LEADERBOARD */}
+                    <div className="bg-[#1e293b]/60 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl flex-1 flex flex-col">
+                        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                            <TrendingUp size={16} /> Top Compradores
+                        </h3>
+                        <div className="space-y-2 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                            {leaderboard.map((emp, index) => (
+                                <div key={emp.id} className="flex items-center justify-between p-3 bg-slate-800/50 hover:bg-slate-800 rounded-xl transition-colors group cursor-default border border-white/5">
+                                    <div className="flex items-center gap-3">
+                                        <span className={`text-xs font-mono font-bold w-5 h-5 flex items-center justify-center rounded ${index === 0 ? 'bg-amber-500/20 text-amber-500' : 'text-slate-500'}`}>
+                                            {index + 1}
+                                        </span>
+                                        <p className="text-sm font-bold text-slate-200 group-hover:text-white transition-colors">{emp.alias || emp.firstName}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="h-1.5 w-16 bg-slate-900 rounded-full overflow-hidden">
+                                            <div
+                                                className={`h-full rounded-full ${index === 0 ? 'bg-amber-500' : 'bg-pink-600'}`}
+                                                style={{ width: `${(emp.groups / Math.max(leaderboard[0]?.groups || 1, 1)) * 100}%` }}
+                                            ></div>
+                                        </div>
+                                        <span className="text-xs font-mono font-bold text-white w-6 text-right">{emp.groups}</span>
+                                    </div>
+                                </div>
+                            ))}
+                            {leaderboard.length === 0 && (
+                                <p className="text-xs text-slate-500 italic text-center py-12">Sin datos de compra hoy</p>
+                            )}
+                        </div>
                     </div>
 
-                    {/* TOTAL SUMMARY FOOTER */}
-                    <div className="mt-6 pt-6 border-t border-white/5 grid grid-cols-3 gap-4">
-                        <div className="text-center">
-                            <p className="text-[10px] uppercase font-bold text-slate-500">Total Horas (Equipo)</p>
-                            <p className="text-2xl font-mono font-bold text-white">{totalHoursToday.toFixed(1)}h</p>
-                        </div>
-                        <div className="text-center border-l border-white/5">
-                            <p className="text-[10px] uppercase font-bold text-slate-500">Eficiencia Pura</p>
-                            <p className="text-2xl font-mono font-bold text-amber-500">{globalGPH}</p>
-                            <p className="text-[10px] text-slate-600">Grupos / Hora-Hombre</p>
-                        </div>
-                        <div className="text-center border-l border-white/5">
-                            <p className="text-[10px] uppercase font-bold text-slate-500">Proyección (Cierre)</p>
-                            <p className="text-2xl font-mono font-bold text-blue-400">{(todayTotalGroups * 1.2).toFixed(0)}?</p>
-                        </div>
-                    </div>
                 </div>
 
             </div>

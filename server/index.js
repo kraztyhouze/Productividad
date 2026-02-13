@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
-import './telegramBot.js'; // Start Telegram Bot
+
 import cors from 'cors';
 import pg from 'pg';
 import path from 'path';

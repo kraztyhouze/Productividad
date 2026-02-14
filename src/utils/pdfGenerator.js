@@ -195,3 +195,128 @@ export const generateDiagnosticCertificate = (session, type = 'mobile') => {
 
     doc.save(`Diagnostico_${type.toUpperCase()}_${session.sessionId ? session.sessionId.slice(0, 8) : 'Manual'}.pdf`);
 };
+
+export const generateWatchCertificate = (data) => {
+    const doc = new jsPDF();
+
+    // COLORS
+    const AMBER = [245, 158, 11]; // Amber-500
+    const DARK = [15, 23, 42];    // Slate-900
+    const GRAY = [100, 116, 139]; // Slate-500
+
+    // HEADER
+    doc.setFillColor(...DARK);
+    doc.rect(0, 0, 210, 40, 'F');
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(22);
+    doc.setTextColor(255, 255, 255);
+    doc.text("INSPECCIÓN RELOJERÍA", 14, 25);
+
+    doc.setFontSize(10);
+    doc.setTextColor(...AMBER);
+    doc.text("CERTIFICADO DE AUTENTICIDAD Y ESTADO", 14, 32);
+
+    // DATE
+    doc.setFontSize(9);
+    doc.setTextColor(200, 200, 200);
+    const dateStr = new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString();
+    doc.text(dateStr, 196, 20, { align: "right" });
+
+    // --- WATCH DETAILS BOX ---
+    doc.setFillColor(255, 251, 235); // Amber-50
+    doc.setDrawColor(251, 191, 36);  // Amber-400
+    doc.roundedRect(14, 50, 182, 35, 3, 3, 'FD');
+
+    doc.setTextColor(...DARK);
+    doc.setFontSize(14);
+    doc.text(data.brand.toUpperCase(), 20, 62);
+
+    doc.setFontSize(10);
+    doc.setTextColor(...GRAY);
+    doc.text("MARCA", 20, 75);
+
+    doc.setTextColor(...DARK);
+    doc.setFontSize(14);
+    doc.text(data.model.toUpperCase(), 90, 62);
+
+    doc.setFontSize(10);
+    doc.setTextColor(...GRAY);
+    doc.text("MODELO", 90, 75);
+
+    // --- TIMEGRAPHER RESULTS (The User's Request) ---
+    const tgY = 95;
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...DARK);
+    doc.text("RESULTADOS CRONOCOMPARADOR", 14, tgY);
+
+    // Rate
+    doc.setFillColor(241, 245, 249); // Slate-100
+    doc.roundedRect(14, tgY + 5, 55, 25, 2, 2, 'F');
+    doc.setFontSize(16);
+    doc.setTextColor(...(data.rate.includes('-') || parseInt(data.rate) > 10 ? [220, 38, 38] : [22, 163, 74])); // Red if high deviation
+    doc.text(`${data.rate} s/d`, 41, tgY + 18, { align: "center" });
+    doc.setFontSize(8);
+    doc.setTextColor(...GRAY);
+    doc.text("RATE (MARCHA)", 41, tgY + 26, { align: "center" });
+
+    // Amplitude
+    doc.setFillColor(241, 245, 249);
+    doc.roundedRect(77, tgY + 5, 55, 25, 2, 2, 'F');
+    doc.setFontSize(16);
+    // Healthy amplitude usually > 250
+    doc.setTextColor(...(parseInt(data.amplitude) < 220 ? [220, 38, 38] : [22, 163, 74]));
+    doc.text(`${data.amplitude}°`, 104, tgY + 18, { align: "center" });
+    doc.setFontSize(8);
+    doc.setTextColor(...GRAY);
+    doc.text("AMPLITUD", 104, tgY + 26, { align: "center" });
+
+    // Beat Error
+    doc.setFillColor(241, 245, 249);
+    doc.roundedRect(140, tgY + 5, 56, 25, 2, 2, 'F');
+    doc.setFontSize(16);
+    // Healthy Beat Error < 0.8ms
+    doc.setTextColor(...(parseFloat(data.beatError) > 0.8 ? [220, 38, 38] : [22, 163, 74]));
+    doc.text(`${data.beatError} ms`, 168, tgY + 18, { align: "center" });
+    doc.setFontSize(8);
+    doc.setTextColor(...GRAY);
+    doc.text("BEAT ERROR", 168, tgY + 26, { align: "center" });
+
+    // --- CHECKLIST TABLE ---
+    // Transform keys like "Inspección Visual:Cristal" -> ["Cristal", "OK/FALLO"]
+    const rows = Object.entries(data.checklist).map(([key, val]) => {
+        const label = key.split(':')[1] || key;
+        const status = val === true ? "APROBADO" : "FALLO";
+        return [label, status];
+    });
+
+    autoTable(doc, {
+        startY: tgY + 40,
+        head: [['PUNTO DE INSPECCIÓN', 'ESTADO']],
+        body: rows,
+        theme: 'striped',
+        headStyles: { fillColor: [...AMBER], textColor: 255 },
+        columnStyles: {
+            0: { width: 120 },
+            1: { fontStyle: 'bold' }
+        },
+        didParseCell: function (cellData) {
+            if (cellData.section === 'body' && cellData.column.index === 1) {
+                if (cellData.cell.raw === 'FALLO') cellData.cell.styles.textColor = [220, 38, 38];
+                else cellData.cell.styles.textColor = [22, 163, 74];
+            }
+        }
+    });
+
+    // FOOTER
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text(`Generado por TikTak Suite 2.1 - ${new Date().getFullYear()}`, 105, 285, { align: "center" });
+    }
+
+    doc.save(`Reloj_${data.brand}_${data.model}.pdf`);
+};

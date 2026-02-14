@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useProductivity } from '../context/ProductivityContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ExternalLink, Smartphone, Monitor, Watch, Hammer, Gamepad2, CheckCircle, XCircle, Grid, QrCode, Download, Info } from 'lucide-react';
-import { generateDiagnosticCertificate } from '../utils/pdfGenerator';
+import { Search, ExternalLink, Smartphone, Monitor, Watch, Hammer, Gamepad2, CheckCircle, XCircle, Grid, QrCode, Download, Info, BookOpen, ChevronRight, CornerDownRight, FileText } from 'lucide-react';
+import { generateDiagnosticCertificate, generateWatchCertificate } from '../utils/pdfGenerator';
+import { ACCOUNT_REMOVAL_GUIDES } from '../data/guides';
 
 const CATEGORIES = {
     phones: { name: 'Móviles/Tablets', margin: 0.40, icon: <Smartphone size={18} />, color: 'pink', checklist: ['IMEI/Red', 'Cosmético', 'Seguridad', 'Pantalla/Touch', 'Vibración/Sensores', 'Micrófono/Audio', 'Cámaras/Flash', 'GPS', 'Carga'] },
@@ -59,7 +60,7 @@ const Market = () => {
     // Context access for Gold Price
     const { goldPrice: contextGoldPrice } = useProductivity(); // Expecting string or number from context
 
-    const [mode, setMode] = useState('product'); // 'product' | 'gold'
+    const [mode, setMode] = useState('product'); // 'product' | 'gold' | 'guides'
     const [searchTerm, setSearchTerm] = useState('');
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -95,11 +96,28 @@ const Market = () => {
     const [diagnosticSession, setDiagnosticSession] = useState(null); // { sessionId, url, status, results }
     const [showTimegrapherHelp, setShowTimegrapherHelp] = useState(false);
 
+    // Watch Inspection Form
+    const [watchForm, setWatchForm] = useState({
+        brand: '',
+        model: '',
+        rate: '',
+        amplitude: '',
+        beatError: ''
+    });
+
+    const [activeGuide, setActiveGuide] = useState(null);
+
     // Reset checklist when category changes
     useEffect(() => {
         const defaultChecklist = {};
         CATEGORIES[category].checklist.forEach(item => defaultChecklist[item] = null); // null = unchecks, true = yes, false = no
         setChecklist(defaultChecklist);
+
+        // Reset Watch Form if not watches
+        if (category !== 'watches') {
+            setWatchForm({ brand: '', model: '', rate: '', amplitude: '', beatError: '' });
+        }
+
         setImeiCheckResult(null);
         setImeiInput('');
         setDiagnosticSession(null);
@@ -445,6 +463,9 @@ const Market = () => {
                     <button onClick={() => setMode('gold')} className={`px-6 py-2 rounded-lg font-bold text-sm transition-all flex items-center gap-2 ${mode === 'gold' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white'}`}>
                         <Watch size={16} /> Cotizador Oro
                     </button>
+                    <button onClick={() => setMode('guides')} className={`px-6 py-2 rounded-lg font-bold text-sm transition-all flex items-center gap-2 ${mode === 'guides' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:text-white'}`}>
+                        <BookOpen size={16} /> Manuales
+                    </button>
                 </div>
             </div>
 
@@ -518,6 +539,32 @@ const Market = () => {
                             {/* 2. Checklists & Diagnostics */}
                             <div className="bg-slate-900/50 p-4 rounded-xl border border-white/5">
                                 <label className="text-xs font-bold text-slate-400 uppercase flex items-center gap-2 mb-3"><CheckCircle size={14} /> Protocolo de Prueba</label>
+
+                                {/* WATCH IDENTITY INPUTS */}
+                                {category === 'watches' && (
+                                    <div className="grid grid-cols-2 gap-3 mb-4 bg-slate-950/50 p-3 rounded-xl border border-white/5">
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">Marca</label>
+                                            <input
+                                                type="text"
+                                                placeholder="Ej. Rolex"
+                                                value={watchForm.brand}
+                                                onChange={e => setWatchForm({ ...watchForm, brand: e.target.value })}
+                                                className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-white text-xs font-bold focus:border-amber-500 outline-none transition-colors"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">Modelo</label>
+                                            <input
+                                                type="text"
+                                                placeholder="Ej. Submariner Date"
+                                                value={watchForm.model}
+                                                onChange={e => setWatchForm({ ...watchForm, model: e.target.value })}
+                                                className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-white text-xs font-bold focus:border-amber-500 outline-none transition-colors"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* Diagnostics Module */}
                                 {(category === 'phones' || category === 'laptops') && (
@@ -604,36 +651,75 @@ const Market = () => {
                                                             // Actually, let's allow dynamic keys for watches.
                                                             const status = checklist[key];
                                                             const isCritical = pt.isCritical;
+                                                            const isTimegrapher = pt.label.includes('Cronocomparador');
 
                                                             return (
-                                                                <div key={pIdx} className={`flex justify-between items-start group p-2 hover:bg-white/5 rounded-lg transition-colors ${isCritical ? 'bg-red-500/5 border border-red-500/10' : ''}`}>
-                                                                    <div className="flex-1 pr-4">
-                                                                        <p className="text-xs font-bold text-slate-300">{pt.label}</p>
-                                                                        <p className="text-[10px] text-slate-500 leading-tight mt-0.5">{pt.desc}</p>
-                                                                    </div>
-                                                                    <div className="flex gap-1 shrink-0">
-                                                                        {pt.hasInfo && (
+                                                                <div key={pIdx} className="flex flex-col gap-2">
+                                                                    <div className={`flex justify-between items-start group p-2 hover:bg-white/5 rounded-lg transition-colors ${isCritical ? 'bg-red-500/5 border border-red-500/10' : ''}`}>
+                                                                        <div className="flex-1 pr-4">
+                                                                            <p className="text-xs font-bold text-slate-300">{pt.label}</p>
+                                                                            <p className="text-[10px] text-slate-500 leading-tight mt-0.5">{pt.desc}</p>
+                                                                        </div>
+                                                                        <div className="flex gap-1 shrink-0">
+                                                                            {pt.hasInfo && (
+                                                                                <button
+                                                                                    onClick={() => setShowTimegrapherHelp(true)}
+                                                                                    className="p-1.5 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 transition-colors mr-1"
+                                                                                    title="+ Info"
+                                                                                >
+                                                                                    <Info size={14} />
+                                                                                </button>
+                                                                            )}
                                                                             <button
-                                                                                onClick={() => setShowTimegrapherHelp(true)}
-                                                                                className="p-1.5 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 transition-colors mr-1"
-                                                                                title="+ Info"
+                                                                                onClick={() => handleChecklistChange(key, true)}
+                                                                                className={`p-1.5 rounded transition-all ${status === true ? 'bg-green-500 text-black' : 'bg-slate-800 text-slate-600 hover:text-slate-400'}`}
                                                                             >
-                                                                                <Info size={14} />
+                                                                                <CheckCircle size={14} />
                                                                             </button>
-                                                                        )}
-                                                                        <button
-                                                                            onClick={() => handleChecklistChange(key, true)}
-                                                                            className={`p-1.5 rounded transition-all ${status === true ? 'bg-green-500 text-black' : 'bg-slate-800 text-slate-600 hover:text-slate-400'}`}
-                                                                        >
-                                                                            <CheckCircle size={14} />
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={() => handleChecklistChange(key, false)}
-                                                                            className={`p-1.5 rounded transition-all ${status === false ? 'bg-red-500 text-white' : 'bg-slate-800 text-slate-600 hover:text-slate-400'}`}
-                                                                        >
-                                                                            <XCircle size={14} />
-                                                                        </button>
+                                                                            <button
+                                                                                onClick={() => handleChecklistChange(key, false)}
+                                                                                className={`p-1.5 rounded transition-all ${status === false ? 'bg-red-500 text-white' : 'bg-slate-800 text-slate-600 hover:text-slate-400'}`}
+                                                                            >
+                                                                                <XCircle size={14} />
+                                                                            </button>
+                                                                        </div>
                                                                     </div>
+
+                                                                    {/* TIMEGRAPHER INPUTS */}
+                                                                    {isTimegrapher && status === true && (
+                                                                        <div className="bg-slate-950 p-3 rounded-lg border border-white/10 mb-2 animate-in slide-in-from-top-2">
+                                                                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Datos Obligatorios del Test:</p>
+                                                                            <div className="grid grid-cols-3 gap-2">
+                                                                                <div>
+                                                                                    <label className="text-[9px] text-slate-500 uppercase block mb-0.5">Rate (s/d)</label>
+                                                                                    <input
+                                                                                        type="text" placeholder="+5"
+                                                                                        value={watchForm.rate}
+                                                                                        onChange={e => setWatchForm({ ...watchForm, rate: e.target.value })}
+                                                                                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white text-center focus:border-amber-500 outline-none"
+                                                                                    />
+                                                                                </div>
+                                                                                <div>
+                                                                                    <label className="text-[9px] text-slate-500 uppercase block mb-0.5">Amplitud (°)</label>
+                                                                                    <input
+                                                                                        type="text" placeholder="280"
+                                                                                        value={watchForm.amplitude}
+                                                                                        onChange={e => setWatchForm({ ...watchForm, amplitude: e.target.value })}
+                                                                                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white text-center focus:border-amber-500 outline-none"
+                                                                                    />
+                                                                                </div>
+                                                                                <div>
+                                                                                    <label className="text-[9px] text-slate-500 uppercase block mb-0.5">Beat Err (ms)</label>
+                                                                                    <input
+                                                                                        type="text" placeholder="0.2"
+                                                                                        value={watchForm.beatError}
+                                                                                        onChange={e => setWatchForm({ ...watchForm, beatError: e.target.value })}
+                                                                                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white text-center focus:border-amber-500 outline-none"
+                                                                                    />
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             );
                                                         })}
@@ -659,380 +745,478 @@ const Market = () => {
                                         )))}
                                 </div>
                             </div>
-
-                            {/* 3. Inputs & Logic */}
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4 relative z-10">
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Precio Nuevo</label>
-                                    <div className="relative group">
-                                        <span className="absolute left-3 top-2.5 text-slate-500 text-sm">€</span>
-                                        <input type="number" name="newPrice" value={survey.newPrice} onChange={handleSurveyChange} className="w-full bg-slate-900/80 border border-white/10 rounded-xl py-2 pl-8 pr-3 text-white text-sm font-medium focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-all outline-none" placeholder="0.00" />
-                                    </div>
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Precio 2ª Mano</label>
-                                    <div className="relative group">
-                                        <span className="absolute left-3 top-2.5 text-slate-500 text-sm">€</span>
-                                        <input type="number" name="secondHandPrice" value={survey.secondHandPrice} onChange={handleSurveyChange} className="w-full bg-slate-900/80 border border-amber-500/30 rounded-xl py-2 pl-8 pr-3 text-white text-sm font-medium focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none" placeholder="Wallapop" />
-                                    </div>
-                                </div>
-                                <div className="space-y-1 md:col-span-1 col-span-2">
-                                    <label className="text-[10px] font-bold text-pink-400 uppercase tracking-wider pl-1">Pide Cliente</label>
-                                    <div className="relative group">
-                                        <span className="absolute left-3 top-2.5 text-pink-500/70 text-sm">€</span>
-                                        <input type="number" name="askedPrice" value={survey.askedPrice} onChange={handleSurveyChange} className="w-full bg-slate-900/80 border border-pink-500/50 rounded-xl py-2 pl-8 pr-3 text-white text-lg font-bold focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 transition-all outline-none bg-pink-500/5" placeholder="0.00" />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* 4. Controls */}
-                            <div className="flex flex-wrap gap-2 text-[10px] mb-6 relative z-10">
-                                {/* Use custom styled radio/checks */}
-                                {['venta', 'recuperable'].map((type) => (
-                                    <label key={type} className={`cursor-pointer px-3 py-1.5 rounded-lg border transition-all flex items-center gap-2 ${survey.saleType === type ? 'bg-indigo-500/20 border-indigo-500 text-indigo-300' : 'bg-slate-900/50 border-white/5 text-slate-400 hover:bg-slate-800'}`}>
-                                        <input type="radio" name="saleType" value={type} checked={survey.saleType === type} onChange={handleSurveyChange} className="hidden" />
-                                        <div className={`w-2 h-2 rounded-full ${survey.saleType === type ? 'bg-indigo-400' : 'bg-slate-600'}`} />
-                                        <span className="capitalize">{type}</span>
-                                    </label>
-                                ))}
-                                <div className="w-px h-8 bg-white/10 mx-1"></div>
-                                {[
-                                    { k: 'hasStock', label: 'Stock Alto' },
-                                    { k: 'hasInvoice', label: 'Sin Fra.', inv: true }, // Logic inverted in original rendering
-                                    { k: 'isHighTurnover', label: 'Alta Rotación' },
-                                ].map((opt) => {
-                                    const isChecked = opt.inv ? survey[opt.k] === 'no' : survey[opt.k] === 'si';
-                                    const toggle = () => {
-                                        const newVal = isChecked ? (opt.inv ? 'si' : 'no') : (opt.inv ? 'no' : 'si');
-                                        setSurvey({ ...survey, [opt.k]: newVal });
-                                    };
-                                    return (
-                                        <label key={opt.k} className={`cursor-pointer px-3 py-1.5 rounded-lg border transition-all select-none ${isChecked ? 'bg-pink-500/20 border-pink-500 text-pink-300' : 'bg-slate-900/50 border-white/5 text-slate-400 hover:bg-slate-800'}`}>
-                                            <input type="checkbox" checked={isChecked} onChange={toggle} className="hidden" />
-                                            <span>{opt.label}</span>
-                                        </label>
-                                    );
-                                })}
-                            </div>
-
-                            <motion.button
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
-                                onClick={calculateAppraisal}
-                                className="relative z-10 w-full py-4 bg-gradient-to-r from-amber-600 to-pink-600 rounded-2xl font-bold text-white shadow-xl shadow-amber-900/20 hover:shadow-pink-900/30 transition-all flex justify-center items-center gap-2 uppercase tracking-wide text-sm"
-                            >
-                                <Monitor size={16} /> Calcular Oferta
-                            </motion.button>
-
-                            {/* RESULT - Animated Presence */}
-                            <AnimatePresence>
-                                {appraisalResult && (
-                                    <motion.div
-                                        initial={{ opacity: 0, height: 0, scale: 0.9 }}
-                                        animate={{ opacity: 1, height: 'auto', scale: 1 }}
-                                        exit={{ opacity: 0, height: 0, scale: 0.9 }}
-                                        className="mt-6 relative z-10"
+                            <div className="mt-4 flex justify-end">
+                                {category === 'watches' && (
+                                    <button
+                                        onClick={() => {
+                                            if (!watchForm.brand || !watchForm.model || !watchForm.rate) {
+                                                alert("Por favor completa Marca, Modelo y datos del Cronocomparador.");
+                                                return;
+                                            }
+                                            generateWatchCertificate({ ...watchForm, checklist });
+                                        }}
+                                        className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-4 py-2 rounded-lg text-xs font-bold border border-white/5 flex items-center gap-2 transition-all"
                                     >
-                                        <div className={`relative overflow-hidden rounded-2xl border p-6 ${appraisalResult.status === 'COMPRAR' ? 'bg-emerald-950/40 border-emerald-500/30' :
-                                            appraisalResult.status === 'RECHAZAR' || appraisalResult.status === 'PELIGRO' ? 'bg-red-950/40 border-red-500/30' :
-                                                'bg-amber-950/40 border-amber-500/30'
-                                            }`}>
-
-                                            {/* Status Badge */}
-                                            <div className="flex justify-between items-start mb-6">
-                                                <div>
-                                                    <span className="text-[10px] uppercase tracking-widest font-bold opacity-60 text-white">Decisión del Sistema</span>
-                                                    <h3 className={`text-3xl font-black tracking-tight ${appraisalResult.statusColor} drop-shadow-sm`}>
-                                                        {appraisalResult.status}
-                                                    </h3>
-                                                </div>
-                                                <div className="text-right">
-                                                    <span className="block text-[10px] text-slate-400 uppercase tracking-widest">Oferta Máxima</span>
-                                                    <span className="text-4xl font-mono text-white font-bold tracking-tighter">
-                                                        {appraisalResult.maxBuyPrice.toFixed(0)}<span className="text-lg align-top opacity-50">€</span>
-                                                    </span>
-                                                </div>
-                                            </div>
-
-                                            {/* Recommendation Details */}
-                                            <div className="bg-black/20 rounded-xl p-4 border border-white/5 backdrop-blur-sm">
-                                                <div className="flex items-start gap-3">
-                                                    <div className={`mt-1 p-1 rounded-full ${appraisalResult.status === 'COMPRAR' ? 'bg-emerald-500 text-black' : 'bg-slate-700 text-slate-300'
-                                                        }`}>
-                                                        {appraisalResult.status === 'COMPRAR' ? <CheckCircle size={14} /> : <Monitor size={14} />}
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm font-medium text-white leading-relaxed">
-                                                            {appraisalResult.recommendation}
-                                                        </p>
-                                                        <div className="text-[10px] text-slate-400 mt-2 flex gap-4 font-mono">
-                                                            <span className="px-2 py-0.5 rounded bg-white/5">Ref: {appraisalResult.marketValue.toFixed(0)}€</span>
-                                                            <span className="px-2 py-0.5 rounded bg-white/5">Mg: {appraisalResult.currentMargin}% (Obj: {appraisalResult.targetMarginPercent}%)</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Decorative Status Bar */}
-                                            <div className={`absolute bottom-0 left-0 right-0 h-1 ${appraisalResult.status === 'COMPRAR' ? 'bg-emerald-500' :
-                                                appraisalResult.status === 'RECHAZAR' ? 'bg-red-500' :
-                                                    'bg-amber-500'
-                                                }`}></div>
-                                        </div>
-                                    </motion.div>
+                                        <FileText size={14} /> Generar Informe PDF
+                                    </button>
                                 )}
-                            </AnimatePresence>
+                            </div>
                         </div>
+
+                        {/* 3. Inputs & Logic */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4 relative z-10">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Precio Nuevo</label>
+                                <div className="relative group">
+                                    <span className="absolute left-3 top-2.5 text-slate-500 text-sm">€</span>
+                                    <input type="number" name="newPrice" value={survey.newPrice} onChange={handleSurveyChange} className="w-full bg-slate-900/80 border border-white/10 rounded-xl py-2 pl-8 pr-3 text-white text-sm font-medium focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-all outline-none" placeholder="0.00" />
+                                </div>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Precio 2ª Mano</label>
+                                <div className="relative group">
+                                    <span className="absolute left-3 top-2.5 text-slate-500 text-sm">€</span>
+                                    <input type="number" name="secondHandPrice" value={survey.secondHandPrice} onChange={handleSurveyChange} className="w-full bg-slate-900/80 border border-amber-500/30 rounded-xl py-2 pl-8 pr-3 text-white text-sm font-medium focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none" placeholder="Wallapop" />
+                                </div>
+                            </div>
+                            <div className="space-y-1 md:col-span-1 col-span-2">
+                                <label className="text-[10px] font-bold text-pink-400 uppercase tracking-wider pl-1">Pide Cliente</label>
+                                <div className="relative group">
+                                    <span className="absolute left-3 top-2.5 text-pink-500/70 text-sm">€</span>
+                                    <input type="number" name="askedPrice" value={survey.askedPrice} onChange={handleSurveyChange} className="w-full bg-slate-900/80 border border-pink-500/50 rounded-xl py-2 pl-8 pr-3 text-white text-lg font-bold focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 transition-all outline-none bg-pink-500/5" placeholder="0.00" />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 4. Controls */}
+                        <div className="flex flex-wrap gap-2 text-[10px] mb-6 relative z-10">
+                            {/* Use custom styled radio/checks */}
+                            {['venta', 'recuperable'].map((type) => (
+                                <label key={type} className={`cursor-pointer px-3 py-1.5 rounded-lg border transition-all flex items-center gap-2 ${survey.saleType === type ? 'bg-indigo-500/20 border-indigo-500 text-indigo-300' : 'bg-slate-900/50 border-white/5 text-slate-400 hover:bg-slate-800'}`}>
+                                    <input type="radio" name="saleType" value={type} checked={survey.saleType === type} onChange={handleSurveyChange} className="hidden" />
+                                    <div className={`w-2 h-2 rounded-full ${survey.saleType === type ? 'bg-indigo-400' : 'bg-slate-600'}`} />
+                                    <span className="capitalize">{type}</span>
+                                </label>
+                            ))}
+                            <div className="w-px h-8 bg-white/10 mx-1"></div>
+                            {[
+                                { k: 'hasStock', label: 'Stock Alto' },
+                                { k: 'hasInvoice', label: 'Sin Fra.', inv: true }, // Logic inverted in original rendering
+                                { k: 'isHighTurnover', label: 'Alta Rotación' },
+                            ].map((opt) => {
+                                const isChecked = opt.inv ? survey[opt.k] === 'no' : survey[opt.k] === 'si';
+                                const toggle = () => {
+                                    const newVal = isChecked ? (opt.inv ? 'si' : 'no') : (opt.inv ? 'no' : 'si');
+                                    setSurvey({ ...survey, [opt.k]: newVal });
+                                };
+                                return (
+                                    <label key={opt.k} className={`cursor-pointer px-3 py-1.5 rounded-lg border transition-all select-none ${isChecked ? 'bg-pink-500/20 border-pink-500 text-pink-300' : 'bg-slate-900/50 border-white/5 text-slate-400 hover:bg-slate-800'}`}>
+                                        <input type="checkbox" checked={isChecked} onChange={toggle} className="hidden" />
+                                        <span>{opt.label}</span>
+                                    </label>
+                                );
+                            })}
+                        </div>
+
+                        <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={calculateAppraisal}
+                            className="relative z-10 w-full py-4 bg-gradient-to-r from-amber-600 to-pink-600 rounded-2xl font-bold text-white shadow-xl shadow-amber-900/20 hover:shadow-pink-900/30 transition-all flex justify-center items-center gap-2 uppercase tracking-wide text-sm"
+                        >
+                            <Monitor size={16} /> Calcular Oferta
+                        </motion.button>
+
+                        {/* RESULT - Animated Presence */}
+                        <AnimatePresence>
+                            {appraisalResult && (
+                                <motion.div
+                                    initial={{ opacity: 0, height: 0, scale: 0.9 }}
+                                    animate={{ opacity: 1, height: 'auto', scale: 1 }}
+                                    exit={{ opacity: 0, height: 0, scale: 0.9 }}
+                                    className="mt-6 relative z-10"
+                                >
+                                    <div className={`relative overflow-hidden rounded-2xl border p-6 ${appraisalResult.status === 'COMPRAR' ? 'bg-emerald-950/40 border-emerald-500/30' :
+                                        appraisalResult.status === 'RECHAZAR' || appraisalResult.status === 'PELIGRO' ? 'bg-red-950/40 border-red-500/30' :
+                                            'bg-amber-950/40 border-amber-500/30'
+                                        }`}>
+
+                                        {/* Status Badge */}
+                                        <div className="flex justify-between items-start mb-6">
+                                            <div>
+                                                <span className="text-[10px] uppercase tracking-widest font-bold opacity-60 text-white">Decisión del Sistema</span>
+                                                <h3 className={`text-3xl font-black tracking-tight ${appraisalResult.statusColor} drop-shadow-sm`}>
+                                                    {appraisalResult.status}
+                                                </h3>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="block text-[10px] text-slate-400 uppercase tracking-widest">Oferta Máxima</span>
+                                                <span className="text-4xl font-mono text-white font-bold tracking-tighter">
+                                                    {appraisalResult.maxBuyPrice.toFixed(0)}<span className="text-lg align-top opacity-50">€</span>
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Recommendation Details */}
+                                        <div className="bg-black/20 rounded-xl p-4 border border-white/5 backdrop-blur-sm">
+                                            <div className="flex items-start gap-3">
+                                                <div className={`mt-1 p-1 rounded-full ${appraisalResult.status === 'COMPRAR' ? 'bg-emerald-500 text-black' : 'bg-slate-700 text-slate-300'
+                                                    }`}>
+                                                    {appraisalResult.status === 'COMPRAR' ? <CheckCircle size={14} /> : <Monitor size={14} />}
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-medium text-white leading-relaxed">
+                                                        {appraisalResult.recommendation}
+                                                    </p>
+                                                    <div className="text-[10px] text-slate-400 mt-2 flex gap-4 font-mono">
+                                                        <span className="px-2 py-0.5 rounded bg-white/5">Ref: {appraisalResult.marketValue.toFixed(0)}€</span>
+                                                        <span className="px-2 py-0.5 rounded bg-white/5">Mg: {appraisalResult.currentMargin}% (Obj: {appraisalResult.targetMarginPercent}%)</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Decorative Status Bar */}
+                                        <div className={`absolute bottom-0 left-0 right-0 h-1 ${appraisalResult.status === 'COMPRAR' ? 'bg-emerald-500' :
+                                            appraisalResult.status === 'RECHAZAR' ? 'bg-red-500' :
+                                                'bg-amber-500'
+                                            }`}></div>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
                 </div>
-            )}
+        </div>
+    )
+}
 
-            {/* CONTENT: GOLD MODE */}
-            {mode === 'gold' && (
-                <div className="max-w-4xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-6">
+{/* CONTENT: GUIDES MODE */ }
+{
+    mode === 'guides' && (
+        <div className="max-w-5xl mx-auto w-full flex flex-col gap-6">
+            <div className="bg-[#1e293b] rounded-2xl p-8 border border-white/5 shadow-2xl relative overflow-hidden min-h-[600px]">
+                <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none"></div>
 
-                    {/* LEFT: CALCULATOR */}
-                    <div className="bg-[#0f172a] rounded-2xl p-6 border border-amber-500/20 shadow-2xl shadow-amber-900/20 flex flex-col">
-                        <h2 className="text-xl font-bold text-amber-500 mb-6 flex items-center gap-2"><Watch /> Cotizador de Oro</h2>
+                <h2 className="text-2xl font-bold text-white mb-8 flex items-center gap-3 relative z-10">
+                    <BookOpen className="text-indigo-500" /> Manuales de Desbloqueo y Restauración
+                </h2>
 
-                        {/* CURRENT REFERENCE PRICE */}
-                        <div className="mb-6 bg-slate-900/50 p-4 rounded-xl border border-white/5 flex items-center justify-between">
-                            <div>
-                                <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Precio Base (18k)</p>
-                                <p className="text-xs text-slate-500">Definido en Productividad</p>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-2xl font-black text-white">{parseFloat(contextGoldPrice).toFixed(2)} €/g</p>
-                            </div>
-                        </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
+                    {/* Guide List */}
+                    <div className="md:col-span-1 space-y-3">
+                        {ACCOUNT_REMOVAL_GUIDES.map(guide => (
+                            <button
+                                key={guide.id}
+                                onClick={() => setActiveGuide(guide)}
+                                className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between group ${activeGuide?.id === guide.id
+                                    ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-900/40'
+                                    : 'bg-slate-800/50 border-white/5 text-slate-400 hover:bg-slate-800 hover:text-white hover:border-white/10'
+                                    }`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    {/* Simple icon mapping or just show title */}
+                                    <span className="font-bold text-sm">{guide.title}</span>
+                                </div>
+                                <ChevronRight size={16} className={`transition-transform ${activeGuide?.id === guide.id ? 'rotate-90' : 'opacity-50'}`} />
+                            </button>
+                        ))}
+                    </div>
 
-                        <div className="space-y-4 flex-1">
-                            <div>
-                                <label className="text-xs font-bold text-slate-400 uppercase">Peso (gramos)</label>
-                                <input type="number" value={goldForm.weight} onChange={e => setGoldForm({ ...goldForm, weight: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white text-lg outline-none focus:border-amber-500" placeholder="0.00" />
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-slate-400 uppercase">Kilates</label>
-                                <div className="grid grid-cols-4 gap-2 mt-1">
-                                    {[24, 18, 14, 9].map(k => (
-                                        <button key={k} onClick={() => setGoldForm({ ...goldForm, karats: k })} className={`py-2 rounded-lg font-bold border transition-all ${goldForm.karats == k ? 'bg-amber-500 text-black border-amber-500' : 'bg-slate-800 text-slate-400 border-white/5'}`}>{k}K</button>
+                    {/* Active Guide Content */}
+                    <div className="md:col-span-2 bg-slate-950/50 rounded-2xl border border-white/5 p-6 h-full min-h-[400px]">
+                        {activeGuide ? (
+                            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <div className={`p-3 rounded-xl bg-${activeGuide.color || 'slate'}-500/20 text-${activeGuide.color || 'slate'}-400`}>
+                                        <BookOpen size={24} />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-white">{activeGuide.title}</h3>
+                                </div>
+
+                                {activeGuide.warning && (
+                                    <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl mb-6 text-sm font-medium flex gap-3 items-start">
+                                        <Info className="shrink-0 mt-0.5" size={16} />
+                                        <p>{activeGuide.warning}</p>
+                                    </div>
+                                )}
+
+                                <div className="space-y-4">
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Pasos a seguir</h4>
+                                    {activeGuide.steps.map((step, idx) => (
+                                        <div key={idx} className="flex gap-4 group">
+                                            <div className="flex flex-col items-center gap-1">
+                                                <div className="w-6 h-6 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-400 group-hover:border-indigo-500 group-hover:text-indigo-400 transition-colors">
+                                                    {idx + 1}
+                                                </div>
+                                                {idx !== activeGuide.steps.length - 1 && <div className="w-px h-full bg-slate-800 group-hover:bg-slate-700 transition-colors"></div>}
+                                            </div>
+                                            <p className="text-slate-300 text-sm leading-relaxed pb-6 pt-0.5 group-hover:text-white transition-colors">
+                                                {step}
+                                            </p>
+                                        </div>
                                     ))}
                                 </div>
                             </div>
-                            <button onClick={calculateGold} className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl shadow-lg shadow-amber-500/20 transition-all mt-4">CALCULAR VALOR</button>
-
-                            {goldQuote && (
-                                <div className="mt-4 bg-slate-900/50 p-4 rounded-xl border border-amber-500/30 text-center animate-in zoom-in">
-                                    <p className="text-slate-400 text-xs mb-1">Valor Estimado ({goldForm.karats}K)</p>
-                                    <p className="text-4xl font-black text-white">{goldQuote.total.toFixed(2)}€</p>
-                                    <p className="text-amber-500 text-xs mt-2 font-mono">{goldQuote.pricePerGram.toFixed(2)} €/gr</p>
-                                    <div className="mt-4 p-2 bg-amber-500/10 rounded border border-amber-500/20">
-                                        <p className="text-[10px] font-bold text-amber-200 uppercase tracking-wide">⚠️ Precio Mínimo Garantizado</p>
-                                        <p className="text-[9px] text-amber-400/80">Para oro limpio de 18 quilates sin mermas.</p>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* RIGHT: TEST PROTOCOL */}
-                    <div className="bg-[#1e293b]/80 backdrop-blur rounded-2xl p-6 border border-white/10 shadow-xl flex flex-col">
-                        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                            <CheckCircle size={18} className="text-green-500" /> Protocolo de Prueba
-                        </h3>
-                        <p className="text-xs text-slate-400 mb-4">Verificaciones obligatorias para evitar errores en la compra.</p>
-
-                        <div className="flex-1 bg-slate-900/50 rounded-xl overflow-hidden border border-white/5 p-4">
-                            {/* Placeholder content for now as requested */}
-                            <table className="w-full text-left">
-                                <thead>
-                                    <tr className="border-b border-white/10">
-                                        <th className="pb-2 text-[10px] font-bold text-slate-500 uppercase">Punto de Control</th>
-                                        <th className="pb-2 text-[10px] font-bold text-slate-500 uppercase text-right">Estado</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="text-sm divide-y divide-white/5">
-                                    <tr className="group">
-                                        <td className="py-3 text-slate-300">Revisión visual (Color/Brillo)</td>
-                                        <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
-                                    </tr>
-                                    <tr className="group">
-                                        <td className="py-3 text-slate-300">Búsqueda de contrastes</td>
-                                        <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
-                                    </tr>
-                                    <tr className="group">
-                                        <td className="py-3 text-slate-300">Prueba del Imán (Hierro)</td>
-                                        <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
-                                    </tr>
-                                    <tr className="group">
-                                        <td className="py-3 text-slate-300">Prueba de la Piedra (Toque)</td>
-                                        <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
-                                    </tr>
-                                    <tr className="group">
-                                        <td className="py-3 text-slate-300">Reacción al Ácido (18k)</td>
-                                        <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
-                                    </tr>
-                                    <tr className="group">
-                                        <td className="py-3 text-slate-300">Revisión de cierres/muelles</td>
-                                        <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
-                                    </tr>
-                                    <tr className="group">
-                                        <td className="py-3 text-slate-300">Pesaje (Báscula calibrada)</td>
-                                        <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                            <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                                <p className="text-[10px] text-blue-300 leading-relaxed">
-                                    ℹ️ <strong>Nota:</strong> Si la pieza tiene piedras, restar el peso estimado antes de cotizar. Ante la duda, consultar con encargado.
-                                </p>
+                        ) : (
+                            <div className="h-full flex flex-col items-center justify-center text-slate-500 opacity-50">
+                                <BookOpen size={48} className="mb-4" />
+                                <p className="text-sm font-medium uppercase tracking-widest">Selecciona una guía</p>
                             </div>
-                        </div>
+                        )}
                     </div>
-
                 </div>
-            )}
-
-            {/* TIMEGRAPHER HELP MODAL */}
-            <AnimatePresence>
-                {showTimegrapherHelp && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setShowTimegrapherHelp(false)}>
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            onClick={e => e.stopPropagation()}
-                            className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto custom-scrollbar flex flex-col"
-                        >
-                            {/* Header */}
-                            <div className="p-6 border-b border-slate-800 flex justify-between items-center sticky top-0 bg-slate-900/95 backdrop-blur z-10">
-                                <div>
-                                    <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-                                        <Watch className="text-amber-500" />
-                                        Guía del Cronocomparador
-                                    </h2>
-                                    <p className="text-slate-400 text-sm mt-1">Cómo medir y entender los resultados</p>
-                                </div>
-                                <button onClick={() => setShowTimegrapherHelp(false)} className="bg-slate-800 hover:bg-slate-700 text-white p-2 rounded-lg transition-colors">
-                                    <XCircle size={20} />
-                                </button>
-                            </div>
-
-                            {/* Content */}
-                            <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                {/* COLUMN 1: USAGE */}
-                                <div className="space-y-6">
-                                    <div className="bg-blue-900/10 border border-blue-500/20 p-4 rounded-xl">
-                                        <h3 className="text-blue-400 font-bold text-lg mb-3 flex items-center gap-2">🛠️ 1. Ritual de Uso</h3>
-                                        <ul className="space-y-3 text-sm text-slate-300">
-                                            <li className="flex gap-3">
-                                                <span className="bg-blue-500/20 text-blue-400 font-bold px-2 py-0.5 rounded h-fit text-xs">A</span>
-                                                <div><strong className="text-white">Carga Máxima:</strong> Dale toda la cuerda al reloj. Sin carga = mala amplitud (falso negativo).</div>
-                                            </li>
-                                            <li className="flex gap-3">
-                                                <span className="bg-blue-500/20 text-blue-400 font-bold px-2 py-0.5 rounded h-fit text-xs">B</span>
-                                                <div><strong className="text-white">Silencio:</strong> No hablar ni golpear la mesa. El micrófono detecta todo.</div>
-                                            </li>
-                                            <li className="flex gap-3">
-                                                <span className="bg-blue-500/20 text-blue-400 font-bold px-2 py-0.5 rounded h-fit text-xs">C</span>
-                                                <div>
-                                                    <strong className="text-white">Lift Angle (Ángulo):</strong>
-                                                    <p className="mt-1 text-xs opacity-80">Por defecto: <span className="text-green-400 font-mono">52°</span> (Valido 80% casos).</p>
-                                                    <p className="text-xs opacity-80">Rolex Modernos (3135/3235): Cambiar a <span className="text-amber-400 font-mono">53°/55°</span>.</p>
-                                                </div>
-                                            </li>
-                                            <li className="flex gap-3">
-                                                <span className="bg-blue-500/20 text-blue-400 font-bold px-2 py-0.5 rounded h-fit text-xs">D</span>
-                                                <div>
-                                                    <strong className="text-white">Posiciones Clave:</strong>
-                                                    <div className="mt-2 grid grid-cols-2 gap-2">
-                                                        <div className="bg-slate-800 p-2 rounded text-center">
-                                                            <span className="block text-xs font-bold text-slate-400">Dial Up</span>
-                                                            <span className="text-[10px] opacity-60">Esfera Arriba</span>
-                                                        </div>
-                                                        <div className="bg-slate-800 p-2 rounded text-center">
-                                                            <span className="block text-xs font-bold text-slate-400">Crown Down</span>
-                                                            <span className="text-[10px] opacity-60">Corona Abajo</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                </div>
-
-                                {/* COLUMN 2: INTERPRETATION */}
-                                <div className="space-y-6">
-                                    <h3 className="text-emerald-400 font-bold text-lg mb-1 flex items-center gap-2">📊 2. Interpretación</h3>
-
-                                    {/* RATE */}
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between items-center">
-                                            <h4 className="font-bold text-white text-sm">A. RATE (Desviación)</h4>
-                                            <span className="text-xs font-mono bg-slate-800 px-2 py-0.5 rounded text-slate-400">s/d</span>
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-1 text-center text-xs">
-                                            <div className="bg-emerald-900/30 border border-emerald-500/30 p-2 rounded text-emerald-400">
-                                                <strong>Excelente</strong><br />-2 a +5
-                                            </div>
-                                            <div className="bg-slate-800 p-2 rounded text-slate-300">
-                                                <strong>Aceptable</strong><br />-10 a +15
-                                            </div>
-                                            <div className="bg-red-900/30 border border-red-500/30 p-2 rounded text-red-400">
-                                                <strong>Alerta</strong><br />&gt; +/- 20
-                                            </div>
-                                        </div>
-                                        <p className="text-[10px] text-slate-500 italic">Si marca &gt;20s, necesita ajuste/limpieza.</p>
-                                    </div>
-
-                                    {/* AMPLITUDE */}
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between items-center">
-                                            <h4 className="font-bold text-white text-sm">B. AMPLITUDE (Salud Motor)</h4>
-                                            <span className="text-xs font-mono bg-slate-800 px-2 py-0.5 rounded text-slate-400">Grados (°)</span>
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-1 text-center text-xs">
-                                            <div className="bg-emerald-900/30 border border-emerald-500/30 p-2 rounded text-emerald-400">
-                                                <strong>Fuerte</strong><br />270° - 310°
-                                            </div>
-                                            <div className="bg-yellow-900/20 border border-yellow-500/20 p-2 rounded text-yellow-400">
-                                                <strong>Baja</strong><br />&lt; 230°
-                                            </div>
-                                            <div className="bg-red-900/30 border border-red-500/30 p-2 rounded text-red-400">
-                                                <strong>Alta (Rebote)</strong><br />&gt; 330°
-                                            </div>
-                                        </div>
-                                        <p className="text-[10px] text-slate-500 italic">Baja amplitud = Aceites secos = Necesita Service.</p>
-                                    </div>
-
-                                    {/* BEAT ERROR */}
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between items-center">
-                                            <h4 className="font-bold text-white text-sm">C. BEAT ERROR (Ritmo)</h4>
-                                            <span className="text-xs font-mono bg-slate-800 px-2 py-0.5 rounded text-slate-400">ms</span>
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-1 text-center text-xs">
-                                            <div className="bg-emerald-900/30 border border-emerald-500/30 p-2 rounded text-emerald-400">
-                                                <strong>Perfecto</strong><br />0.0 - 0.2
-                                            </div>
-                                            <div className="bg-slate-800 p-2 rounded text-slate-300">
-                                                <strong>Aceptable</strong><br />Hasta 0.8
-                                            </div>
-                                            <div className="bg-red-900/30 border border-red-500/30 p-2 rounded text-red-400">
-                                                <strong>Cojo</strong><br />&gt; 1.0 ms
-                                            </div>
-                                        </div>
-                                        <p className="text-[10px] text-slate-500 italic">Error alto requiere ajuste de relojero.</p>
-                                    </div>
-
-                                </div>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+            </div>
         </div>
-    );
+    )
+}
+{
+    mode === 'gold' && (
+        <div className="max-w-4xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            {/* LEFT: CALCULATOR */}
+            <div className="bg-[#0f172a] rounded-2xl p-6 border border-amber-500/20 shadow-2xl shadow-amber-900/20 flex flex-col">
+                <h2 className="text-xl font-bold text-amber-500 mb-6 flex items-center gap-2"><Watch /> Cotizador de Oro</h2>
+
+                {/* CURRENT REFERENCE PRICE */}
+                <div className="mb-6 bg-slate-900/50 p-4 rounded-xl border border-white/5 flex items-center justify-between">
+                    <div>
+                        <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Precio Base (18k)</p>
+                        <p className="text-xs text-slate-500">Definido en Productividad</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-2xl font-black text-white">{parseFloat(contextGoldPrice).toFixed(2)} €/g</p>
+                    </div>
+                </div>
+
+                <div className="space-y-4 flex-1">
+                    <div>
+                        <label className="text-xs font-bold text-slate-400 uppercase">Peso (gramos)</label>
+                        <input type="number" value={goldForm.weight} onChange={e => setGoldForm({ ...goldForm, weight: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white text-lg outline-none focus:border-amber-500" placeholder="0.00" />
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-slate-400 uppercase">Kilates</label>
+                        <div className="grid grid-cols-4 gap-2 mt-1">
+                            {[24, 18, 14, 9].map(k => (
+                                <button key={k} onClick={() => setGoldForm({ ...goldForm, karats: k })} className={`py-2 rounded-lg font-bold border transition-all ${goldForm.karats == k ? 'bg-amber-500 text-black border-amber-500' : 'bg-slate-800 text-slate-400 border-white/5'}`}>{k}K</button>
+                            ))}
+                        </div>
+                    </div>
+                    <button onClick={calculateGold} className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl shadow-lg shadow-amber-500/20 transition-all mt-4">CALCULAR VALOR</button>
+
+                    {goldQuote && (
+                        <div className="mt-4 bg-slate-900/50 p-4 rounded-xl border border-amber-500/30 text-center animate-in zoom-in">
+                            <p className="text-slate-400 text-xs mb-1">Valor Estimado ({goldForm.karats}K)</p>
+                            <p className="text-4xl font-black text-white">{goldQuote.total.toFixed(2)}€</p>
+                            <p className="text-amber-500 text-xs mt-2 font-mono">{goldQuote.pricePerGram.toFixed(2)} €/gr</p>
+                            <div className="mt-4 p-2 bg-amber-500/10 rounded border border-amber-500/20">
+                                <p className="text-[10px] font-bold text-amber-200 uppercase tracking-wide">⚠️ Precio Mínimo Garantizado</p>
+                                <p className="text-[9px] text-amber-400/80">Para oro limpio de 18 quilates sin mermas.</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* RIGHT: TEST PROTOCOL */}
+            <div className="bg-[#1e293b]/80 backdrop-blur rounded-2xl p-6 border border-white/10 shadow-xl flex flex-col">
+                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <CheckCircle size={18} className="text-green-500" /> Protocolo de Prueba
+                </h3>
+                <p className="text-xs text-slate-400 mb-4">Verificaciones obligatorias para evitar errores en la compra.</p>
+
+                <div className="flex-1 bg-slate-900/50 rounded-xl overflow-hidden border border-white/5 p-4">
+                    {/* Placeholder content for now as requested */}
+                    <table className="w-full text-left">
+                        <thead>
+                            <tr className="border-b border-white/10">
+                                <th className="pb-2 text-[10px] font-bold text-slate-500 uppercase">Punto de Control</th>
+                                <th className="pb-2 text-[10px] font-bold text-slate-500 uppercase text-right">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-sm divide-y divide-white/5">
+                            <tr className="group">
+                                <td className="py-3 text-slate-300">Revisión visual (Color/Brillo)</td>
+                                <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
+                            </tr>
+                            <tr className="group">
+                                <td className="py-3 text-slate-300">Búsqueda de contrastes</td>
+                                <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
+                            </tr>
+                            <tr className="group">
+                                <td className="py-3 text-slate-300">Prueba del Imán (Hierro)</td>
+                                <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
+                            </tr>
+                            <tr className="group">
+                                <td className="py-3 text-slate-300">Prueba de la Piedra (Toque)</td>
+                                <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
+                            </tr>
+                            <tr className="group">
+                                <td className="py-3 text-slate-300">Reacción al Ácido (18k)</td>
+                                <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
+                            </tr>
+                            <tr className="group">
+                                <td className="py-3 text-slate-300">Revisión de cierres/muelles</td>
+                                <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
+                            </tr>
+                            <tr className="group">
+                                <td className="py-3 text-slate-300">Pesaje (Báscula calibrada)</td>
+                                <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                        <p className="text-[10px] text-blue-300 leading-relaxed">
+                            ℹ️ <strong>Nota:</strong> Si la pieza tiene piedras, restar el peso estimado antes de cotizar. Ante la duda, consultar con encargado.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    )
+}
+
+{/* TIMEGRAPHER HELP MODAL */ }
+<AnimatePresence>
+    {showTimegrapherHelp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setShowTimegrapherHelp(false)}>
+            <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                onClick={e => e.stopPropagation()}
+                className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto custom-scrollbar flex flex-col"
+            >
+                {/* Header */}
+                <div className="p-6 border-b border-slate-800 flex justify-between items-center sticky top-0 bg-slate-900/95 backdrop-blur z-10">
+                    <div>
+                        <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                            <Watch className="text-amber-500" />
+                            Guía del Cronocomparador
+                        </h2>
+                        <p className="text-slate-400 text-sm mt-1">Cómo medir y entender los resultados</p>
+                    </div>
+                    <button onClick={() => setShowTimegrapherHelp(false)} className="bg-slate-800 hover:bg-slate-700 text-white p-2 rounded-lg transition-colors">
+                        <XCircle size={20} />
+                    </button>
+                </div>
+
+                {/* Content */}
+                <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* COLUMN 1: USAGE */}
+                    <div className="space-y-6">
+                        <div className="bg-blue-900/10 border border-blue-500/20 p-4 rounded-xl">
+                            <h3 className="text-blue-400 font-bold text-lg mb-3 flex items-center gap-2">🛠️ 1. Ritual de Uso</h3>
+                            <ul className="space-y-3 text-sm text-slate-300">
+                                <li className="flex gap-3">
+                                    <span className="bg-blue-500/20 text-blue-400 font-bold px-2 py-0.5 rounded h-fit text-xs">A</span>
+                                    <div><strong className="text-white">Carga Máxima:</strong> Dale toda la cuerda al reloj. Sin carga = mala amplitud (falso negativo).</div>
+                                </li>
+                                <li className="flex gap-3">
+                                    <span className="bg-blue-500/20 text-blue-400 font-bold px-2 py-0.5 rounded h-fit text-xs">B</span>
+                                    <div><strong className="text-white">Silencio:</strong> No hablar ni golpear la mesa. El micrófono detecta todo.</div>
+                                </li>
+                                <li className="flex gap-3">
+                                    <span className="bg-blue-500/20 text-blue-400 font-bold px-2 py-0.5 rounded h-fit text-xs">C</span>
+                                    <div>
+                                        <strong className="text-white">Lift Angle (Ángulo):</strong>
+                                        <p className="mt-1 text-xs opacity-80">Por defecto: <span className="text-green-400 font-mono">52°</span> (Valido 80% casos).</p>
+                                        <p className="text-xs opacity-80">Rolex Modernos (3135/3235): Cambiar a <span className="text-amber-400 font-mono">53°/55°</span>.</p>
+                                    </div>
+                                </li>
+                                <li className="flex gap-3">
+                                    <span className="bg-blue-500/20 text-blue-400 font-bold px-2 py-0.5 rounded h-fit text-xs">D</span>
+                                    <div>
+                                        <strong className="text-white">Posiciones Clave:</strong>
+                                        <div className="mt-2 grid grid-cols-2 gap-2">
+                                            <div className="bg-slate-800 p-2 rounded text-center">
+                                                <span className="block text-xs font-bold text-slate-400">Dial Up</span>
+                                                <span className="text-[10px] opacity-60">Esfera Arriba</span>
+                                            </div>
+                                            <div className="bg-slate-800 p-2 rounded text-center">
+                                                <span className="block text-xs font-bold text-slate-400">Crown Down</span>
+                                                <span className="text-[10px] opacity-60">Corona Abajo</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    {/* COLUMN 2: INTERPRETATION */}
+                    <div className="space-y-6">
+                        <h3 className="text-emerald-400 font-bold text-lg mb-1 flex items-center gap-2">📊 2. Interpretación</h3>
+
+                        {/* RATE */}
+                        <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                                <h4 className="font-bold text-white text-sm">A. RATE (Desviación)</h4>
+                                <span className="text-xs font-mono bg-slate-800 px-2 py-0.5 rounded text-slate-400">s/d</span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-1 text-center text-xs">
+                                <div className="bg-emerald-900/30 border border-emerald-500/30 p-2 rounded text-emerald-400">
+                                    <strong>Excelente</strong><br />-2 a +5
+                                </div>
+                                <div className="bg-slate-800 p-2 rounded text-slate-300">
+                                    <strong>Aceptable</strong><br />-10 a +15
+                                </div>
+                                <div className="bg-red-900/30 border border-red-500/30 p-2 rounded text-red-400">
+                                    <strong>Alerta</strong><br />&gt; +/- 20
+                                </div>
+                            </div>
+                            <p className="text-[10px] text-slate-500 italic">Si marca &gt;20s, necesita ajuste/limpieza.</p>
+                        </div>
+
+                        {/* AMPLITUDE */}
+                        <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                                <h4 className="font-bold text-white text-sm">B. AMPLITUDE (Salud Motor)</h4>
+                                <span className="text-xs font-mono bg-slate-800 px-2 py-0.5 rounded text-slate-400">Grados (°)</span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-1 text-center text-xs">
+                                <div className="bg-emerald-900/30 border border-emerald-500/30 p-2 rounded text-emerald-400">
+                                    <strong>Fuerte</strong><br />270° - 310°
+                                </div>
+                                <div className="bg-yellow-900/20 border border-yellow-500/20 p-2 rounded text-yellow-400">
+                                    <strong>Baja</strong><br />&lt; 230°
+                                </div>
+                                <div className="bg-red-900/30 border border-red-500/30 p-2 rounded text-red-400">
+                                    <strong>Alta (Rebote)</strong><br />&gt; 330°
+                                </div>
+                            </div>
+                            <p className="text-[10px] text-slate-500 italic">Baja amplitud = Aceites secos = Necesita Service.</p>
+                        </div>
+
+                        {/* BEAT ERROR */}
+                        <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                                <h4 className="font-bold text-white text-sm">C. BEAT ERROR (Ritmo)</h4>
+                                <span className="text-xs font-mono bg-slate-800 px-2 py-0.5 rounded text-slate-400">ms</span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-1 text-center text-xs">
+                                <div className="bg-emerald-900/30 border border-emerald-500/30 p-2 rounded text-emerald-400">
+                                    <strong>Perfecto</strong><br />0.0 - 0.2
+                                </div>
+                                <div className="bg-slate-800 p-2 rounded text-slate-300">
+                                    <strong>Aceptable</strong><br />Hasta 0.8
+                                </div>
+                                <div className="bg-red-900/30 border border-red-500/30 p-2 rounded text-red-400">
+                                    <strong>Cojo</strong><br />&gt; 1.0 ms
+                                </div>
+                            </div>
+                            <p className="text-[10px] text-slate-500 italic">Error alto requiere ajuste de relojero.</p>
+                        </div>
+
+                    </div>
+                </div>
+            </motion.div>
+        </div>
+    )}
+</AnimatePresence>
+                </div >
+            );
 };
 
 export default Market;

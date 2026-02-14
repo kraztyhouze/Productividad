@@ -144,6 +144,27 @@ export const ACCOUNT_REMOVAL_GUIDES = [
 // AUTHENTICITY / COUNTERFEIT DETECTION GUIDES
 export const AUTHENTICITY_GUIDES = [
     {
+        id: 'airpods_4_fake',
+        title: 'Detectar Falsos: AirPods 4 (ANC/Std)',
+        icon: 'AlertTriangle',
+        color: 'indigo',
+        model: 'AirPods 4',
+        checks: [
+            {
+                label: "Botón Oculto (Capacitivo)",
+                desc: "NO tienen botón físico atrás. Tienen un botón 'invisible' en la parte delantera (bajo el LED). Se activa con 'Doble Toque' para emparejar. Si tiene botón atrás = FALSO."
+            },
+            {
+                label: "LED de Estado Invisible",
+                desc: "El LED está oculto bajo el plástico blanco y solo se ve al encenderse. Si se ve un agujerito gris o negro cuando está apagado = FALSO."
+            },
+            {
+                label: "Altavoz (Solo modelo ANC)",
+                desc: "El modelo con Cancelación de Ruido tiene orificios de altavoz en la base del estuche para 'Buscar'. El modelo normal NO tiene orificios."
+            }
+        ]
+    },
+    {
         id: 'airpods_pro_2_fake',
         title: 'Detectar Falsos: AirPods Pro 2',
         icon: 'AlertTriangle',
@@ -236,6 +257,27 @@ export const AUTHENTICITY_GUIDES = [
         ]
     },
     {
+        id: 'airpods_1_2_fake',
+        title: 'Detectar Falsos: AirPods 1 y 2',
+        icon: 'AlertTriangle',
+        color: 'cyan',
+        model: 'AirPods 1/2',
+        checks: [
+            {
+                label: "Número de Modelo (A...)",
+                desc: "Mira bajo el auricular. Gen 1: A1523/A1722. Gen 2: A2031/A2032. Si ves un modelo A1... pero con estuche de carga inalámbrica (LED fuera), es sospechoso (reburbished o fake)."
+            },
+            {
+                label: "Difusores de Audio",
+                desc: "La malla metálica debe ser densa y oscura. Las copias (especialmente las antiguas i12, i500) tienen mallas plateadas brillantes o azules."
+            },
+            {
+                label: "El Estuche (LED)",
+                desc: "Estuche Carga (Wired): LED dentro, entre los auriculares. Estuche Wireless: LED fuera. Botón trasero siempre presente."
+            }
+        ]
+    },
+    {
         id: 'general_fake',
         title: 'Tips Generales Apple (Cables/Cajas)',
         icon: 'Box',
@@ -268,20 +310,32 @@ export const AUTHENTICITY_GUIDES = [
         model: 'Todos',
         checks: [
             {
-                label: "AirPods Pro 2 (USB-C / Lightning)",
-                desc: "Auricular: 5.3g (cada uno) | Estuche MagSafe: 50.8g"
+                label: "AirPods 4 (ANC)",
+                desc: "Auricular: 4.3g | Estuche (Wireless+Speaker): 34.7g"
             },
             {
-                label: "AirPods 3 (Magsafe / Lightning)",
-                desc: "Auricular: 4.28g (cada uno) | Estuche MagSafe: 37.91g | Estuche Lightning: 37.91g"
+                label: "AirPods 4 (Estándar)",
+                desc: "Auricular: 4.3g | Estuche (USB-C): 32.3g"
+            },
+            {
+                label: "AirPods Pro 2 (USB-C / Lightning)",
+                desc: "Auricular: 5.3g | Estuche MagSafe: 50.8g"
+            },
+            {
+                label: "AirPods 3",
+                desc: "Auricular: 4.28g | Estuche MagSafe: 37.91g | Estuche Lightning: 37.91g"
             },
             {
                 label: "AirPods Pro 1",
-                desc: "Auricular: 5.4g (cada uno) | Estuche Carga: 45.6g"
+                desc: "Auricular: 5.4g | Estuche Carga: 45.6g"
             },
             {
-                label: "AirPods 2",
-                desc: "Auricular: 4g (cada uno) | Estuche Carga: 38g | Estuche Inalámbrico: 40g"
+                label: "AirPods 2 (2ª Gen)",
+                desc: "Auricular: 4g | Estuche Carga (LED dentro): 38g | Estuche Wireless (LED fuera): 40g"
+            },
+            {
+                label: "AirPods 1 (1ª Gen)",
+                desc: "Auricular: 4g | Estuche Carga: 38g"
             },
             {
                 label: "AirPods Max",
@@ -289,7 +343,7 @@ export const AUTHENTICITY_GUIDES = [
             },
             {
                 label: "Nota Importante",
-                desc: "Pesos aproximados oficiales de Apple. Variaciones de >0.5g suelen indicar falsificación (baterías o componentes internos más ligeros/baratos)."
+                desc: "Pesos oficiales Apple. Variaciones >0.5g = Sospechoso."
             }
         ]
     }

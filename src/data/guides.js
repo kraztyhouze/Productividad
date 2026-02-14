@@ -259,5 +259,38 @@ export const AUTHENTICITY_GUIDES = [
                 desc: "El cable original tiene los contactos dorados/plateados perfectos y el plástico interno del conector es liso. Busca texto 'Designed by Apple...' muy tenue impreso a unos 15cm del conector USB. Las copias a veces lo tienen muy oscuro o con faltas de ortografía ('Califronia')."
             }
         ]
+    },
+    {
+        id: 'airpods_weights',
+        title: 'Pesos Oficiales (Báscula)',
+        icon: 'Scale',
+        color: 'emerald',
+        model: 'Todos',
+        checks: [
+            {
+                label: "AirPods Pro 2 (USB-C / Lightning)",
+                desc: "Auricular: 5.3g (cada uno) | Estuche MagSafe: 50.8g"
+            },
+            {
+                label: "AirPods 3 (Magsafe / Lightning)",
+                desc: "Auricular: 4.28g (cada uno) | Estuche MagSafe: 37.91g | Estuche Lightning: 37.91g"
+            },
+            {
+                label: "AirPods Pro 1",
+                desc: "Auricular: 5.4g (cada uno) | Estuche Carga: 45.6g"
+            },
+            {
+                label: "AirPods 2",
+                desc: "Auricular: 4g (cada uno) | Estuche Carga: 38g | Estuche Inalámbrico: 40g"
+            },
+            {
+                label: "AirPods Max",
+                desc: "Auriculares: 384.8g | Smart Case: 134.5g"
+            },
+            {
+                label: "Nota Importante",
+                desc: "Pesos aproximados oficiales de Apple. Variaciones de >0.5g suelen indicar falsificación (baterías o componentes internos más ligeros/baratos)."
+            }
+        ]
     }
 ];

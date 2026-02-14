@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useProductivity } from '../context/ProductivityContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ExternalLink, Smartphone, Monitor, Watch, Hammer, Gamepad2, CheckCircle, XCircle, Grid, QrCode, Download, Info, BookOpen, ChevronRight, CornerDownRight, FileText, ShieldCheck, UserMinus, AlertTriangle } from 'lucide-react';
+import { Search, ExternalLink, Smartphone, Monitor, Watch, Hammer, Gamepad2, CheckCircle, XCircle, Grid, QrCode, Download, Info, BookOpen, ChevronRight, CornerDownRight, FileText, ShieldCheck, UserMinus, AlertTriangle, Scale } from 'lucide-react';
 import { generateDiagnosticCertificate, generateWatchCertificate } from '../utils/pdfGenerator';
 import { ACCOUNT_REMOVAL_GUIDES, AUTHENTICITY_GUIDES } from '../data/guides';
 
@@ -944,7 +944,9 @@ const Market = () => {
                                         <div className="animate-in fade-in slide-in-from-right-4 duration-300">
                                             <div className="flex items-center gap-3 mb-6">
                                                 <div className={`p-3 rounded-xl bg-${activeGuide.color || 'slate'}-500/20 text-${activeGuide.color || 'slate'}-400`}>
-                                                    {guideCategory === 'accounts' ? <BookOpen size={24} /> : <AlertTriangle size={24} />}
+                                                    {guideCategory === 'accounts' ? <BookOpen size={24} /> :
+                                                        activeGuide.id === 'airpods_weights' ? <Scale size={24} /> :
+                                                            <AlertTriangle size={24} />}
                                                 </div>
                                                 <h3 className="text-xl font-bold text-white">{activeGuide.title}</h3>
                                             </div>

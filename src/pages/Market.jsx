@@ -887,9 +887,10 @@ const Market = () => {
                         </AnimatePresence>
                     </div>
                 </div>
+            )}
 
 
-{/* CONTENT: GUIDES MODE */}
+            {/* CONTENT: GUIDES MODE */}
             {
                 mode === 'guides' && (
                     <div className="max-w-5xl mx-auto w-full flex flex-col gap-6">

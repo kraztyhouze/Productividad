@@ -86,56 +86,104 @@ const PriceList = () => {
         setNewItem(null);
     };
 
-    // Render Row Helper
-    const RenderRow = ({ item, isEditing, isNew }) => {
+    // Initial Data from User Image
+    const INITIAL_DATA = [
+        { category: 'THERMOMIX', brand: 'VORWERK', model: 'TM21', price_a: 0, price_b: 219, price_c: 199 },
+        { category: 'THERMOMIX', brand: 'VORWERK', model: 'TM31', price_a: 0, price_b: 399, price_c: 349 },
+        { category: 'THERMOMIX', brand: 'VORWERK', model: 'TM5', price_a: 429, price_b: 379, price_c: 349 },
+        { category: 'THERMOMIX', brand: 'VORWERK', model: 'TM6', price_a: 749, price_b: 679, price_c: 649 },
+        { category: 'THERMOMIX', brand: 'VORWERK', model: 'TM6 BLACK cocodrilo', price_a: 899, price_b: 829, price_c: 749 },
+        { category: 'THERMOMIX', brand: 'VORWERK', model: 'TM6 Blanco perlado', price_a: 899, price_b: 829, price_c: 749 },
+        { category: 'THERMOMIX', brand: 'VORWERK', model: 'TM6 BLACK', price_a: 749, price_b: 679, price_c: 649 },
+        { category: 'THERMOMIX', brand: 'VORWERK', model: 'TM7', price_a: 1349, price_b: 1249, price_c: 1149 },
+        { category: 'THERMOMIX', brand: 'VORWERK', model: 'FRIEND', price_a: 179, price_b: 129, price_c: 99 },
+
+        { category: 'PS5', brand: 'sony', model: 'ps5 Pro', price_a: 699, price_b: 629, price_c: 579 },
+        { category: 'PS5', brand: 'sony', model: 'ps5 slim', price_a: 429, price_b: 399, price_c: 369 },
+        { category: 'PS5', brand: 'sony', model: 'ps5 digital slim', price_a: 329, price_b: 299, price_c: 279 },
+        { category: 'PS5', brand: 'sony', model: 'ps5', price_a: 399, price_b: 369, price_c: 339 },
+        { category: 'PS5', brand: 'sony', model: 'ps5 digital', price_a: 279, price_b: 259, price_c: 239 },
+
+        { category: 'PS4', brand: 'sony', model: 'PS4 500GB', price_a: 0, price_b: 89, price_c: 79 },
+        { category: 'PS4', brand: 'sony', model: 'PS4 1TB', price_a: 0, price_b: 99, price_c: 89 },
+        { category: 'PS4', brand: 'sony', model: 'PS4 SLIM 500GB', price_a: 0, price_b: 109, price_c: 99 },
+        { category: 'PS4', brand: 'sony', model: 'PS4 SLIM 1TB', price_a: 0, price_b: 129, price_c: 109 },
+        { category: 'PS4', brand: 'sony', model: 'PS4 PRO', price_a: 179, price_b: 149, price_c: 129 },
+
+        { category: 'SWITCH', brand: 'Nintendo', model: 'Switch Oled', price_a: 229, price_b: 199, price_c: 179 },
+        { category: 'SWITCH', brand: 'Nintendo', model: 'Switch', price_a: 169, price_b: 149, price_c: 129 },
+        { category: 'SWITCH', brand: 'Nintendo', model: 'Switch Lite', price_a: 105, price_b: 95, price_c: 85 },
+        { category: 'SWITCH', brand: 'Nintendo', model: 'Switch 2', price_a: 429, price_b: 419, price_c: 399 },
+    ];
+
+    const populateData = async () => {
+        if (!window.confirm("¿Cargar todos los datos iniciales? Se duplicarán si ya existen.")) return;
+        const storeId = currentStore || 'store_1';
+        setLoading(true);
+        for (const item of INITIAL_DATA) {
+            await fetch('/api/market-prices', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-store-id': storeId },
+                body: JSON.stringify(item)
+            });
+        }
+        fetchItems();
+    };
+
+    const EditableRow = ({ item, onSave, onCancel, isNew }) => {
+        // Local state for the form row to prevent parent re-renders from killing input focus/state
         const [formData, setFormData] = useState({ ...item });
 
         const handleChange = (e) => {
             setFormData({ ...formData, [e.target.name]: e.target.value });
         };
 
-        const onSave = () => handleSave(formData);
+        const handleSubmit = () => onSave(formData);
 
-        const rowClass = "border-b border-white/5 hover:bg-white/5 transition-colors";
         const cellClass = "p-3 text-sm";
-        const inputClass = "w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs outline-none focus:border-amber-500";
+        const inputClass = "w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs outline-none focus:border-amber-500 transition-colors";
 
-        if (isEditing || isNew) {
-            return (
-                <tr className={`${rowClass} bg-slate-800/50`}>
-                    <td className={cellClass}>
-                        <input name="category" value={formData.category} onChange={handleChange} className={inputClass} placeholder="CAT" list="categories" />
-                    </td>
-                    <td className={cellClass}>
-                        <input name="brand" value={formData.brand} onChange={handleChange} className={inputClass} placeholder="Marca" />
-                    </td>
-                    <td className={cellClass}>
-                        <input name="model" value={formData.model} onChange={handleChange} className={inputClass} placeholder="Modelo" />
-                    </td>
-                    <td className={cellClass}><input name="price_a" type="number" value={formData.price_a} onChange={handleChange} className={inputClass} placeholder="€" /></td>
-                    <td className={cellClass}><input name="price_b" type="number" value={formData.price_b} onChange={handleChange} className={inputClass} placeholder="€" /></td>
-                    <td className={cellClass}><input name="price_c" type="number" value={formData.price_c} onChange={handleChange} className={inputClass} placeholder="€" /></td>
-                    <td className={cellClass}>
-                        <div className="flex gap-2">
-                            <button onClick={onSave} className="p-1.5 bg-green-600 text-white rounded"><Save size={14} /></button>
-                            <button onClick={cancelEdit} className="p-1.5 bg-red-600 text-white rounded"><X size={14} /></button>
-                        </div>
-                    </td>
-                </tr>
-            );
-        }
+        return (
+            <tr className="bg-slate-800/50 border-b border-white/5 animate-in fade-in">
+                <td className={cellClass}>
+                    <input name="category" value={formData.category} onChange={handleChange} className={inputClass} placeholder="CAT" list="categories" autoFocus />
+                </td>
+                <td className={cellClass}>
+                    <input name="brand" value={formData.brand} onChange={handleChange} className={inputClass} placeholder="Marca" />
+                </td>
+                <td className={cellClass}>
+                    <input name="model" value={formData.model} onChange={handleChange} className={inputClass} placeholder="Modelo" />
+                </td>
+                <td className={cellClass}><input name="price_a" type="number" value={formData.price_a} onChange={handleChange} className={inputClass} placeholder="€" /></td>
+                <td className={cellClass}><input name="price_b" type="number" value={formData.price_b} onChange={handleChange} className={inputClass} placeholder="€" /></td>
+                <td className={cellClass}><input name="price_c" type="number" value={formData.price_c} onChange={handleChange} className={inputClass} placeholder="€" /></td>
+                <td className={cellClass}>
+                    <div className="flex gap-2">
+                        <button onClick={handleSubmit} className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded transition-colors"><Save size={14} /></button>
+                        <button onClick={onCancel} className="p-1.5 bg-red-600 hover:bg-red-500 text-white rounded transition-colors"><X size={14} /></button>
+                    </div>
+                </td>
+            </tr>
+        );
+    };
+
+    const StaticRow = ({ item }) => {
+        // Only render headers if this is the first item of its category
+        // But we handle headers in the parent map loop.
+        const rowClass = "border-b border-white/5 hover:bg-white/5 transition-colors group";
+        const cellClass = "p-3 text-sm";
 
         return (
             <tr className={rowClass}>
-                <td className={`${cellClass} font-bold text-slate-400 uppercase text-xs w-24`}>{item.category}</td>
-                <td className={`${cellClass} text-slate-300 w-32`}>{item.brand}</td>
+                <td className={`${cellClass} font-bold text-slate-500 uppercase text-[10px] w-24 group-hover:text-slate-300 transition-colors`}>{item.category}</td>
+                <td className={`${cellClass} text-slate-400 w-32 uppercase text-[10px]`}>{item.brand}</td>
                 <td className={`${cellClass} font-bold text-white`}>{item.model}</td>
-                <td className={`${cellClass} font-mono text-amber-400 font-bold text-right w-24`}>{item.price_a}€</td>
-                <td className={`${cellClass} font-mono text-slate-300 text-right w-24`}>{item.price_b}€</td>
-                <td className={`${cellClass} font-mono text-slate-500 text-right w-24`}>{item.price_c}€</td>
+                <td className={`${cellClass} font-mono text-amber-400 font-bold text-right w-24`}>{item.price_a > 0 ? item.price_a + '€' : '-'}</td>
+                <td className={`${cellClass} font-mono text-slate-300 text-right w-24`}>{item.price_b > 0 ? item.price_b + '€' : '-'}</td>
+                <td className={`${cellClass} font-mono text-slate-500 text-right w-24`}>{item.price_c > 0 ? item.price_c + '€' : '-'}</td>
                 {canEdit && (
                     <td className={cellClass}>
-                        <div className="flex gap-2 justify-end">
+                        <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onClick={() => startEdit(item)} className="p-1.5 hover:bg-slate-700 text-slate-400 hover:text-white rounded"><Edit2 size={14} /></button>
                             <button onClick={() => handleDelete(item.id)} className="p-1.5 hover:bg-slate-700 text-slate-400 hover:text-red-500 rounded"><Trash2 size={14} /></button>
                         </div>
@@ -196,11 +244,9 @@ const PriceList = () => {
                         </thead>
                         <tbody className="divide-y divide-white/5">
                             {newItem && (
-                                <RenderRow item={newItem} isNew={true} />
+                                <EditableRow item={newItem} onSave={handleSave} onCancel={cancelEdit} isNew={true} />
                             )}
                             {items.map((item, idx) => {
-                                // Add separator logic if needed, but categories are sorted.
-                                // Let's add a visual separator row if category changes?
                                 const prev = items[idx - 1];
                                 const showHeader = !prev || prev.category !== item.category;
 
@@ -209,19 +255,28 @@ const PriceList = () => {
                                         {showHeader && idx > 0 && <tr className="h-4 bg-transparent border-none"><td colSpan="7"></td></tr>}
                                         {showHeader && (
                                             <tr className="bg-slate-950/30">
-                                                <td colSpan="7" className="px-4 py-2 text-xs font-bold text-slate-500 border-l-4 border-emerald-500 uppercase tracking-widest">
+                                                <td colSpan="7" className="px-4 py-2 text-xs font-bold text-slate-500 border-l-4 border-emerald-500 uppercase tracking-widest bg-gradient-to-r from-slate-900 to-transparent">
                                                     {item.category}
                                                 </td>
                                             </tr>
                                         )}
-                                        <RenderRow item={item} isEditing={editingId === item.id} />
+                                        {editingId === item.id ? (
+                                            <EditableRow item={item} onSave={handleSave} onCancel={cancelEdit} />
+                                        ) : (
+                                            <StaticRow item={item} />
+                                        )}
                                     </React.Fragment>
                                 );
                             })}
                             {items.length === 0 && !loading && !newItem && (
                                 <tr>
-                                    <td colSpan="7" className="p-8 text-center text-slate-500">
-                                        No hay precios definidos.
+                                    <td colSpan="7" className="p-12 text-center text-slate-500 flex flex-col items-center gap-4">
+                                        <p>No hay precios definidos.</p>
+                                        {canEdit && (
+                                            <button onClick={populateData} className="px-4 py-2 bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-lg text-xs font-bold border border-white/5 transition-colors">
+                                                Cargar Datos Iniciales (Ejemplo)
+                                            </button>
+                                        )}
                                     </td>
                                 </tr>
                             )}

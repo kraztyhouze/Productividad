@@ -887,336 +887,334 @@ const Market = () => {
                         </AnimatePresence>
                     </div>
                 </div>
-        </div>
-    )
-}
 
-{/* CONTENT: GUIDES MODE */ }
-{
-    mode === 'guides' && (
-        <div className="max-w-5xl mx-auto w-full flex flex-col gap-6">
-            <div className="bg-[#1e293b] rounded-2xl p-8 border border-white/5 shadow-2xl relative overflow-hidden min-h-[600px]">
-                <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none"></div>
 
-                <h2 className="text-2xl font-bold text-white mb-8 flex items-center gap-3 relative z-10">
-                    <BookOpen className="text-indigo-500" /> Manuales de Desbloqueo y Restauración
-                </h2>
+{/* CONTENT: GUIDES MODE */}
+            {
+                mode === 'guides' && (
+                    <div className="max-w-5xl mx-auto w-full flex flex-col gap-6">
+                        <div className="bg-[#1e293b] rounded-2xl p-8 border border-white/5 shadow-2xl relative overflow-hidden min-h-[600px]">
+                            <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none"></div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
-                    {/* Guide List */}
-                    <div className="md:col-span-1 space-y-3">
-                        {ACCOUNT_REMOVAL_GUIDES.map(guide => (
-                            <button
-                                key={guide.id}
-                                onClick={() => setActiveGuide(guide)}
-                                className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between group ${activeGuide?.id === guide.id
-                                    ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-900/40'
-                                    : 'bg-slate-800/50 border-white/5 text-slate-400 hover:bg-slate-800 hover:text-white hover:border-white/10'
-                                    }`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    {/* Simple icon mapping or just show title */}
-                                    <span className="font-bold text-sm">{guide.title}</span>
-                                </div>
-                                <ChevronRight size={16} className={`transition-transform ${activeGuide?.id === guide.id ? 'rotate-90' : 'opacity-50'}`} />
-                            </button>
-                        ))}
-                    </div>
+                            <h2 className="text-2xl font-bold text-white mb-8 flex items-center gap-3 relative z-10">
+                                <BookOpen className="text-indigo-500" /> Manuales de Desbloqueo y Restauración
+                            </h2>
 
-                    {/* Active Guide Content */}
-                    <div className="md:col-span-2 bg-slate-950/50 rounded-2xl border border-white/5 p-6 h-full min-h-[400px]">
-                        {activeGuide ? (
-                            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                                <div className="flex items-center gap-3 mb-6">
-                                    <div className={`p-3 rounded-xl bg-${activeGuide.color || 'slate'}-500/20 text-${activeGuide.color || 'slate'}-400`}>
-                                        <BookOpen size={24} />
-                                    </div>
-                                    <h3 className="text-xl font-bold text-white">{activeGuide.title}</h3>
-                                </div>
-
-                                {activeGuide.warning && (
-                                    <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl mb-6 text-sm font-medium flex gap-3 items-start">
-                                        <Info className="shrink-0 mt-0.5" size={16} />
-                                        <p>{activeGuide.warning}</p>
-                                    </div>
-                                )}
-
-                                <div className="space-y-4">
-                                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Pasos a seguir</h4>
-                                    {activeGuide.steps.map((step, idx) => (
-                                        <div key={idx} className="flex gap-4 group">
-                                            <div className="flex flex-col items-center gap-1">
-                                                <div className="w-6 h-6 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-400 group-hover:border-indigo-500 group-hover:text-indigo-400 transition-colors">
-                                                    {idx + 1}
-                                                </div>
-                                                {idx !== activeGuide.steps.length - 1 && <div className="w-px h-full bg-slate-800 group-hover:bg-slate-700 transition-colors"></div>}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
+                                {/* Guide List */}
+                                <div className="md:col-span-1 space-y-3">
+                                    {ACCOUNT_REMOVAL_GUIDES.map(guide => (
+                                        <button
+                                            key={guide.id}
+                                            onClick={() => setActiveGuide(guide)}
+                                            className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between group ${activeGuide?.id === guide.id
+                                                ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-900/40'
+                                                : 'bg-slate-800/50 border-white/5 text-slate-400 hover:bg-slate-800 hover:text-white hover:border-white/10'
+                                                }`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                {/* Simple icon mapping or just show title */}
+                                                <span className="font-bold text-sm">{guide.title}</span>
                                             </div>
-                                            <p className="text-slate-300 text-sm leading-relaxed pb-6 pt-0.5 group-hover:text-white transition-colors">
-                                                {step}
-                                            </p>
-                                        </div>
+                                            <ChevronRight size={16} className={`transition-transform ${activeGuide?.id === guide.id ? 'rotate-90' : 'opacity-50'}`} />
+                                        </button>
                                     ))}
                                 </div>
-                            </div>
-                        ) : (
-                            <div className="h-full flex flex-col items-center justify-center text-slate-500 opacity-50">
-                                <BookOpen size={48} className="mb-4" />
-                                <p className="text-sm font-medium uppercase tracking-widest">Selecciona una guía</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
-    )
-}
-{
-    mode === 'gold' && (
-        <div className="max-w-4xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-6">
 
-            {/* LEFT: CALCULATOR */}
-            <div className="bg-[#0f172a] rounded-2xl p-6 border border-amber-500/20 shadow-2xl shadow-amber-900/20 flex flex-col">
-                <h2 className="text-xl font-bold text-amber-500 mb-6 flex items-center gap-2"><Watch /> Cotizador de Oro</h2>
-
-                {/* CURRENT REFERENCE PRICE */}
-                <div className="mb-6 bg-slate-900/50 p-4 rounded-xl border border-white/5 flex items-center justify-between">
-                    <div>
-                        <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Precio Base (18k)</p>
-                        <p className="text-xs text-slate-500">Definido en Productividad</p>
-                    </div>
-                    <div className="text-right">
-                        <p className="text-2xl font-black text-white">{parseFloat(contextGoldPrice).toFixed(2)} €/g</p>
-                    </div>
-                </div>
-
-                <div className="space-y-4 flex-1">
-                    <div>
-                        <label className="text-xs font-bold text-slate-400 uppercase">Peso (gramos)</label>
-                        <input type="number" value={goldForm.weight} onChange={e => setGoldForm({ ...goldForm, weight: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white text-lg outline-none focus:border-amber-500" placeholder="0.00" />
-                    </div>
-                    <div>
-                        <label className="text-xs font-bold text-slate-400 uppercase">Kilates</label>
-                        <div className="grid grid-cols-4 gap-2 mt-1">
-                            {[24, 18, 14, 9].map(k => (
-                                <button key={k} onClick={() => setGoldForm({ ...goldForm, karats: k })} className={`py-2 rounded-lg font-bold border transition-all ${goldForm.karats == k ? 'bg-amber-500 text-black border-amber-500' : 'bg-slate-800 text-slate-400 border-white/5'}`}>{k}K</button>
-                            ))}
-                        </div>
-                    </div>
-                    <button onClick={calculateGold} className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl shadow-lg shadow-amber-500/20 transition-all mt-4">CALCULAR VALOR</button>
-
-                    {goldQuote && (
-                        <div className="mt-4 bg-slate-900/50 p-4 rounded-xl border border-amber-500/30 text-center animate-in zoom-in">
-                            <p className="text-slate-400 text-xs mb-1">Valor Estimado ({goldForm.karats}K)</p>
-                            <p className="text-4xl font-black text-white">{goldQuote.total.toFixed(2)}€</p>
-                            <p className="text-amber-500 text-xs mt-2 font-mono">{goldQuote.pricePerGram.toFixed(2)} €/gr</p>
-                            <div className="mt-4 p-2 bg-amber-500/10 rounded border border-amber-500/20">
-                                <p className="text-[10px] font-bold text-amber-200 uppercase tracking-wide">⚠️ Precio Mínimo Garantizado</p>
-                                <p className="text-[9px] text-amber-400/80">Para oro limpio de 18 quilates sin mermas.</p>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* RIGHT: TEST PROTOCOL */}
-            <div className="bg-[#1e293b]/80 backdrop-blur rounded-2xl p-6 border border-white/10 shadow-xl flex flex-col">
-                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                    <CheckCircle size={18} className="text-green-500" /> Protocolo de Prueba
-                </h3>
-                <p className="text-xs text-slate-400 mb-4">Verificaciones obligatorias para evitar errores en la compra.</p>
-
-                <div className="flex-1 bg-slate-900/50 rounded-xl overflow-hidden border border-white/5 p-4">
-                    {/* Placeholder content for now as requested */}
-                    <table className="w-full text-left">
-                        <thead>
-                            <tr className="border-b border-white/10">
-                                <th className="pb-2 text-[10px] font-bold text-slate-500 uppercase">Punto de Control</th>
-                                <th className="pb-2 text-[10px] font-bold text-slate-500 uppercase text-right">Estado</th>
-                            </tr>
-                        </thead>
-                        <tbody className="text-sm divide-y divide-white/5">
-                            <tr className="group">
-                                <td className="py-3 text-slate-300">Revisión visual (Color/Brillo)</td>
-                                <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
-                            </tr>
-                            <tr className="group">
-                                <td className="py-3 text-slate-300">Búsqueda de contrastes</td>
-                                <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
-                            </tr>
-                            <tr className="group">
-                                <td className="py-3 text-slate-300">Prueba del Imán (Hierro)</td>
-                                <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
-                            </tr>
-                            <tr className="group">
-                                <td className="py-3 text-slate-300">Prueba de la Piedra (Toque)</td>
-                                <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
-                            </tr>
-                            <tr className="group">
-                                <td className="py-3 text-slate-300">Reacción al Ácido (18k)</td>
-                                <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
-                            </tr>
-                            <tr className="group">
-                                <td className="py-3 text-slate-300">Revisión de cierres/muelles</td>
-                                <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
-                            </tr>
-                            <tr className="group">
-                                <td className="py-3 text-slate-300">Pesaje (Báscula calibrada)</td>
-                                <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                        <p className="text-[10px] text-blue-300 leading-relaxed">
-                            ℹ️ <strong>Nota:</strong> Si la pieza tiene piedras, restar el peso estimado antes de cotizar. Ante la duda, consultar con encargado.
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-        </div>
-    )
-}
-
-{/* TIMEGRAPHER HELP MODAL */ }
-<AnimatePresence>
-    {showTimegrapherHelp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setShowTimegrapherHelp(false)}>
-            <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                onClick={e => e.stopPropagation()}
-                className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto custom-scrollbar flex flex-col"
-            >
-                {/* Header */}
-                <div className="p-6 border-b border-slate-800 flex justify-between items-center sticky top-0 bg-slate-900/95 backdrop-blur z-10">
-                    <div>
-                        <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-                            <Watch className="text-amber-500" />
-                            Guía del Cronocomparador
-                        </h2>
-                        <p className="text-slate-400 text-sm mt-1">Cómo medir y entender los resultados</p>
-                    </div>
-                    <button onClick={() => setShowTimegrapherHelp(false)} className="bg-slate-800 hover:bg-slate-700 text-white p-2 rounded-lg transition-colors">
-                        <XCircle size={20} />
-                    </button>
-                </div>
-
-                {/* Content */}
-                <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {/* COLUMN 1: USAGE */}
-                    <div className="space-y-6">
-                        <div className="bg-blue-900/10 border border-blue-500/20 p-4 rounded-xl">
-                            <h3 className="text-blue-400 font-bold text-lg mb-3 flex items-center gap-2">🛠️ 1. Ritual de Uso</h3>
-                            <ul className="space-y-3 text-sm text-slate-300">
-                                <li className="flex gap-3">
-                                    <span className="bg-blue-500/20 text-blue-400 font-bold px-2 py-0.5 rounded h-fit text-xs">A</span>
-                                    <div><strong className="text-white">Carga Máxima:</strong> Dale toda la cuerda al reloj. Sin carga = mala amplitud (falso negativo).</div>
-                                </li>
-                                <li className="flex gap-3">
-                                    <span className="bg-blue-500/20 text-blue-400 font-bold px-2 py-0.5 rounded h-fit text-xs">B</span>
-                                    <div><strong className="text-white">Silencio:</strong> No hablar ni golpear la mesa. El micrófono detecta todo.</div>
-                                </li>
-                                <li className="flex gap-3">
-                                    <span className="bg-blue-500/20 text-blue-400 font-bold px-2 py-0.5 rounded h-fit text-xs">C</span>
-                                    <div>
-                                        <strong className="text-white">Lift Angle (Ángulo):</strong>
-                                        <p className="mt-1 text-xs opacity-80">Por defecto: <span className="text-green-400 font-mono">52°</span> (Valido 80% casos).</p>
-                                        <p className="text-xs opacity-80">Rolex Modernos (3135/3235): Cambiar a <span className="text-amber-400 font-mono">53°/55°</span>.</p>
-                                    </div>
-                                </li>
-                                <li className="flex gap-3">
-                                    <span className="bg-blue-500/20 text-blue-400 font-bold px-2 py-0.5 rounded h-fit text-xs">D</span>
-                                    <div>
-                                        <strong className="text-white">Posiciones Clave:</strong>
-                                        <div className="mt-2 grid grid-cols-2 gap-2">
-                                            <div className="bg-slate-800 p-2 rounded text-center">
-                                                <span className="block text-xs font-bold text-slate-400">Dial Up</span>
-                                                <span className="text-[10px] opacity-60">Esfera Arriba</span>
+                                {/* Active Guide Content */}
+                                <div className="md:col-span-2 bg-slate-950/50 rounded-2xl border border-white/5 p-6 h-full min-h-[400px]">
+                                    {activeGuide ? (
+                                        <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                                            <div className="flex items-center gap-3 mb-6">
+                                                <div className={`p-3 rounded-xl bg-${activeGuide.color || 'slate'}-500/20 text-${activeGuide.color || 'slate'}-400`}>
+                                                    <BookOpen size={24} />
+                                                </div>
+                                                <h3 className="text-xl font-bold text-white">{activeGuide.title}</h3>
                                             </div>
-                                            <div className="bg-slate-800 p-2 rounded text-center">
-                                                <span className="block text-xs font-bold text-slate-400">Crown Down</span>
-                                                <span className="text-[10px] opacity-60">Corona Abajo</span>
+
+                                            {activeGuide.warning && (
+                                                <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl mb-6 text-sm font-medium flex gap-3 items-start">
+                                                    <Info className="shrink-0 mt-0.5" size={16} />
+                                                    <p>{activeGuide.warning}</p>
+                                                </div>
+                                            )}
+
+                                            <div className="space-y-4">
+                                                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Pasos a seguir</h4>
+                                                {activeGuide.steps.map((step, idx) => (
+                                                    <div key={idx} className="flex gap-4 group">
+                                                        <div className="flex flex-col items-center gap-1">
+                                                            <div className="w-6 h-6 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-400 group-hover:border-indigo-500 group-hover:text-indigo-400 transition-colors">
+                                                                {idx + 1}
+                                                            </div>
+                                                            {idx !== activeGuide.steps.length - 1 && <div className="w-px h-full bg-slate-800 group-hover:bg-slate-700 transition-colors"></div>}
+                                                        </div>
+                                                        <p className="text-slate-300 text-sm leading-relaxed pb-6 pt-0.5 group-hover:text-white transition-colors">
+                                                            {step}
+                                                        </p>
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
+                                    ) : (
+                                        <div className="h-full flex flex-col items-center justify-center text-slate-500 opacity-50">
+                                            <BookOpen size={48} className="mb-4" />
+                                            <p className="text-sm font-medium uppercase tracking-widest">Selecciona una guía</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+            {
+                mode === 'gold' && (
+                    <div className="max-w-4xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                        {/* LEFT: CALCULATOR */}
+                        <div className="bg-[#0f172a] rounded-2xl p-6 border border-amber-500/20 shadow-2xl shadow-amber-900/20 flex flex-col">
+                            <h2 className="text-xl font-bold text-amber-500 mb-6 flex items-center gap-2"><Watch /> Cotizador de Oro</h2>
+
+                            {/* CURRENT REFERENCE PRICE */}
+                            <div className="mb-6 bg-slate-900/50 p-4 rounded-xl border border-white/5 flex items-center justify-between">
+                                <div>
+                                    <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Precio Base (18k)</p>
+                                    <p className="text-xs text-slate-500">Definido en Productividad</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-2xl font-black text-white">{parseFloat(contextGoldPrice).toFixed(2)} €/g</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4 flex-1">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-400 uppercase">Peso (gramos)</label>
+                                    <input type="number" value={goldForm.weight} onChange={e => setGoldForm({ ...goldForm, weight: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white text-lg outline-none focus:border-amber-500" placeholder="0.00" />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-400 uppercase">Kilates</label>
+                                    <div className="grid grid-cols-4 gap-2 mt-1">
+                                        {[24, 18, 14, 9].map(k => (
+                                            <button key={k} onClick={() => setGoldForm({ ...goldForm, karats: k })} className={`py-2 rounded-lg font-bold border transition-all ${goldForm.karats == k ? 'bg-amber-500 text-black border-amber-500' : 'bg-slate-800 text-slate-400 border-white/5'}`}>{k}K</button>
+                                        ))}
                                     </div>
-                                </li>
-                            </ul>
+                                </div>
+                                <button onClick={calculateGold} className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl shadow-lg shadow-amber-500/20 transition-all mt-4">CALCULAR VALOR</button>
+
+                                {goldQuote && (
+                                    <div className="mt-4 bg-slate-900/50 p-4 rounded-xl border border-amber-500/30 text-center animate-in zoom-in">
+                                        <p className="text-slate-400 text-xs mb-1">Valor Estimado ({goldForm.karats}K)</p>
+                                        <p className="text-4xl font-black text-white">{goldQuote.total.toFixed(2)}€</p>
+                                        <p className="text-amber-500 text-xs mt-2 font-mono">{goldQuote.pricePerGram.toFixed(2)} €/gr</p>
+                                        <div className="mt-4 p-2 bg-amber-500/10 rounded border border-amber-500/20">
+                                            <p className="text-[10px] font-bold text-amber-200 uppercase tracking-wide">⚠️ Precio Mínimo Garantizado</p>
+                                            <p className="text-[9px] text-amber-400/80">Para oro limpio de 18 quilates sin mermas.</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
+
+                        {/* RIGHT: TEST PROTOCOL */}
+                        <div className="bg-[#1e293b]/80 backdrop-blur rounded-2xl p-6 border border-white/10 shadow-xl flex flex-col">
+                            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                                <CheckCircle size={18} className="text-green-500" /> Protocolo de Prueba
+                            </h3>
+                            <p className="text-xs text-slate-400 mb-4">Verificaciones obligatorias para evitar errores en la compra.</p>
+
+                            <div className="flex-1 bg-slate-900/50 rounded-xl overflow-hidden border border-white/5 p-4">
+                                {/* Placeholder content for now as requested */}
+                                <table className="w-full text-left">
+                                    <thead>
+                                        <tr className="border-b border-white/10">
+                                            <th className="pb-2 text-[10px] font-bold text-slate-500 uppercase">Punto de Control</th>
+                                            <th className="pb-2 text-[10px] font-bold text-slate-500 uppercase text-right">Estado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="text-sm divide-y divide-white/5">
+                                        <tr className="group">
+                                            <td className="py-3 text-slate-300">Revisión visual (Color/Brillo)</td>
+                                            <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
+                                        </tr>
+                                        <tr className="group">
+                                            <td className="py-3 text-slate-300">Búsqueda de contrastes</td>
+                                            <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
+                                        </tr>
+                                        <tr className="group">
+                                            <td className="py-3 text-slate-300">Prueba del Imán (Hierro)</td>
+                                            <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
+                                        </tr>
+                                        <tr className="group">
+                                            <td className="py-3 text-slate-300">Prueba de la Piedra (Toque)</td>
+                                            <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
+                                        </tr>
+                                        <tr className="group">
+                                            <td className="py-3 text-slate-300">Reacción al Ácido (18k)</td>
+                                            <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
+                                        </tr>
+                                        <tr className="group">
+                                            <td className="py-3 text-slate-300">Revisión de cierres/muelles</td>
+                                            <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
+                                        </tr>
+                                        <tr className="group">
+                                            <td className="py-3 text-slate-300">Pesaje (Báscula calibrada)</td>
+                                            <td className="py-3 text-right text-slate-500 group-hover:text-white">--</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                                    <p className="text-[10px] text-blue-300 leading-relaxed">
+                                        ℹ️ <strong>Nota:</strong> Si la pieza tiene piedras, restar el peso estimado antes de cotizar. Ante la duda, consultar con encargado.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
+                )
+            }
 
-                    {/* COLUMN 2: INTERPRETATION */}
-                    <div className="space-y-6">
-                        <h3 className="text-emerald-400 font-bold text-lg mb-1 flex items-center gap-2">📊 2. Interpretación</h3>
+            {/* TIMEGRAPHER HELP MODAL */}
+            <AnimatePresence>
+                {showTimegrapherHelp && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setShowTimegrapherHelp(false)}>
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            onClick={e => e.stopPropagation()}
+                            className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto custom-scrollbar flex flex-col"
+                        >
+                            {/* Header */}
+                            <div className="p-6 border-b border-slate-800 flex justify-between items-center sticky top-0 bg-slate-900/95 backdrop-blur z-10">
+                                <div>
+                                    <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                                        <Watch className="text-amber-500" />
+                                        Guía del Cronocomparador
+                                    </h2>
+                                    <p className="text-slate-400 text-sm mt-1">Cómo medir y entender los resultados</p>
+                                </div>
+                                <button onClick={() => setShowTimegrapherHelp(false)} className="bg-slate-800 hover:bg-slate-700 text-white p-2 rounded-lg transition-colors">
+                                    <XCircle size={20} />
+                                </button>
+                            </div>
 
-                        {/* RATE */}
-                        <div className="space-y-2">
-                            <div className="flex justify-between items-center">
-                                <h4 className="font-bold text-white text-sm">A. RATE (Desviación)</h4>
-                                <span className="text-xs font-mono bg-slate-800 px-2 py-0.5 rounded text-slate-400">s/d</span>
-                            </div>
-                            <div className="grid grid-cols-3 gap-1 text-center text-xs">
-                                <div className="bg-emerald-900/30 border border-emerald-500/30 p-2 rounded text-emerald-400">
-                                    <strong>Excelente</strong><br />-2 a +5
+                            {/* Content */}
+                            <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                {/* COLUMN 1: USAGE */}
+                                <div className="space-y-6">
+                                    <div className="bg-blue-900/10 border border-blue-500/20 p-4 rounded-xl">
+                                        <h3 className="text-blue-400 font-bold text-lg mb-3 flex items-center gap-2">🛠️ 1. Ritual de Uso</h3>
+                                        <ul className="space-y-3 text-sm text-slate-300">
+                                            <li className="flex gap-3">
+                                                <span className="bg-blue-500/20 text-blue-400 font-bold px-2 py-0.5 rounded h-fit text-xs">A</span>
+                                                <div><strong className="text-white">Carga Máxima:</strong> Dale toda la cuerda al reloj. Sin carga = mala amplitud (falso negativo).</div>
+                                            </li>
+                                            <li className="flex gap-3">
+                                                <span className="bg-blue-500/20 text-blue-400 font-bold px-2 py-0.5 rounded h-fit text-xs">B</span>
+                                                <div><strong className="text-white">Silencio:</strong> No hablar ni golpear la mesa. El micrófono detecta todo.</div>
+                                            </li>
+                                            <li className="flex gap-3">
+                                                <span className="bg-blue-500/20 text-blue-400 font-bold px-2 py-0.5 rounded h-fit text-xs">C</span>
+                                                <div>
+                                                    <strong className="text-white">Lift Angle (Ángulo):</strong>
+                                                    <p className="mt-1 text-xs opacity-80">Por defecto: <span className="text-green-400 font-mono">52°</span> (Valido 80% casos).</p>
+                                                    <p className="text-xs opacity-80">Rolex Modernos (3135/3235): Cambiar a <span className="text-amber-400 font-mono">53°/55°</span>.</p>
+                                                </div>
+                                            </li>
+                                            <li className="flex gap-3">
+                                                <span className="bg-blue-500/20 text-blue-400 font-bold px-2 py-0.5 rounded h-fit text-xs">D</span>
+                                                <div>
+                                                    <strong className="text-white">Posiciones Clave:</strong>
+                                                    <div className="mt-2 grid grid-cols-2 gap-2">
+                                                        <div className="bg-slate-800 p-2 rounded text-center">
+                                                            <span className="block text-xs font-bold text-slate-400">Dial Up</span>
+                                                            <span className="text-[10px] opacity-60">Esfera Arriba</span>
+                                                        </div>
+                                                        <div className="bg-slate-800 p-2 rounded text-center">
+                                                            <span className="block text-xs font-bold text-slate-400">Crown Down</span>
+                                                            <span className="text-[10px] opacity-60">Corona Abajo</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </li>
+                                        </ul>
+                                    </div>
                                 </div>
-                                <div className="bg-slate-800 p-2 rounded text-slate-300">
-                                    <strong>Aceptable</strong><br />-10 a +15
-                                </div>
-                                <div className="bg-red-900/30 border border-red-500/30 p-2 rounded text-red-400">
-                                    <strong>Alerta</strong><br />&gt; +/- 20
-                                </div>
-                            </div>
-                            <p className="text-[10px] text-slate-500 italic">Si marca &gt;20s, necesita ajuste/limpieza.</p>
-                        </div>
 
-                        {/* AMPLITUDE */}
-                        <div className="space-y-2">
-                            <div className="flex justify-between items-center">
-                                <h4 className="font-bold text-white text-sm">B. AMPLITUDE (Salud Motor)</h4>
-                                <span className="text-xs font-mono bg-slate-800 px-2 py-0.5 rounded text-slate-400">Grados (°)</span>
-                            </div>
-                            <div className="grid grid-cols-3 gap-1 text-center text-xs">
-                                <div className="bg-emerald-900/30 border border-emerald-500/30 p-2 rounded text-emerald-400">
-                                    <strong>Fuerte</strong><br />270° - 310°
-                                </div>
-                                <div className="bg-yellow-900/20 border border-yellow-500/20 p-2 rounded text-yellow-400">
-                                    <strong>Baja</strong><br />&lt; 230°
-                                </div>
-                                <div className="bg-red-900/30 border border-red-500/30 p-2 rounded text-red-400">
-                                    <strong>Alta (Rebote)</strong><br />&gt; 330°
-                                </div>
-                            </div>
-                            <p className="text-[10px] text-slate-500 italic">Baja amplitud = Aceites secos = Necesita Service.</p>
-                        </div>
+                                {/* COLUMN 2: INTERPRETATION */}
+                                <div className="space-y-6">
+                                    <h3 className="text-emerald-400 font-bold text-lg mb-1 flex items-center gap-2">📊 2. Interpretación</h3>
 
-                        {/* BEAT ERROR */}
-                        <div className="space-y-2">
-                            <div className="flex justify-between items-center">
-                                <h4 className="font-bold text-white text-sm">C. BEAT ERROR (Ritmo)</h4>
-                                <span className="text-xs font-mono bg-slate-800 px-2 py-0.5 rounded text-slate-400">ms</span>
-                            </div>
-                            <div className="grid grid-cols-3 gap-1 text-center text-xs">
-                                <div className="bg-emerald-900/30 border border-emerald-500/30 p-2 rounded text-emerald-400">
-                                    <strong>Perfecto</strong><br />0.0 - 0.2
-                                </div>
-                                <div className="bg-slate-800 p-2 rounded text-slate-300">
-                                    <strong>Aceptable</strong><br />Hasta 0.8
-                                </div>
-                                <div className="bg-red-900/30 border border-red-500/30 p-2 rounded text-red-400">
-                                    <strong>Cojo</strong><br />&gt; 1.0 ms
-                                </div>
-                            </div>
-                            <p className="text-[10px] text-slate-500 italic">Error alto requiere ajuste de relojero.</p>
-                        </div>
+                                    {/* RATE */}
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <h4 className="font-bold text-white text-sm">A. RATE (Desviación)</h4>
+                                            <span className="text-xs font-mono bg-slate-800 px-2 py-0.5 rounded text-slate-400">s/d</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-1 text-center text-xs">
+                                            <div className="bg-emerald-900/30 border border-emerald-500/30 p-2 rounded text-emerald-400">
+                                                <strong>Excelente</strong><br />-2 a +5
+                                            </div>
+                                            <div className="bg-slate-800 p-2 rounded text-slate-300">
+                                                <strong>Aceptable</strong><br />-10 a +15
+                                            </div>
+                                            <div className="bg-red-900/30 border border-red-500/30 p-2 rounded text-red-400">
+                                                <strong>Alerta</strong><br />&gt; +/- 20
+                                            </div>
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 italic">Si marca &gt;20s, necesita ajuste/limpieza.</p>
+                                    </div>
 
+                                    {/* AMPLITUDE */}
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <h4 className="font-bold text-white text-sm">B. AMPLITUDE (Salud Motor)</h4>
+                                            <span className="text-xs font-mono bg-slate-800 px-2 py-0.5 rounded text-slate-400">Grados (°)</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-1 text-center text-xs">
+                                            <div className="bg-emerald-900/30 border border-emerald-500/30 p-2 rounded text-emerald-400">
+                                                <strong>Fuerte</strong><br />270° - 310°
+                                            </div>
+                                            <div className="bg-yellow-900/20 border border-yellow-500/20 p-2 rounded text-yellow-400">
+                                                <strong>Baja</strong><br />&lt; 230°
+                                            </div>
+                                            <div className="bg-red-900/30 border border-red-500/30 p-2 rounded text-red-400">
+                                                <strong>Alta (Rebote)</strong><br />&gt; 330°
+                                            </div>
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 italic">Baja amplitud = Aceites secos = Necesita Service.</p>
+                                    </div>
+
+                                    {/* BEAT ERROR */}
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <h4 className="font-bold text-white text-sm">C. BEAT ERROR (Ritmo)</h4>
+                                            <span className="text-xs font-mono bg-slate-800 px-2 py-0.5 rounded text-slate-400">ms</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-1 text-center text-xs">
+                                            <div className="bg-emerald-900/30 border border-emerald-500/30 p-2 rounded text-emerald-400">
+                                                <strong>Perfecto</strong><br />0.0 - 0.2
+                                            </div>
+                                            <div className="bg-slate-800 p-2 rounded text-slate-300">
+                                                <strong>Aceptable</strong><br />Hasta 0.8
+                                            </div>
+                                            <div className="bg-red-900/30 border border-red-500/30 p-2 rounded text-red-400">
+                                                <strong>Cojo</strong><br />&gt; 1.0 ms
+                                            </div>
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 italic">Error alto requiere ajuste de relojero.</p>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </motion.div>
                     </div>
-                </div>
-            </motion.div>
-        </div>
-    )}
-</AnimatePresence>
-                </div >
-            );
+                )}
+            </AnimatePresence>
+        </div >
+    );
 };
 
 export default Market;

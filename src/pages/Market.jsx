@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useProductivity } from '../context/ProductivityContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ExternalLink, Smartphone, Monitor, Watch, Hammer, Gamepad2, CheckCircle, XCircle, Grid, QrCode, Download, Info, BookOpen, ChevronRight, CornerDownRight, FileText } from 'lucide-react';
+import { Search, ExternalLink, Smartphone, Monitor, Watch, Hammer, Gamepad2, CheckCircle, XCircle, Grid, QrCode, Download, Info, BookOpen, ChevronRight, CornerDownRight, FileText, ShieldCheck, UserMinus, AlertTriangle } from 'lucide-react';
 import { generateDiagnosticCertificate, generateWatchCertificate } from '../utils/pdfGenerator';
-import { ACCOUNT_REMOVAL_GUIDES } from '../data/guides';
+import { ACCOUNT_REMOVAL_GUIDES, AUTHENTICITY_GUIDES } from '../data/guides';
 
 const CATEGORIES = {
     phones: { name: 'Móviles/Tablets', margin: 0.40, icon: <Smartphone size={18} />, color: 'pink', checklist: ['IMEI/Red', 'Cosmético', 'Seguridad', 'Pantalla/Touch', 'Vibración/Sensores', 'Micrófono/Audio', 'Cámaras/Flash', 'GPS', 'Carga'] },
@@ -106,6 +106,7 @@ const Market = () => {
     });
 
     const [activeGuide, setActiveGuide] = useState(null);
+    const [guideCategory, setGuideCategory] = useState('accounts'); // 'accounts' | 'authenticity'
 
     // Reset checklist when category changes
     useEffect(() => {
@@ -893,28 +894,43 @@ const Market = () => {
             {/* CONTENT: GUIDES MODE */}
             {
                 mode === 'guides' && (
-                    <div className="max-w-5xl mx-auto w-full flex flex-col gap-6">
+                    <div className="max-w-6xl mx-auto w-full flex flex-col gap-6">
                         <div className="bg-[#1e293b] rounded-2xl p-8 border border-white/5 shadow-2xl relative overflow-hidden min-h-[600px]">
                             <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none"></div>
 
-                            <h2 className="text-2xl font-bold text-white mb-8 flex items-center gap-3 relative z-10">
-                                <BookOpen className="text-indigo-500" /> Manuales de Desbloqueo y Restauración
-                            </h2>
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 relative z-10">
+                                <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                                    <BookOpen className="text-indigo-500" /> Manuales y Guías
+                                </h2>
+                                <div className="flex bg-slate-900/50 p-1 rounded-xl border border-white/10">
+                                    <button
+                                        onClick={() => { setGuideCategory('accounts'); setActiveGuide(null); }}
+                                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${guideCategory === 'accounts' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:text-white'}`}
+                                    >
+                                        <UserMinus size={14} /> Desbloqueos
+                                    </button>
+                                    <button
+                                        onClick={() => { setGuideCategory('authenticity'); setActiveGuide(null); }}
+                                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${guideCategory === 'authenticity' ? 'bg-red-600 text-white shadow-lg shadow-red-500/20' : 'text-slate-400 hover:text-white'}`}
+                                    >
+                                        <ShieldCheck size={14} /> Autenticidad
+                                    </button>
+                                </div>
+                            </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
                                 {/* Guide List */}
-                                <div className="md:col-span-1 space-y-3">
-                                    {ACCOUNT_REMOVAL_GUIDES.map(guide => (
+                                <div className="md:col-span-1 space-y-3 max-h-[600px] overflow-y-auto custom-scrollbar pr-2">
+                                    {(guideCategory === 'accounts' ? ACCOUNT_REMOVAL_GUIDES : AUTHENTICITY_GUIDES).map(guide => (
                                         <button
                                             key={guide.id}
                                             onClick={() => setActiveGuide(guide)}
                                             className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between group ${activeGuide?.id === guide.id
-                                                ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-900/40'
+                                                ? guideCategory === 'accounts' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-red-600 border-red-500 text-white'
                                                 : 'bg-slate-800/50 border-white/5 text-slate-400 hover:bg-slate-800 hover:text-white hover:border-white/10'
                                                 }`}
                                         >
                                             <div className="flex items-center gap-3">
-                                                {/* Simple icon mapping or just show title */}
                                                 <span className="font-bold text-sm">{guide.title}</span>
                                             </div>
                                             <ChevronRight size={16} className={`transition-transform ${activeGuide?.id === guide.id ? 'rotate-90' : 'opacity-50'}`} />
@@ -923,16 +939,17 @@ const Market = () => {
                                 </div>
 
                                 {/* Active Guide Content */}
-                                <div className="md:col-span-2 bg-slate-950/50 rounded-2xl border border-white/5 p-6 h-full min-h-[400px]">
+                                <div className="md:col-span-2 bg-slate-950/50 rounded-2xl border border-white/5 p-6 h-full min-h-[400px] overflow-y-auto custom-scrollbar">
                                     {activeGuide ? (
                                         <div className="animate-in fade-in slide-in-from-right-4 duration-300">
                                             <div className="flex items-center gap-3 mb-6">
                                                 <div className={`p-3 rounded-xl bg-${activeGuide.color || 'slate'}-500/20 text-${activeGuide.color || 'slate'}-400`}>
-                                                    <BookOpen size={24} />
+                                                    {guideCategory === 'accounts' ? <BookOpen size={24} /> : <AlertTriangle size={24} />}
                                                 </div>
                                                 <h3 className="text-xl font-bold text-white">{activeGuide.title}</h3>
                                             </div>
 
+                                            {/* Warning Box */}
                                             {activeGuide.warning && (
                                                 <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl mb-6 text-sm font-medium flex gap-3 items-start">
                                                     <Info className="shrink-0 mt-0.5" size={16} />
@@ -940,26 +957,44 @@ const Market = () => {
                                                 </div>
                                             )}
 
-                                            <div className="space-y-4">
-                                                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Pasos a seguir</h4>
-                                                {activeGuide.steps.map((step, idx) => (
-                                                    <div key={idx} className="flex gap-4 group">
-                                                        <div className="flex flex-col items-center gap-1">
-                                                            <div className="w-6 h-6 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-400 group-hover:border-indigo-500 group-hover:text-indigo-400 transition-colors">
-                                                                {idx + 1}
+                                            {/* STEPS (Account Removal) */}
+                                            {activeGuide.steps && (
+                                                <div className="space-y-4">
+                                                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Pasos a seguir</h4>
+                                                    {activeGuide.steps.map((step, idx) => (
+                                                        <div key={idx} className="flex gap-4 group">
+                                                            <div className="flex flex-col items-center gap-1">
+                                                                <div className="w-6 h-6 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-400 group-hover:border-indigo-500 group-hover:text-indigo-400 transition-colors">
+                                                                    {idx + 1}
+                                                                </div>
+                                                                {idx !== activeGuide.steps.length - 1 && <div className="w-px h-full bg-slate-800 group-hover:bg-slate-700 transition-colors"></div>}
                                                             </div>
-                                                            {idx !== activeGuide.steps.length - 1 && <div className="w-px h-full bg-slate-800 group-hover:bg-slate-700 transition-colors"></div>}
+                                                            <p className="text-slate-300 text-sm leading-relaxed pb-6 pt-0.5 group-hover:text-white transition-colors">
+                                                                {step}
+                                                            </p>
                                                         </div>
-                                                        <p className="text-slate-300 text-sm leading-relaxed pb-6 pt-0.5 group-hover:text-white transition-colors">
-                                                            {step}
-                                                        </p>
-                                                    </div>
-                                                ))}
-                                            </div>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {/* CHECKS (Authenticity) */}
+                                            {activeGuide.checks && (
+                                                <div className="space-y-6">
+                                                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Puntos de Verificación de Copia</h4>
+                                                    {activeGuide.checks.map((check, idx) => (
+                                                        <div key={idx} className="bg-slate-900/50 p-4 rounded-xl border border-white/5 hover:border-red-500/30 transition-colors">
+                                                            <h5 className="text-sm font-bold text-red-400 mb-2 flex items-center gap-2">
+                                                                <AlertTriangle size={14} /> {check.label}
+                                                            </h5>
+                                                            <p className="text-slate-300 text-sm leading-relaxed">{check.desc}</p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     ) : (
                                         <div className="h-full flex flex-col items-center justify-center text-slate-500 opacity-50">
-                                            <BookOpen size={48} className="mb-4" />
+                                            {guideCategory === 'accounts' ? <UserMinus size={48} className="mb-4" /> : <ShieldCheck size={48} className="mb-4" />}
                                             <p className="text-sm font-medium uppercase tracking-widest">Selecciona una guía</p>
                                         </div>
                                     )}

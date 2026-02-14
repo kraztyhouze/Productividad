@@ -240,25 +240,29 @@ app.post('/api/settings/gold', async (req, res) => {
 });
 
 // Closing Hours Settings
-app.get('/api/settings/closing-hours', async (req, res) => {
+// General Store Settings (Closing Hours + Announcement)
+app.get('/api/settings', async (req, res) => {
     const storeId = req.headers['x-store-id'] || 'store_1';
     try {
-        const result = await pool.query('SELECT midday_close, night_close FROM store_settings WHERE store_id = $1', [storeId]);
+        const result = await pool.query('SELECT midday_close, night_close, announcement FROM store_settings WHERE store_id = $1', [storeId]);
         if (result.rows.length > 0) {
             res.json(result.rows[0]);
         } else {
-            res.json({ midday_close: '', night_close: '' });
+            res.json({ midday_close: '', night_close: '', announcement: '' });
         }
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/settings/closing-hours', async (req, res) => {
+app.post('/api/settings', async (req, res) => {
     const storeId = req.headers['x-store-id'] || 'store_1';
-    const { midday_close, night_close } = req.body;
+    const { midday_close, night_close, announcement } = req.body;
     try {
         await pool.query(
-            'INSERT INTO store_settings (store_id, midday_close, night_close) VALUES ($1, $2, $3) ON CONFLICT (store_id) DO UPDATE SET midday_close = $2, night_close = $3, updated_at = CURRENT_TIMESTAMP',
-            [storeId, midday_close, night_close]
+            `INSERT INTO store_settings (store_id, midday_close, night_close, announcement) 
+             VALUES ($1, $2, $3, $4) 
+             ON CONFLICT (store_id) 
+             DO UPDATE SET midday_close = $2, night_close = $3, announcement = $4, updated_at = CURRENT_TIMESTAMP`,
+            [storeId, midday_close, night_close, announcement]
         );
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }

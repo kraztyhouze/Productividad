@@ -51,10 +51,31 @@ async function migratePasswords() {
     try {
         await pool.query('ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS midday_close TEXT');
         await pool.query('ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS night_close TEXT');
-        console.log('Schema updated: closing-hours columns ensured.');
+        await pool.query('ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS announcement TEXT');
+        console.log('Schema updated: closing-hours and announcement columns ensured.');
     } catch (e) {
         console.log('Schema check skipped:', e.message);
     }
+})();
+
+// --- NEW: Transaction Logs for Accurate Metrics ---
+// Table Init (Run once)
+(async () => {
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS transaction_logs (
+                id SERIAL PRIMARY KEY,
+                store_id TEXT NOT NULL,
+                employee_id TEXT NOT NULL,
+                start_time TIMESTAMP WITH TIME ZONE NOT NULL,
+                end_time TIMESTAMP WITH TIME ZONE NOT NULL,
+                type TEXT,
+                details JSONB,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('Schema updated: transaction_logs table ensured.');
+    } catch (e) { console.error('Error ensuring transaction_logs:', e); }
 })();
 
 // 0. Auth (Login) - Secure Server-Side Check
@@ -965,6 +986,24 @@ async function updateGoldPrices() {
             quickGoldPrice = goldPriceCache.data.quickgold !== 'Cargando...' ? goldPriceCache.data.quickgold : 'Error';
         }
 
+        // Fallback if QuickGold failed but we can try a generic search on the page content
+        if (!quickGoldPrice || quickGoldPrice === 'Error') {
+            try {
+                // Try parsing the whole text for 18k price pattern
+                quickGoldPrice = await page.evaluate(() => {
+                    const text = document.body.innerText;
+                    // Look for "18k" or "18 quilates" etc near a price
+                    // Regex: 18\s*[kK].{0,20}(\d+[,.]\d+)\s*€
+                    const match = text.match(/18\s*[kK].{0,30}(\d+[,.]\d+)\s*€\/g/i);
+                    if (match) {
+                        const val = parseFloat(match[1].replace(',', '.'));
+                        return (val - 0.35).toFixed(2);
+                    }
+                    return null;
+                });
+            } catch (e) { }
+        }
+
         goldPriceCache.data = {
             andorrano: andorranoPrice || goldPriceCache.data.andorrano,
             quickgold: quickGoldPrice || goldPriceCache.data.quickgold
@@ -1073,8 +1112,35 @@ app.get('/api/settings/closing-hours', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Endpoint to Update Settings
+// Endpoint to Get All Settings (Closing + Announcement)
+app.get('/api/settings', async (req, res) => {
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    try {
+        const result = await pool.query('SELECT midday_close, night_close, announcement FROM store_settings WHERE store_id = $1', [storeId]);
+        res.json(result.rows[0] || { midday_close: '', night_close: '', announcement: '' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Endpoint to Update Settings (Generic)
+app.post('/api/settings', async (req, res) => {
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    const { midday_close, night_close, announcement } = req.body;
+    try {
+        await pool.query(
+            `INSERT INTO store_settings (store_id, midday_close, night_close, announcement) 
+             VALUES ($1, $2, $3, $4) 
+             ON CONFLICT (store_id) 
+             DO UPDATE SET midday_close = COALESCE($2, store_settings.midday_close), 
+                           night_close = COALESCE($3, store_settings.night_close),
+                           announcement = COALESCE($4, store_settings.announcement)`,
+            [storeId, midday_close, night_close, announcement]
+        );
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/settings/closing-hours', async (req, res) => {
+    // Legacy support or specific update
     const storeId = req.headers['x-store-id'] || 'store_1';
     const { midday_close, night_close } = req.body;
     try {
@@ -1127,6 +1193,12 @@ async function closeStoreSessions(storeId) {
                     VALUES ($1, $2, $3)
                     ON CONFLICT (key) DO UPDATE SET client_seconds = daily_groups.client_seconds + $2
                 `, [key, clientDuration, storeId]);
+
+                // LOG TRANSACTION FOR STATS (Auto Close)
+                await client.query(
+                    'INSERT INTO transaction_logs (store_id, employee_id, start_time, end_time, type, details) VALUES ($1, $2, $3, $4, $5, $6)',
+                    [storeId, session.employee_id, session.client_start_time, endTimeStr, 'auto_close', JSON.stringify({ reason: 'Auto Close' })]
+                );
             }
 
             // Create Daily Record (Closed Session)
@@ -1182,6 +1254,172 @@ setInterval(async () => {
         console.error('[AutoCloseLoop] Error:', e);
     }
 }, 60000);
+
+
+// --- DASHBOARD STATS & TRANSACTION LOGS ---
+
+app.post('/api/transaction-logs', async (req, res) => {
+    const { employeeId, startTime, endTime, type, details } = req.body;
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    try {
+        await pool.query(
+            'INSERT INTO transaction_logs (store_id, employee_id, start_time, end_time, type, details) VALUES ($1, $2, $3, $4, $5, $6)',
+            [storeId, employeeId, startTime, endTime, type, details]
+        );
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Helper: Calculate Union Duration and Max Concurrency
+const calculateTimeStats = (logs) => {
+    if (!logs || logs.length === 0) return { unionSeconds: 0, maxConcurrent: 0, peakUsers: [] };
+
+    // 1. Union Duration
+    const intervals = logs.map(l => ({ start: new Date(l.start_time).getTime(), end: new Date(l.end_time).getTime() })).sort((a, b) => a.start - b.start);
+    let unionDuration = 0;
+    if (intervals.length > 0) {
+        let current = intervals[0];
+        for (let i = 1; i < intervals.length; i++) {
+            if (intervals[i].start < current.end) {
+                current.end = Math.max(current.end, intervals[i].end);
+            } else {
+                unionDuration += (current.end - current.start);
+                current = intervals[i];
+            }
+        }
+        unionDuration += (current.end - current.start);
+    }
+
+    // 2. Max Concurrency
+    const points = [];
+    logs.forEach(l => {
+        points.push({ t: new Date(l.start_time).getTime(), type: 1, emp: l.employee_id });
+        points.push({ t: new Date(l.end_time).getTime(), type: -1, emp: l.employee_id });
+    });
+    points.sort((a, b) => a.t - b.t || a.type - b.type);
+
+    let maxC = 0;
+    let currentC = 0;
+    let peakUsers = new Set();
+    let currentUsers = new Set();
+
+    for (const p of points) {
+        if (p.type === 1) {
+            currentUsers.add(p.emp);
+            currentC++;
+            if (currentC > maxC) {
+                maxC = currentC;
+                peakUsers = new Set(currentUsers);
+            } else if (currentC === maxC) {
+                p.emp && peakUsers.add(p.emp);
+            }
+        } else {
+            currentUsers.delete(p.emp);
+            currentC--;
+        }
+    }
+
+    return {
+        unionSeconds: unionDuration / 1000,
+        maxConcurrent: maxC,
+        peakUsers: Array.from(peakUsers)
+    };
+};
+
+app.get('/api/dashboard/stats', async (req, res) => {
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    const { date, month } = req.query;
+
+    try {
+        const response = {};
+
+        // 1. TOP BUYERS (Monthly)
+        if (month) {
+            const groupsRes = await pool.query(
+                `SELECT * FROM daily_groups 
+                 WHERE store_id = $1 AND key LIKE $2`,
+                [storeId, `%-${month}-%`]
+            );
+
+            const shiftsRes = await pool.query(
+                `SELECT employee_id, duration_seconds FROM daily_records 
+                 WHERE store_id = $1 AND date LIKE $2`,
+                [storeId, `${month}-%`]
+            );
+
+            const buyers = {};
+
+            groupsRes.rows.forEach(r => {
+                const [empId] = r.key.split('-');
+                if (!buyers[empId]) buyers[empId] = { id: empId, groups: 0, clientSeconds: 0, shiftSeconds: 0 };
+
+                const g = r.standard + r.jewelry + r.recoverable;
+                buyers[empId].groups += g;
+                buyers[empId].clientSeconds += (r.client_seconds || 0);
+            });
+
+            shiftsRes.rows.forEach(r => {
+                if (buyers[r.employee_id]) {
+                    buyers[r.employee_id].shiftSeconds += (r.duration_seconds || 0);
+                } else if (!buyers[r.employee_id]) {
+                    buyers[r.employee_id] = { id: r.employee_id, groups: 0, clientSeconds: 0, shiftSeconds: 0 };
+                    buyers[r.employee_id].shiftSeconds += (r.duration_seconds || 0);
+                }
+            });
+
+            response.monthlyTop = Object.values(buyers).map(b => ({
+                id: b.id,
+                groups: b.groups,
+                clientSeconds: b.clientSeconds,
+                shiftSeconds: b.shiftSeconds,
+                groupsPerHour: b.clientSeconds > 0 ? (b.groups / (b.clientSeconds / 3600)) : 0,
+                efficiency: b.shiftSeconds > 0 ? (b.clientSeconds / b.shiftSeconds) : 0
+            })).sort((a, b) => b.groups - a.groups).slice(0, 10);
+        }
+
+        // 2. SHOPPING TIME & CONCURRENCY (Today/Yesterday/Month)
+        if (date) {
+            const dateStr = date;
+            const logsRes = await pool.query(
+                `SELECT * FROM transaction_logs 
+                 WHERE store_id = $1 
+                 AND start_time >= $2::timestamp 
+                 AND start_time < ($2::timestamp + INTERVAL '1 day')`,
+                [storeId, dateStr]
+            );
+
+            response.timeStats = calculateTimeStats(logsRes.rows);
+
+            // Fetch Total Groups for Date
+            const groupsQuery = await pool.query(
+                `SELECT standard, jewelry, recoverable FROM daily_groups 
+                 WHERE store_id = $1 AND key LIKE $2`,
+                [storeId, `%-${dateStr}`]
+            );
+
+            let totalGroups = 0;
+            groupsQuery.rows.forEach(r => totalGroups += (r.standard + r.jewelry + r.recoverable));
+            response.totalGroups = totalGroups;
+        }
+
+        if (month) {
+            const monthLogsRes = await pool.query(
+                `SELECT * FROM transaction_logs 
+                 WHERE store_id = $1 
+                 AND start_time >= $2::date 
+                 AND start_time < ($2::date + INTERVAL '1 month')`,
+                [storeId, `${month}-01`]
+            );
+            response.monthStats = calculateTimeStats(monthLogsRes.rows);
+        }
+
+        res.json(response);
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+});
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);

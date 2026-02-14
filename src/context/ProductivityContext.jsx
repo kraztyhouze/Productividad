@@ -463,7 +463,16 @@ export const ProductivityProvider = ({ children }) => {
                 } catch (err) { console.error(err); }
             },
             goldPrice,
-            updateGoldPrice
+            updateGoldPrice,
+            logTransaction: async (employeeId, startTime, endTime, type, details) => {
+                try {
+                    await fetch('/api/transaction-logs', {
+                        method: 'POST',
+                        headers: getHeaders(),
+                        body: JSON.stringify({ employeeId, startTime, endTime, type, details })
+                    });
+                } catch (err) { console.error('Error logging transaction:', err); }
+            }
         }}>
             {children}
         </ProductivityContext.Provider>

@@ -3,7 +3,7 @@ import { useProductivity } from '../context/ProductivityContext';
 import { useTeam } from '../context/TeamContext';
 import { useAuth, ROLES } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
-import { ShoppingBag, Clock, RefreshCw, Trash2, UserPlus, Check, X, Watch, Pencil, BarChart2, Box, Save, Settings } from 'lucide-react';
+import { ShoppingBag, Clock, RefreshCw, Trash2, UserPlus, Check, X, Watch, Pencil, BarChart2, Box, Save, Settings, Megaphone } from 'lucide-react';
 import { format } from 'date-fns';
 import InfoPanel from '../components/Productivity/InfoPanel';
 import CloseDayModal from '../components/Productivity/CloseDayModal';
@@ -24,7 +24,7 @@ const Productivity = () => {
         updateRecord, addManualRecord, deleteEmployeeDayData,
         productFamilies, addProductFamily, removeProductFamily,
         addNoDealDetail, toggleClientSession,
-        goldPrice, updateGoldPrice, updateEmployeeShiftTime
+        goldPrice, updateGoldPrice, updateEmployeeShiftTime, logTransaction
     } = useProductivity();
 
     const { employees } = useTeam();
@@ -64,34 +64,44 @@ const Productivity = () => {
 
     const [noDealDetail, setNoDealDetail] = useState(null);
 
-    // Auto-Close Settings
-    const [closingHours, setClosingHours] = useState({ midday: '', night: '' });
+    // Auto-Close & Announcement Settings
+    const [settings, setSettings] = useState({ midday: '', night: '', announcement: '' });
+    const [showSettings, setShowSettings] = useState(false); // Toggle settings panel
 
-    // Fetch Closing Hours
+    // Fetch Settings
     useEffect(() => {
         const storeId = currentStore || 'store_1';
-        fetch('/api/settings/closing-hours', {
+        fetch('/api/settings', {
             headers: { 'x-store-id': storeId }
         })
             .then(res => res.json())
-            .then(data => setClosingHours({ midday: data.midday_close || '', night: data.night_close || '' }))
-            .catch(err => console.error("Error fetching closing hours", err));
+            .then(data => setSettings({
+                midday: data.midday_close || '',
+                night: data.night_close || '',
+                announcement: data.announcement || ''
+            }))
+            .catch(err => console.error("Error fetching settings", err));
     }, [currentStore]);
 
-    const handleSaveClosingHours = async () => {
+    const handleSaveSettings = async () => {
         try {
             const storeId = currentStore || 'store_1';
-            await fetch('/api/settings/closing-hours', {
+            await fetch('/api/settings', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'x-store-id': storeId
                 },
-                body: JSON.stringify({ midday_close: closingHours.midday, night_close: closingHours.night })
+                body: JSON.stringify({
+                    midday_close: settings.midday,
+                    night_close: settings.night,
+                    announcement: settings.announcement
+                })
             });
-            alert('Horarios de cierre automático actualizados.');
+            alert('Configuración guardada correctamente.');
+            setShowSettings(false);
         } catch (err) {
-            alert('Error al guardar horarios.');
+            alert('Error al guardar configuración.');
         }
     };
 
@@ -278,6 +288,10 @@ const Productivity = () => {
         }
 
         await updateDailyGroups(empId, selectedDate, updates);
+
+        // Log accurate transaction for stats
+        logTransaction(empId, new Date(start).toISOString(), new Date().toISOString(), type, { reason });
+
         await toggleClientSession(empId, false); // End in DB
         setActiveClientModal(null);
     };
@@ -288,46 +302,78 @@ const Productivity = () => {
     // I will inline the simple ones needed for display.
 
     return (
-        <div className="h-[calc(100vh-140px)] flex flex-col gap-4 relative">
+        <div className="flex flex-col h-full overflow-hidden relative gap-4">
+
+            {/* ANNOUNCEMENT TICKER */}
+            {settings.announcement && (
+                <div className="w-full bg-red-600 text-white overflow-hidden py-1 shrink-0 shadow-lg relative z-20">
+                    <div className="animate-marquee whitespace-nowrap font-bold text-sm tracking-widest flex items-center gap-8 uppercase">
+                        <span><Megaphone size={14} className="inline mr-2 fill-white text-red-600" /> {settings.announcement}</span>
+                        <span><Megaphone size={14} className="inline mr-2 fill-white text-red-600" /> {settings.announcement}</span>
+                        <span><Megaphone size={14} className="inline mr-2 fill-white text-red-600" /> {settings.announcement}</span>
+                        <span><Megaphone size={14} className="inline mr-2 fill-white text-red-600" /> {settings.announcement}</span>
+                    </div>
+                </div>
+            )}
 
             {/* TOP SECTION: TEAM GRID */}
-            <div className="flex-[3] flex gap-6 min-h-0">
-                <div className="w-2/3 bg-[#1e293b]/60 backdrop-blur-xl rounded-[2.5rem] p-0 border border-white/5 flex flex-col shadow-2xl relative overflow-hidden">
+            <div className="flex-[3] flex flex-col xl:flex-row gap-6 min-h-0 overflow-hidden">
+                <div className="w-full xl:w-2/3 bg-[#1e293b]/60 backdrop-blur-xl rounded-[2.5rem] p-0 border border-white/5 flex flex-col shadow-2xl relative overflow-hidden shrink-0">
 
-                    {/* AUTO-CLOSE SETTINGS BAR (Manager/Supervisor/Responsible) */}
+                    {/* SETTINGS PANEL (Manager/Supervisor/Responsible) */}
                     {canEditPanels && (
-                        <div className="bg-slate-900/80 backdrop-blur border-b border-white/5 px-6 py-2 flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-2 text-slate-400">
-                                <Settings size={14} className="text-pink-500" />
-                                <span className="text-[10px] font-bold uppercase tracking-widest">Config Cierre Automático</span>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[10px] uppercase font-bold text-slate-500">Mediodía</span>
-                                    <input
-                                        type="time"
-                                        value={closingHours.midday}
-                                        onChange={e => setClosingHours({ ...closingHours, midday: e.target.value })}
-                                        className="bg-slate-800 border border-white/10 rounded px-2 py-0.5 text-xs text-white font-mono focus:border-pink-500 outline-none"
-                                    />
+                        <div className="bg-slate-900/80 backdrop-blur border-b border-white/5 py-2 px-6 flex flex-col gap-2 relative z-20">
+                            <div className="flex justify-between items-center cursor-pointer" onClick={() => setShowSettings(!showSettings)}>
+                                <div className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
+                                    <Settings size={14} className="text-pink-500" />
+                                    <span className="text-[10px] font-bold uppercase tracking-widest">Configuración Tienda / Tablón</span>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[10px] uppercase font-bold text-slate-500">Noche</span>
-                                    <input
-                                        type="time"
-                                        value={closingHours.night}
-                                        onChange={e => setClosingHours({ ...closingHours, night: e.target.value })}
-                                        className="bg-slate-800 border border-white/10 rounded px-2 py-0.5 text-xs text-white font-mono focus:border-pink-500 outline-none"
-                                    />
-                                </div>
-                                <button
-                                    onClick={handleSaveClosingHours}
-                                    className="p-1.5 bg-pink-600 hover:bg-pink-500 text-white rounded-lg transition-colors flex items-center gap-1"
-                                    title="Guardar Configuración"
-                                >
-                                    <Save size={12} />
-                                </button>
+                                <span className="text-[10px] text-slate-500">{showSettings ? 'Ocultar' : 'Mostrar'}</span>
                             </div>
+
+                            {showSettings && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 animate-in slide-in-from-top-2">
+                                    {/* Closes */}
+                                    <div className="flex items-center gap-4 bg-slate-800/50 p-2 rounded-lg border border-white/5">
+                                        <span className="text-[10px] uppercase font-bold text-slate-500 w-20">Cierre Auto:</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] text-slate-400">Mediodía</span>
+                                            <input
+                                                type="time"
+                                                value={settings.midday}
+                                                onChange={e => setSettings({ ...settings, midday: e.target.value })}
+                                                className="bg-slate-900 border border-white/10 rounded px-2 py-0.5 text-xs text-white font-mono focus:border-pink-500 outline-none w-20"
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] text-slate-400">Noche</span>
+                                            <input
+                                                type="time"
+                                                value={settings.night}
+                                                onChange={e => setSettings({ ...settings, night: e.target.value })}
+                                                className="bg-slate-900 border border-white/10 rounded px-2 py-0.5 text-xs text-white font-mono focus:border-pink-500 outline-none w-20"
+                                            />
+                                        </div>
+                                    </div>
+                                    {/* Announcement */}
+                                    <div className="flex items-center gap-2 bg-slate-800/50 p-2 rounded-lg border border-white/5">
+                                        <Megaphone size={14} className="text-red-500 shrink-0" />
+                                        <input
+                                            type="text"
+                                            placeholder="Mensaje Urgente (Tablón)..."
+                                            value={settings.announcement}
+                                            onChange={e => setSettings({ ...settings, announcement: e.target.value })}
+                                            className="bg-slate-900 border border-white/10 rounded px-2 py-0.5 text-xs text-white flex-1 focus:border-red-500 outline-none"
+                                        />
+                                        <button
+                                            onClick={handleSaveSettings}
+                                            className="p-1 px-3 bg-pink-600 hover:bg-pink-500 text-white rounded-md text-[10px] font-bold uppercase transition-colors"
+                                        >
+                                            Guardar
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -432,7 +478,7 @@ const Productivity = () => {
                 </div>
 
                 {/* STATS RIGHT - 3 CELLS RESTORED */}
-                <div className="w-1/3 flex flex-col gap-4">
+                <div className="w-full xl:w-1/3 flex flex-col gap-4 min-h-0 overflow-hidden">
                     {/* Cell 1: Gold Price & Shop Active Timer */}
                     <div className="flex gap-4 h-24 shrink-0 transition-transform hover:scale-[1.02]">
                         <div className="flex-1 flex bg-gradient-to-r from-amber-200 via-yellow-400 to-amber-600 rounded-3xl shadow-xl relative overflow-hidden group">
@@ -520,7 +566,7 @@ const Productivity = () => {
 
             {/* BOTTOM SECTION: DETAILED TABLE */}
             <div className="flex-[1] bg-[#1e293b]/60 backdrop-blur-xl rounded-[2.5rem] border border-white/5 p-6 min-h-0 shadow-xl flex flex-col">
-                <div className="overflow-y-auto custom-scrollbar">
+                <div className="overflow-y-auto custom-scrollbar flex-1">
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="text-xs font-bold text-slate-400 uppercase border-b border-white/5">

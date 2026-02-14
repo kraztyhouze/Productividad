@@ -11,6 +11,7 @@ import {
     AreaChart, Area, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer,
     PieChart, Pie, Cell, Legend
 } from 'recharts';
+import { useStore } from '../context/StoreContext';
 
 const Dashboard = () => {
     const { dailyRecords, dailyGroups, activeSessions, closedDays } = useProductivity();
@@ -22,6 +23,52 @@ const Dashboard = () => {
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
         return () => clearInterval(timer);
+    }, []);
+
+    // --- FETCH EXTENDED STATS ---
+    const [extendedStats, setExtendedStats] = useState({
+        yesterday: null,
+        month: null,
+        monthlyTop: []
+    });
+    const { currentStore } = useStore(); // Need this for headers if calling manually, but we can reuse context helper if exposed or just fetch.
+    // Dashboard doesn't import useStore directly but useProductivity, let's just use fetch relative.
+
+    useEffect(() => {
+        const fetchStats = async () => {
+            const storeId = localStorage.getItem('tiktak_current_store') || 'store_1'; // Fallback
+            const headers = { 'x-store-id': storeId };
+            const todayStr = new Date().toISOString().split('T')[0];
+            const yesterdayDate = new Date();
+            yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+            const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
+            const monthStr = todayStr.substring(0, 7);
+
+            try {
+                // Parallel fetch
+                const [dayRes, monthRes] = await Promise.all([
+                    fetch(`/api/dashboard/stats?date=${yesterdayStr}`, { headers }),
+                    fetch(`/api/dashboard/stats?month=${monthStr}`, { headers })
+                ]);
+
+                const todayRes = await fetch(`/api/dashboard/stats?date=${todayStr}`, { headers });
+
+                const dayData = await dayRes.json();
+                const monthData = await monthRes.json();
+                const todayData = await todayRes.json();
+
+                setExtendedStats({
+                    yesterday: dayData,
+                    month: monthData,
+                    today: todayData, // For union time/concurrency
+                    monthlyTop: monthData.monthlyTop || []
+                });
+            } catch (e) { console.error("Stats fetch error", e); }
+        };
+        fetchStats();
+        // Refresh every minute
+        const interval = setInterval(fetchStats, 60000);
+        return () => clearInterval(interval);
     }, []);
 
     // --- DATA AGGREGATION HELPERS ---
@@ -190,8 +237,11 @@ const Dashboard = () => {
                 />
                 <KPICard
                     title="Tiempo Comprando"
-                    value={`${Math.floor(todayClientSeconds / 3600)}h ${Math.floor((todayClientSeconds % 3600) / 60)}m`}
-                    subValue="Acumulado Hoy"
+                    value={extendedStats.today?.timeStats?.unionSeconds
+                        ? `${Math.floor(extendedStats.today.timeStats.unionSeconds / 3600)}h ${Math.floor((extendedStats.today.timeStats.unionSeconds % 3600) / 60)}m`
+                        : `${Math.floor(todayClientSeconds / 3600)}h ${Math.floor((todayClientSeconds % 3600) / 60)}m`
+                    }
+                    subValue={extendedStats.today?.timeStats?.unionSeconds ? "Tiempo Real (Unión)" : "Acumulado Hoy"}
                     icon={Clock}
                     colorClass="text-blue-400"
                     gradient="bg-gradient-to-br from-blue-500 to-cyan-600"
@@ -212,6 +262,40 @@ const Dashboard = () => {
                     colorClass="text-amber-400"
                     gradient="bg-gradient-to-br from-amber-500 to-orange-600"
                 />
+            </div>
+
+            {/* EXTENDED STATS BAR */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-[#1e293b]/40 backdrop-blur-xl rounded-2xl border border-white/5 p-4 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Ayer</span>
+                    <div className="text-right">
+                        <span className="block text-xl font-black text-white">{extendedStats.yesterday?.totalGroups || 0} <span className="text-sm text-slate-500 font-bold">gr.</span></span>
+                        <span className="text-[10px] text-slate-500">
+                            {extendedStats.yesterday?.timeStats?.unionSeconds ? (extendedStats.yesterday.timeStats.unionSeconds / 3600).toFixed(1) : 0}h Activo
+                        </span>
+                    </div>
+                </div>
+                <div className="bg-[#1e293b]/40 backdrop-blur-xl rounded-2xl border border-white/5 p-4 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Mes Actual</span>
+                    <div className="text-right">
+                        <span className="block text-xl font-black text-white">{extendedStats.monthlyTop?.reduce((acc, curr) => acc + curr.groups, 0) || 0}</span>
+                        <span className="text-[10px] text-slate-500">Compras Totales</span>
+                    </div>
+                </div>
+                <div className="bg-[#1e293b]/40 backdrop-blur-xl rounded-2xl border border-white/5 p-4 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pico Simultáneo</span>
+                    <div className="text-right">
+                        <span className="block text-xl font-black text-white flex items-center gap-2 justify-end">
+                            <Users size={16} className="text-pink-500" />
+                            {extendedStats.today?.timeStats?.maxConcurrent || 0}
+                        </span>
+                        <span className="text-[10px] text-slate-500">
+                            {extendedStats.today?.timeStats?.peakUsers?.length > 0
+                                ? extendedStats.today.timeStats.peakUsers.map(uid => employees.find(e => String(e.id) === String(uid))?.alias).join(', ')
+                                : '-'}
+                        </span>
+                    </div>
+                </div>
             </div>
 
             {/* MAIN CONTENT SPLIT */}
@@ -390,33 +474,37 @@ const Dashboard = () => {
                         </div>
                     </div>
 
-                    {/* DAILY LEADERBOARD */}
+                    {/* MONTHLY LEADERBOARD */}
                     <div className="bg-[#1e293b]/60 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl flex-1 flex flex-col">
                         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                            <TrendingUp size={16} /> Top Compradores
+                            <TrendingUp size={16} /> Top Mes (Productividad)
                         </h3>
                         <div className="space-y-2 flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                            {leaderboard.map((emp, index) => (
-                                <div key={emp.id} className="flex items-center justify-between p-3 bg-slate-800/50 hover:bg-slate-800 rounded-xl transition-colors group cursor-default border border-white/5">
-                                    <div className="flex items-center gap-3">
-                                        <span className={`text-xs font-mono font-bold w-5 h-5 flex items-center justify-center rounded ${index === 0 ? 'bg-amber-500/20 text-amber-500' : 'text-slate-500'}`}>
-                                            {index + 1}
-                                        </span>
-                                        <p className="text-sm font-bold text-slate-200 group-hover:text-white transition-colors">{emp.alias || emp.firstName}</p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="h-1.5 w-16 bg-slate-900 rounded-full overflow-hidden">
-                                            <div
-                                                className={`h-full rounded-full ${index === 0 ? 'bg-amber-500' : 'bg-pink-600'}`}
-                                                style={{ width: `${(emp.groups / Math.max(leaderboard[0]?.groups || 1, 1)) * 100}%` }}
-                                            ></div>
+                            {extendedStats.monthlyTop.map((empData, index) => {
+                                const emp = employees.find(e => String(e.id) === String(empData.id)) || { alias: `Emp ${empData.id}` };
+                                const name = emp.alias || emp.firstName;
+                                const prod = empData.efficiency ? (empData.efficiency * 100).toFixed(0) : 0;
+
+                                return (
+                                    <div key={empData.id} className="flex items-center justify-between p-3 bg-slate-800/50 hover:bg-slate-800 rounded-xl transition-colors group cursor-default border border-white/5">
+                                        <div className="flex items-center gap-3">
+                                            <span className={`text-xs font-mono font-bold w-5 h-5 flex items-center justify-center rounded ${index === 0 ? 'bg-amber-500/20 text-amber-500' : 'text-slate-500'}`}>
+                                                {index + 1}
+                                            </span>
+                                            <div>
+                                                <p className="text-sm font-bold text-slate-200 group-hover:text-white transition-colors">{name}</p>
+                                                <p className="text-[10px] text-slate-500 font-mono">Eficiencia: <span className={prod > 70 ? 'text-green-400' : 'text-slate-400'}>{prod}%</span></p>
+                                            </div>
                                         </div>
-                                        <span className="text-xs font-mono font-bold text-white w-6 text-right">{emp.groups}</span>
+                                        <div className="flex flex-col items-end">
+                                            <span className="text-sm font-bold text-white">{empData.groups} <span className="text-[10px] font-normal text-slate-500">gr.</span></span>
+                                            <span className="text-[10px] text-blue-400 font-mono">{(empData.clientSeconds / 3600).toFixed(1)}h</span>
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
-                            {leaderboard.length === 0 && (
-                                <p className="text-xs text-slate-500 italic text-center py-12">Sin datos de compra hoy</p>
+                                )
+                            })}
+                            {extendedStats.monthlyTop.length === 0 && (
+                                <p className="text-xs text-slate-500 italic text-center py-12">Cargando datos del mes...</p>
                             )}
                         </div>
                     </div>

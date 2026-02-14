@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useProductivity } from '../context/ProductivityContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ExternalLink, Smartphone, Monitor, Watch, Hammer, Gamepad2, CheckCircle, XCircle, Grid, QrCode, Download, Info, BookOpen, ChevronRight, CornerDownRight, FileText, ShieldCheck, UserMinus, AlertTriangle, Scale } from 'lucide-react';
+import { Search, ExternalLink, Smartphone, Monitor, Watch, Hammer, Gamepad2, CheckCircle, XCircle, Grid, QrCode, Download, Info, BookOpen, ChevronRight, CornerDownRight, FileText, ShieldCheck, UserMinus, AlertTriangle, Scale, ShoppingCart } from 'lucide-react';
 import { generateDiagnosticCertificate, generateWatchCertificate } from '../utils/pdfGenerator';
 import { ACCOUNT_REMOVAL_GUIDES, AUTHENTICITY_GUIDES } from '../data/guides';
+import PriceList from '../components/Market/PriceList'; // Import PriceList
 
 const CATEGORIES = {
     phones: { name: 'Móviles/Tablets', margin: 0.40, icon: <Smartphone size={18} />, color: 'pink', checklist: ['IMEI/Red', 'Cosmético', 'Seguridad', 'Pantalla/Touch', 'Vibración/Sensores', 'Micrófono/Audio', 'Cámaras/Flash', 'GPS', 'Carga'] },
@@ -467,8 +468,14 @@ const Market = () => {
                     <button onClick={() => setMode('guides')} className={`px-6 py-2 rounded-lg font-bold text-sm transition-all flex items-center gap-2 ${mode === 'guides' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:text-white'}`}>
                         <BookOpen size={16} /> Manuales
                     </button>
+                    <button onClick={() => setMode('prices')} className={`px-6 py-2 rounded-lg font-bold text-sm transition-all flex items-center gap-2 ${mode === 'prices' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20' : 'text-slate-400 hover:text-white'}`}>
+                        <ShoppingCart size={16} /> Precios
+                    </button>
                 </div>
             </div>
+
+            {/* CONTENT: PRICES MODE */}
+            {mode === 'prices' && <PriceList />}
 
             {/* CONTENT: PRODUCT MODE */}
             {mode === 'product' && (

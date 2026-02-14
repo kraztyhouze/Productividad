@@ -8,7 +8,7 @@ import { ACCOUNT_REMOVAL_GUIDES, AUTHENTICITY_GUIDES } from '../data/guides';
 const CATEGORIES = {
     phones: { name: 'Móviles/Tablets', margin: 0.40, icon: <Smartphone size={18} />, color: 'pink', checklist: ['IMEI/Red', 'Cosmético', 'Seguridad', 'Pantalla/Touch', 'Vibración/Sensores', 'Micrófono/Audio', 'Cámaras/Flash', 'GPS', 'Carga'] },
     laptops: { name: 'Portátiles', margin: 0.40, icon: <Monitor size={18} />, color: 'cyan', checklist: ['Enciende', 'Cargador Original', 'Teclado Completo', 'Pantalla sin manchas', 'Webcam/Audio', 'Hardware OK'] },
-    watches: { name: 'Relojes', margin: 0.35, icon: <Watch size={18} />, color: 'amber', checklist: ['Inspección Visual', 'Mecánica', 'Autenticidad', 'Marca Específica'] }
+    watches: { name: 'Relojes', margin: 0.35, icon: <Watch size={18} />, color: 'amber', checklist: [] }
 };
 
 const WATCH_INSPECTION_GUIDE = [

@@ -8,6 +8,7 @@ export const ROLES = {
     SUPERVISOR: 'Supervisor',
     RESPONSIBLE: 'Responsable',
     EMPLOYEE: 'Empleado',
+    KIOSK: 'Kiosko',
 };
 
 export const AuthProvider = ({ children }) => {

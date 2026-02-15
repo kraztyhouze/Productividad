@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth, ROLES } from '../../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Edit2, Save, X, Plus, Trash2, ShoppingCart } from 'lucide-react';
+import { Edit2, Save, X, Plus, Trash2, ShoppingCart, ChevronDown, ChevronRight } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 
 const PriceList = () => {
@@ -130,8 +130,27 @@ const PriceList = () => {
         fetchItems();
     };
 
+
+
+    const [expandedCategories, setExpandedCategories] = useState({});
+
+    // Group items by category
+    const groupedItems = items.reduce((acc, item) => {
+        const cat = item.category || 'OTROS';
+        if (!acc[cat]) acc[cat] = [];
+        acc[cat].push(item);
+        return acc;
+    }, {});
+
+    const toggleCategory = (cat) => {
+        setExpandedCategories(prev => ({
+            ...prev,
+            [cat]: !prev[cat]
+        }));
+    };
+
     const EditableRow = ({ item, onSave, onCancel, isNew }) => {
-        // Local state for the form row to prevent parent re-renders from killing input focus/state
+        // Local state for the form row
         const [formData, setFormData] = useState({ ...item });
 
         const handleChange = (e) => {
@@ -140,11 +159,13 @@ const PriceList = () => {
 
         const handleSubmit = () => onSave(formData);
 
-        const cellClass = "p-3 text-sm";
+        // Common styles
+        const cellClass = "p-3 text-sm align-middle";
         const inputClass = "w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs outline-none focus:border-amber-500 transition-colors";
 
         return (
             <tr className="bg-slate-800/50 border-b border-white/5 animate-in fade-in">
+                {!isNew && <td className={cellClass}></td>}
                 <td className={cellClass}>
                     <input name="category" value={formData.category} onChange={handleChange} className={inputClass} placeholder="CAT" list="categories" autoFocus />
                 </td>
@@ -168,19 +189,16 @@ const PriceList = () => {
     };
 
     const StaticRow = ({ item }) => {
-        // Only render headers if this is the first item of its category
-        // But we handle headers in the parent map loop.
         const rowClass = "border-b border-white/5 hover:bg-white/5 transition-colors group";
-        const cellClass = "p-3 text-sm";
+        const cellClass = "p-3 text-sm align-middle";
 
         return (
             <tr className={rowClass}>
-                <td className={`${cellClass} font-bold text-slate-500 uppercase text-[10px] w-24 group-hover:text-slate-300 transition-colors`}>{item.category}</td>
                 <td className={`${cellClass} text-slate-400 w-32 uppercase text-[10px]`}>{item.brand}</td>
-                <td className={`${cellClass} font-bold text-white`}>{item.model}</td>
+                <td className={`${cellClass} font-bold text-white text-xs`}>{item.model}</td>
                 <td className={`${cellClass} font-mono text-amber-400 font-bold text-right w-24`}>{item.price_a > 0 ? item.price_a + '€' : '-'}</td>
-                <td className={`${cellClass} font-mono text-slate-300 text-right w-24`}>{item.price_b > 0 ? item.price_b + '€' : '-'}</td>
-                <td className={`${cellClass} font-mono text-slate-500 text-right w-24`}>{item.price_c > 0 ? item.price_c + '€' : '-'}</td>
+                <td className={`${cellClass} font-mono text-emerald-400 text-right w-24`}>{item.price_b > 0 ? item.price_b + '€' : '-'}</td>
+                <td className={`${cellClass} font-mono text-slate-400 text-right w-24`}>{item.price_c > 0 ? item.price_c + '€' : '-'}</td>
                 {canEdit && (
                     <td className={cellClass}>
                         <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
@@ -193,16 +211,11 @@ const PriceList = () => {
         );
     };
 
-    // Group items
-    // We want to render them in blocks?
-    // Actually, a single table sorted by category is fine, or we can add visual headers.
-    // Let's do visual headers when category changes.
-
     return (
         <div className="max-w-6xl mx-auto w-full flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4">
-            <div className="bg-[#1e293b] rounded-2xl p-8 border border-white/5 shadow-2xl relative overflow-hidden min-h-[600px]">
+            <div className="bg-[#1e293b] rounded-2xl p-6 border border-white/5 shadow-2xl relative overflow-hidden min-h-[600px]">
                 {/* Header */}
-                <div className="flex justify-between items-center mb-8 relative z-10">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 relative z-10 gap-4">
                     <div>
                         <h2 className="text-2xl font-bold text-white flex items-center gap-3">
                             <ShoppingCart className="text-emerald-500" /> PVP Consolas y Thermomix
@@ -228,60 +241,110 @@ const PriceList = () => {
                     <option value="XBOX" />
                 </datalist>
 
-                {/* Table */}
-                <div className="overflow-x-auto rounded-xl border border-white/10 relative z-10">
-                    <table className="w-full text-left border-collapse">
-                        <thead>
-                            <tr className="bg-slate-900 border-b border-white/10 text-xs uppercase tracking-wider text-slate-500">
-                                <th className="p-4 font-bold">Categoría</th>
-                                <th className="p-4 font-bold">Marca</th>
-                                <th className="p-4 font-bold">Modelo</th>
-                                <th className="p-4 font-bold text-right text-amber-500">A (Impecable)</th>
-                                <th className="p-4 font-bold text-right">B (Bueno)</th>
-                                <th className="p-4 font-bold text-right">C (Usado)</th>
-                                {canEdit && <th className="p-4 text-right">Acciones</th>}
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/5">
-                            {newItem && (
-                                <EditableRow item={newItem} onSave={handleSave} onCancel={cancelEdit} isNew={true} />
-                            )}
-                            {items.map((item, idx) => {
-                                const prev = items[idx - 1];
-                                const showHeader = !prev || prev.category !== item.category;
+                {/* New Item Form Area */}
+                <AnimatePresence>
+                    {newItem && (
+                        <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="mb-8 overflow-hidden"
+                        >
+                            <div className="bg-slate-900/50 border border-emerald-500/30 rounded-xl p-4">
+                                <h3 className="text-emerald-400 font-bold text-sm mb-4 uppercase tracking-wider">Nuevo Registro</h3>
+                                <table className="w-full text-left">
+                                    <thead>
+                                        <tr className="text-xs uppercase text-slate-500 border-b border-white/5">
+                                            <th className="p-2">Cat</th>
+                                            <th className="p-2">Marca</th>
+                                            <th className="p-2">Modelo</th>
+                                            <th className="p-2">A</th>
+                                            <th className="p-2">B</th>
+                                            <th className="p-2">C</th>
+                                            <th className="p-2">Acción</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <EditableRow item={newItem} onSave={handleSave} onCancel={cancelEdit} isNew={true} />
+                                    </tbody>
+                                </table>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
-                                return (
-                                    <React.Fragment key={item.id}>
-                                        {showHeader && idx > 0 && <tr className="h-4 bg-transparent border-none"><td colSpan="7"></td></tr>}
-                                        {showHeader && (
-                                            <tr className="bg-slate-950/30">
-                                                <td colSpan="7" className="px-4 py-2 text-xs font-bold text-slate-500 border-l-4 border-emerald-500 uppercase tracking-widest bg-gradient-to-r from-slate-900 to-transparent">
-                                                    {item.category}
-                                                </td>
-                                            </tr>
-                                        )}
-                                        {editingId === item.id ? (
-                                            <EditableRow item={item} onSave={handleSave} onCancel={cancelEdit} />
-                                        ) : (
-                                            <StaticRow item={item} />
-                                        )}
-                                    </React.Fragment>
-                                );
-                            })}
-                            {items.length === 0 && !loading && !newItem && (
-                                <tr>
-                                    <td colSpan="7" className="p-12 text-center text-slate-500 flex flex-col items-center gap-4">
-                                        <p>No hay precios definidos.</p>
-                                        {canEdit && (
-                                            <button onClick={populateData} className="px-4 py-2 bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-lg text-xs font-bold border border-white/5 transition-colors">
-                                                Cargar Datos Iniciales (Ejemplo)
-                                            </button>
-                                        )}
-                                    </td>
-                                </tr>
+                {/* Collapsible Categories */}
+                <div className="flex flex-col gap-4 relative z-10">
+                    {Object.keys(groupedItems).length === 0 && !loading && (
+                        <div className="text-center p-12 text-slate-500">
+                            <p>No hay precios definidos.</p>
+                            {canEdit && (
+                                <button onClick={populateData} className="mt-4 px-4 py-2 bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-lg text-xs font-bold border border-white/5 transition-colors">
+                                    Cargar Datos Iniciales (Ejemplo)
+                                </button>
                             )}
-                        </tbody>
-                    </table>
+                        </div>
+                    )}
+
+                    {Object.entries(groupedItems).sort((a, b) => a[0].localeCompare(b[0])).map(([category, catItems]) => {
+                        const isExpanded = expandedCategories[category];
+
+                        return (
+                            <div key={category} className="bg-slate-900/40 border border-white/5 rounded-xl overflow-hidden">
+                                <button
+                                    onClick={() => toggleCategory(category)}
+                                    className={`w-full flex items-center justify-between p-4 transition-all ${isExpanded ? 'bg-slate-800/80 text-emerald-400' : 'bg-slate-900/20 text-slate-300 hover:bg-slate-800/50 hover:text-white'}`}
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className={`p-2 rounded-lg ${isExpanded ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
+                                            {isExpanded ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+                                        </div>
+                                        <div className="text-left">
+                                            <span className="font-bold text-lg tracking-wide uppercase">{category}</span>
+                                            <span className="text-xs text-slate-500 font-medium ml-3 bg-slate-950 px-2 py-0.5 rounded-full border border-white/5">{catItems.length} Modelos</span>
+                                        </div>
+                                    </div>
+                                </button>
+
+                                <AnimatePresence>
+                                    {isExpanded && (
+                                        <motion.div
+                                            initial={{ height: 0, opacity: 0 }}
+                                            animate={{ height: 'auto', opacity: 1 }}
+                                            exit={{ height: 0, opacity: 0 }}
+                                            transition={{ duration: 0.3 }}
+                                        >
+                                            <div className="overflow-x-auto border-t border-white/5">
+                                                <table className="w-full text-left border-collapse">
+                                                    <thead>
+                                                        <tr className="bg-slate-950/50 text-[10px] uppercase tracking-wider text-slate-500">
+                                                            <th className="p-3 font-bold">Marca</th>
+                                                            <th className="p-3 font-bold">Modelo</th>
+                                                            <th className="p-3 font-bold text-right text-amber-500">A (Impecable)</th>
+                                                            <th className="p-3 font-bold text-right text-emerald-500">B (Bueno)</th>
+                                                            <th className="p-3 font-bold text-right text-slate-400">C (Usado)</th>
+                                                            {canEdit && <th className="p-3 text-right">Acciones</th>}
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-white/5">
+                                                        {catItems.map((item) => (
+                                                            <React.Fragment key={item.id}>
+                                                                {editingId === item.id ? (
+                                                                    <EditableRow item={item} onSave={handleSave} onCancel={cancelEdit} />
+                                                                ) : (
+                                                                    <StaticRow item={item} />
+                                                                )}
+                                                            </React.Fragment>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
         </div>

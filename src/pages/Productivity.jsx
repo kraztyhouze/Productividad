@@ -3,7 +3,7 @@ import { useProductivity } from '../context/ProductivityContext';
 import { useTeam } from '../context/TeamContext';
 import { useAuth, ROLES } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
-import { ShoppingBag, Clock, RefreshCw, Trash2, UserPlus, Check, X, Watch, Pencil, BarChart2, Box, Save, Settings, Megaphone } from 'lucide-react';
+import { ShoppingBag, Clock, RefreshCw, Trash2, UserPlus, Check, X, Watch, Pencil, BarChart2, Box, Save, Settings, Megaphone, AlertTriangle, UserX, Activity } from 'lucide-react';
 import { format } from 'date-fns';
 import InfoPanel from '../components/Productivity/InfoPanel';
 import CloseDayModal from '../components/Productivity/CloseDayModal';
@@ -158,7 +158,12 @@ const Productivity = () => {
         }
     };
 
-    const isManagerial = user?.role === ROLES.MANAGER;
+    const isManagerial = user?.role === ROLES.MANAGER || user?.role === ROLES.SUPERVISOR;
+    // Responsible can edit panels but NOT necessarily see deep stats? Let's check request.
+    // Request: "estadisticas completas solo las pueda ver el gerente y el supervisor".
+    // So Responsible/Employee/Kiosk get simplified view.
+    const canSeeDeepStats = [ROLES.MANAGER, ROLES.SUPERVISOR].includes(user?.role);
+
     const canEditPanels = [ROLES.MANAGER, ROLES.RESPONSIBLE, ROLES.SUPERVISOR].includes(user?.role);
     const canEditTimes = [ROLES.MANAGER, ROLES.SUPERVISOR].includes(user?.role);
     const isToday = selectedDate === new Date().toISOString().split('T')[0];
@@ -429,7 +434,7 @@ const Productivity = () => {
                                                     'bg-slate-800/40 border-white/5 opacity-60 hover:opacity-100 hover:bg-slate-800'
                                             }`}
                                     >
-                                        {isSessionActive && !isClientActive && (isManagerial || emp.id === user?.id) && (
+                                        {isSessionActive && !isClientActive && (isManagerial || emp.id === user?.id || user?.role === ROLES.KIOSK) && (
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); if (confirm('¿Terminar turno de ' + emp.alias + '?')) endSession(emp.id); }}
                                                 className="absolute top-2 right-2 p-1.5 text-slate-400 hover:text-white bg-black/20 hover:bg-red-500 rounded-full z-20 transition-all backdrop-blur-sm"
@@ -571,16 +576,24 @@ const Productivity = () => {
                         <thead>
                             <tr className="text-xs font-bold text-slate-400 uppercase border-b border-white/5">
                                 <th className="pb-3 pl-2">Empleado</th>
-                                <th className="pb-3">Tiempo Turno</th>
+                                {canSeeDeepStats && <th className="pb-3 text-center text-slate-400">Eficiencia/Ocupación</th>}
                                 <th className="pb-3 text-center text-blue-400">T. Compras</th>
-                                <th className="pb-3 text-center text-slate-400">Gen</th>
-                                <th className="pb-3 text-center text-slate-400">Joy</th>
-                                <th className="pb-3 text-center text-slate-400">Rec</th>
-                                <th className="pb-3 text-center text-red-500">NO</th>
+                                {canSeeDeepStats && (
+                                    <>
+                                        <th className="pb-3 text-center text-slate-400">Gen</th>
+                                        <th className="pb-3 text-center text-slate-400">Joy</th>
+                                        <th className="pb-3 text-center text-slate-400">Rec</th>
+                                        <th className="pb-3 text-center text-red-500">NO</th>
+                                    </>
+                                )}
                                 <th className="pb-3 text-right text-pink-500">Total</th>
-                                <th className="pb-3 text-right text-amber-500">Gr/h</th>
-                                <th className="pb-3 text-right">Hit Rate</th>
-                                <th className="pb-3 text-right">T. Medio/Cli</th>
+                                {canSeeDeepStats && (
+                                    <>
+                                        <th className="pb-3 text-right text-amber-500">Gr/h</th>
+                                        <th className="pb-3 text-right">Hit Rate</th>
+                                        <th className="pb-3 text-right">T. Medio/Cli</th>
+                                    </>
+                                )}
                                 {isManagerial && <th className="pb-3 text-right">Acciones</th>}
                             </tr>
                         </thead>
@@ -601,26 +614,78 @@ const Productivity = () => {
                                 const employeeData = employees.find(e => e.id === parseInt(empId));
                                 const displayName = employeeData ? (employeeData.alias || employeeData.firstName) : stat.name;
 
-                                return (
-                                    <tr key={empId} className="group hover:bg-white/5 transition-colors">
-                                        <td className="py-3 pl-2 font-bold text-slate-300">{displayName}</td>
-                                        <td className="py-3 font-mono text-slate-400 text-xs">{formatDuration(stat.totalSeconds * 1000)}</td>
-                                        <td className="py-3 text-center font-mono text-blue-400 font-bold">{formatDuration(data.clientSeconds * 1000)}</td>
+                                // --- METRICS FOR FRAUD DETECTION ---
+                                const totalShiftSeconds = Math.max(1, stat.totalSeconds);
+                                const totalClientSeconds = data.clientSeconds;
+                                const occupationRate = Math.min(100, (totalClientSeconds / totalShiftSeconds) * 100).toFixed(0);
+                                const idleTime = Math.max(0, totalShiftSeconds - totalClientSeconds);
 
-                                        <td className="py-3 text-center font-mono text-slate-300">{data.standard}</td>
-                                        <td className="py-3 text-center font-mono text-slate-300">{data.jewelry}</td>
-                                        <td className="py-3 text-center font-mono text-slate-300">{data.recoverable}</td>
-                                        <td className="py-3 text-center font-bold text-red-500 font-mono">{data.noDeal}</td>
+                                // Suspicious Criteria: 
+                                // 1. Extremely low avg time (< 3 mins) AND Low Occupation (< 30%)
+                                // 2. High number of interactions but barely any logged time
+                                const isSuspicious = (avgTime < 180 && occupationRate < 30 && data.totalInteractions > 2);
+
+                                // Show suspicion only if allowed
+                                const showSuspicion = isSuspicious && canSeeDeepStats;
+
+                                return (
+                                    <tr key={empId} className={`group border-b border-transparent hover:bg-white/5 transition-colors ${showSuspicion ? 'bg-red-500/10 border-red-500/20' : ''}`}>
+                                        <td className="py-3 pl-2">
+                                            <div className="flex flex-col">
+                                                <span className={`font-bold ${showSuspicion ? 'text-red-400' : 'text-slate-300'}`}>{displayName}</span>
+                                                {canSeeDeepStats && <span className="text-[10px] text-slate-500 font-mono">Turno: {formatDuration(stat.totalSeconds * 1000)}</span>}
+                                            </div>
+                                        </td>
+
+                                        {canSeeDeepStats && (
+                                            <td className="py-3 px-2">
+                                                <div className="flex flex-col gap-1">
+                                                    <div className="flex justify-between items-end text-[10px] uppercase font-bold text-slate-500">
+                                                        <span>Ocupación</span>
+                                                        <span className={isSuspicious ? 'text-red-400' : 'text-white'}>{occupationRate}%</span>
+                                                    </div>
+                                                    <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                                        <div
+                                                            className={`h-full rounded-full ${isSuspicious ? 'bg-red-500' : 'bg-emerald-500'}`}
+                                                            style={{ width: `${occupationRate}%` }}
+                                                        />
+                                                    </div>
+                                                    {isSuspicious && (
+                                                        <div className="flex items-center gap-1 text-[10px] text-red-400 font-bold mt-0.5 animate-pulse">
+                                                            <AlertTriangle size={10} /> POSIBLE MANIPULACIÓN
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        )}
+
+                                        <td className="py-3 text-center font-mono text-blue-400 font-bold text-xs">
+                                            {formatDuration(data.clientSeconds * 1000)}
+                                            {canSeeDeepStats && <div className="text-[9px] text-slate-600 font-normal">Idle: {formatDuration(idleTime * 1000)}</div>}
+                                        </td>
+
+                                        {canSeeDeepStats && (
+                                            <>
+                                                <td className="py-3 text-center font-mono text-slate-300">{data.standard}</td>
+                                                <td className="py-3 text-center font-mono text-slate-300">{data.jewelry}</td>
+                                                <td className="py-3 text-center font-mono text-slate-300">{data.recoverable}</td>
+                                                <td className="py-3 text-center font-bold text-red-500 font-mono">{data.noDeal}</td>
+                                            </>
+                                        )}
 
                                         <td className="py-3 text-right font-bold text-pink-500 text-lg">{data.totalSold}</td>
-                                        <td className="py-3 text-right font-mono font-bold text-amber-500">{groupsPerHour}</td>
 
-                                        <td className="py-3 text-right font-mono">
-                                            <span className={`${hitRate < 50 ? 'text-red-500' : hitRate > 80 ? 'text-green-500' : 'text-amber-500'}`}>{hitRate}%</span>
-                                        </td>
-                                        <td className="py-3 text-right font-mono text-slate-400">
-                                            {avgTimeMin}m {avgTimeSec}s
-                                        </td>
+                                        {canSeeDeepStats && (
+                                            <>
+                                                <td className="py-3 text-right font-mono font-bold text-amber-500">{groupsPerHour}</td>
+                                                <td className="py-3 text-right font-mono">
+                                                    <span className={`${hitRate < 50 ? 'text-red-500' : hitRate > 80 ? 'text-green-500' : 'text-amber-500'}`}>{hitRate}%</span>
+                                                </td>
+                                                <td className="py-3 text-right font-mono text-slate-400">
+                                                    {avgTimeMin}m {avgTimeSec}s
+                                                </td>
+                                            </>
+                                        )}
                                         {isManagerial && (
                                             <td className="py-2.5 text-right flex justify-end gap-2">
                                                 <button

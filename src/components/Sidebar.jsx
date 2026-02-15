@@ -61,10 +61,12 @@ const Sidebar = ({ expanded, setExpanded }) => {
             {/* Navigation Links */}
             <nav className="flex-1 py-8 px-3 space-y-2 overflow-y-auto custom-scrollbar">
 
-                <NavLink to="/" className={({ isActive }) => `flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 group ${isActive ? 'bg-pink-600 shadow-lg shadow-pink-500/20 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'} ${!expanded ? 'justify-center' : ''}`}>
-                    <LayoutGrid size={20} className="shrink-0 group-hover:scale-110 transition-transform" />
-                    <span className={`font-bold text-sm transition-opacity duration-300 ${expanded ? 'opacity-100' : 'opacity-0 hidden'}`}>Dashboard</span>
-                </NavLink>
+                {user?.role !== ROLES.KIOSK && (
+                    <NavLink to="/" className={({ isActive }) => `flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 group ${isActive ? 'bg-pink-600 shadow-lg shadow-pink-500/20 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'} ${!expanded ? 'justify-center' : ''}`}>
+                        <LayoutGrid size={20} className="shrink-0 group-hover:scale-110 transition-transform" />
+                        <span className={`font-bold text-sm transition-opacity duration-300 ${expanded ? 'opacity-100' : 'opacity-0 hidden'}`}>Dashboard</span>
+                    </NavLink>
+                )}
 
                 <p className={`px-3 text-xs font-bold text-slate-500 uppercase tracking-widest mt-6 mb-2 transition-opacity duration-300 ${expanded ? 'opacity-100' : 'opacity-0 hidden'}`}>Gestión</p>
 

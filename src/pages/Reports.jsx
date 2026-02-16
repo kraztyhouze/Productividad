@@ -485,6 +485,111 @@ const Reports = () => {
         );
     };
 
+    // --- EXPORT PERFORMANCE EXCEL ---
+    const exportPerformanceExcel = () => {
+        // Professional Excel HTML Table (XLS)
+        let tableHTML = `
+            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+            <head>
+                <meta charset="UTF-8">
+                <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Rendimiento</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+                <style>
+                    table { border-collapse: collapse; width: 100%; font-family: sans-serif; }
+                    th { background-color: #f3f4f6; color: #1f2937; border: 1px solid #d1d5db; padding: 10px; text-align: center; font-weight: bold; }
+                    td { border: 1px solid #e5e7eb; padding: 8px; vertical-align: middle; }
+                    .text-left { text-align: left; }
+                    .text-center { text-align: center; }
+                    .text-right { text-align: right; }
+                    .font-bold { font-weight: bold; }
+                    .text-blue { color: #3b82f6; }
+                    .text-red { color: #ef4444; }
+                    .text-pink { color: #ec4899; }
+                    .text-indigo { color: #6366f1; }
+                    .text-yellow { color: #eab308; }
+                    .text-amber { color: #f59e0b; }
+                    .num { mso-number-format:"\#\,\#\#0"; }
+                    .dec { mso-number-format:"\#\,\#\#0\.0"; }
+                    .pct { mso-number-format:"0%"; }
+                </style>
+            </head>
+            <body>
+                <table>
+                    <thead>
+                        <tr style="background-color: #e2e8f0;">
+                            <th class="text-left">Empleado</th>
+                            <th class="text-left">Rol</th>
+                            <th>Días Activos</th>
+                            <th>Tiempo Turno</th>
+                            <th class="text-blue">Tiempo Compras</th>
+                            <th>General</th>
+                            <th>Joyería</th>
+                            <th>Recuperable</th>
+                            <th class="text-red">No Compras</th>
+                            <th class="text-pink">Total Grupos</th>
+                            <th class="text-indigo">% Eficiencia</th>
+                            <th class="text-yellow">% Mix Joya</th>
+                            <th class="text-amber">Gr/h (Compras)</th>
+                            <th>Gr/h (Turno)</th>
+                            <th>Hit Rate</th>
+                            <th>T. Medio/Cli</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        sortedEmpIds.forEach(empId => {
+            const data = stats[empId];
+            const emp = employees.find(e => e.id === parseInt(empId));
+
+            // Calculations
+            const shiftHours = data.totalSeconds / 3600;
+            const buyingHours = data.clientSeconds / 3600;
+
+            const gphBuying = buyingHours > 0 ? (data.totalGroups / buyingHours).toFixed(1) : '0,0';
+            const gphShift = shiftHours > 0 ? (data.totalGroups / shiftHours).toFixed(1) : '0,0';
+
+            const efficiency = data.totalSeconds > 0 ? ((data.clientSeconds / data.totalSeconds) * 100).toFixed(0) : 0;
+            const jewelryMix = data.totalGroups > 0 ? ((data.jewelry / data.totalGroups) * 100).toFixed(0) : 0;
+
+            const totalInteractions = data.totalGroups + data.noDeal;
+            const hitRate = totalInteractions > 0 ? ((data.totalGroups / totalInteractions) * 100).toFixed(0) : 0;
+
+            const avgTime = totalInteractions > 0 ? (data.clientSeconds / totalInteractions) : 0;
+            const avgTimeMin = Math.floor(avgTime / 60);
+            const avgTimeSec = Math.floor(avgTime % 60);
+            const avgTimeStr = `${avgTimeMin}m ${avgTimeSec}s`;
+
+            tableHTML += `
+                <tr>
+                    <td class="text-left font-bold">${emp?.alias || emp?.firstName || 'Desconocido'}</td>
+                    <td class="text-left">${emp?.role || ''}</td>
+                    <td class="text-center">${data.daysActive.size}</td>
+                    <td class="text-center">${formatDuration(data.totalSeconds)}</td>
+                    <td class="text-center text-blue font-bold">${formatDuration(data.clientSeconds)}</td>
+                    <td class="text-center num">${data.standard}</td>
+                    <td class="text-center num">${data.jewelry}</td>
+                    <td class="text-center num">${data.recoverable}</td>
+                    <td class="text-center num text-red font-bold">${data.noDeal}</td>
+                    <td class="text-center num text-pink font-bold">${data.totalGroups}</td>
+                    <td class="text-right text-indigo font-bold">${efficiency}%</td>
+                    <td class="text-right text-yellow font-bold">${jewelryMix}%</td>
+                    <td class="text-right text-amber font-bold dec">${gphBuying.toString().replace('.', ',')}</td>
+                    <td class="text-right dec">${gphShift.toString().replace('.', ',')}</td>
+                    <td class="text-right font-bold">${hitRate}%</td>
+                    <td class="text-right">${avgTimeStr}</td>
+                </tr>
+            `;
+        });
+
+        tableHTML += `</tbody></table></body></html>`;
+
+        const blob = new Blob([tableHTML], { type: 'application/vnd.ms-excel' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `rendimiento_${startDate}_${endDate}.xls`;
+        link.click();
+    };
+
     return (
         <div className="space-y-6 pb-10">
             <header className="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-6">
@@ -582,8 +687,11 @@ const Reports = () => {
                         <span className="text-xs font-normal text-slate-500 ml-2 font-mono">({startDate} — {endDate})</span>
                     </h2>
                     {reportType === 'performance' && (
-                        <button className="flex items-center gap-2 px-4 py-2.5 bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white font-bold rounded-xl transition-all text-xs border border-white/5 hover:border-white/10">
-                            <Download size={16} /> Exportar CSV
+                        <button
+                            onClick={exportPerformanceExcel}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-green-600/10 hover:bg-green-600/20 text-green-400 border border-green-600/30 font-bold rounded-xl transition-all text-xs hover:scale-105 active:scale-95"
+                        >
+                            <FileSpreadsheet size={16} /> Exportar Excel
                         </button>
                     )}
                 </div>

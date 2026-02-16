@@ -3,7 +3,7 @@ import { useProductivity } from '../context/ProductivityContext';
 import { useTeam } from '../context/TeamContext';
 import { useAuth, ROLES } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
-import { BarChart, FileText, Filter, Download, Trash2, Loader, Search, Gem, Package, FileSpreadsheet, Calendar as CalendarIcon, ChevronDown } from 'lucide-react';
+import { BarChart, FileText, Filter, Download, Trash2, Loader, Search, Gem, Package, FileSpreadsheet, Calendar as CalendarIcon, ChevronDown, Info, X } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays, subWeeks, subMonths } from 'date-fns';
 
 const Reports = () => {
@@ -37,6 +37,20 @@ const Reports = () => {
     const [noDealsData, setNoDealsData] = useState([]);
     const [noDealsTab, setNoDealsTab] = useState('jewelry');
     const [searchTerm, setSearchTerm] = useState('');
+    const [showGlossary, setShowGlossary] = useState(false);
+
+    const glossaryDefinitions = [
+        { term: "Días Activos", def: "Días con al menos una sesión de compra iniciada." },
+        { term: "Tiempo Turno", def: "Tiempo total registrado en sesiones de turno." },
+        { term: "Tiempo Compras", def: "Tiempo dedicado exclusivamente a la atención de clientes (sesiones de compra)." },
+        { term: "Gen / Joy / Rec", def: "Cantidad de grupos comprados por categoría: General, Joyería y Recuperable (Buyback)." },
+        { term: "% Eficiencia", def: "Porcentaje del tiempo de turno dedicado a atender clientes. (T. Compras / T. Turno)" },
+        { term: "% Mix Joya", def: "Porcentaje de las compras totales que son de joyería." },
+        { term: "Gr/h (Compras)", def: "Velocidad de compra: Grupos comprados por hora de atención real." },
+        { term: "Gr/h (Turno)", def: "Productividad global: Grupos comprados por hora de turno total." },
+        { term: "Hit Rate", def: "Tasa de Éxito: Porcentaje de clientes atendidos que finalizaron en compra." },
+        { term: "T. Medio/Cli", def: "Tiempo promedio dedicado a cada cliente (se compre o no)." }
+    ];
 
 
 
@@ -581,7 +595,29 @@ const Reports = () => {
             `;
         });
 
-        tableHTML += `</tbody></table></body></html>`;
+        tableHTML += `</tbody></table>`;
+
+        // Add Glossary Table to Excel
+        tableHTML += `
+            <br/><br/>
+            <table>
+                <thead>
+                    <tr>
+                        <th colspan="2" style="background-color: #1e293b; color: white; text-align: left; border: 1px solid #000;">GLOSARIO DE TÉRMINOS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${glossaryDefinitions.map(item => `
+                        <tr>
+                            <td style="background-color: #f3f4f6; font-weight: bold; border: 1px solid #e5e7eb;">${item.term}</td>
+                            <td style="border: 1px solid #e5e7eb;">${item.def}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+
+        tableHTML += `</body></html>`;
 
         const blob = new Blob([tableHTML], { type: 'application/vnd.ms-excel' });
         const link = document.createElement('a');
@@ -685,6 +721,15 @@ const Reports = () => {
                         <BarChart size={24} className="text-pink-500" />
                         {reportType === 'performance' ? 'Rendimiento' : 'No Compras'}
                         <span className="text-xs font-normal text-slate-500 ml-2 font-mono">({startDate} — {endDate})</span>
+                        {reportType === 'performance' && (
+                            <button
+                                onClick={() => setShowGlossary(true)}
+                                className="ml-2 p-1.5 rounded-full hover:bg-white/10 text-slate-500 hover:text-pink-400 transition-colors"
+                                title="Glosario de Términos"
+                            >
+                                <Info size={18} />
+                            </button>
+                        )}
                     </h2>
                     {reportType === 'performance' && (
                         <button
@@ -820,6 +865,41 @@ const Reports = () => {
                     renderNoDeals()
                 )}
             </div>
+
+            {/* GLOSSARY MODAL */}
+            {showGlossary && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl max-w-2xl w-full flex flex-col max-h-[90vh]">
+                        <div className="flex justify-between items-center p-6 border-b border-white/5">
+                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                <Info className="text-pink-500" size={24} />
+                                Glosario de Métricas
+                            </h3>
+                            <button
+                                onClick={() => setShowGlossary(false)}
+                                className="text-slate-400 hover:text-white transition-colors"
+                            >
+                                <X size={24} />
+                            </button>
+                        </div>
+                        <div className="p-6 overflow-y-auto custom-scrollbar">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {glossaryDefinitions.map((item, idx) => (
+                                    <div key={idx} className="bg-slate-800/50 p-4 rounded-xl border border-white/5 hover:border-pink-500/20 transition-colors">
+                                        <h4 className="text-pink-400 font-bold text-sm mb-2">{item.term}</h4>
+                                        <p className="text-slate-300 text-xs leading-relaxed">{item.def}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="p-4 border-t border-white/5 bg-slate-900/50 rounded-b-2xl">
+                            <p className="text-center text-slate-500 text-xs">
+                                Este glosario también se adjunta al final de los archivos Excel exportados.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

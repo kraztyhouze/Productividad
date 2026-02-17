@@ -1404,6 +1404,32 @@ const calculateTimeStats = (logs) => {
     };
 };
 
+const calculateHourlyStats = (logs) => {
+    // Breakdown by Hour (10-21)
+    const hourly = {};
+    const shifts = { morning: 0, afternoon: 0 };
+
+    for (let i = 10; i <= 21; i++) {
+        hourly[i] = 0;
+    }
+
+    logs.forEach(log => {
+        // Only count COMPLETED SALES types
+        if (['standard', 'jewelry', 'recoverable'].includes(log.type)) {
+            const date = new Date(log.end_time);
+            const hour = date.getHours();
+
+            if (hourly[hour] !== undefined) hourly[hour]++;
+
+            // Morning vs Afternoon (Cutoff 15:00)
+            if (hour < 15) shifts.morning++;
+            else shifts.afternoon++;
+        }
+    });
+
+    return { hourly, shifts };
+};
+
 app.get('/api/dashboard/stats', async (req, res) => {
     const storeId = req.headers['x-store-id'] || 'store_1';
     const { date, month } = req.query;
@@ -1523,6 +1549,9 @@ app.get('/api/dashboard/stats', async (req, res) => {
             });
 
             response.timeStats = calculateTimeStats([...logsRes.rows, ...activeLogs]);
+
+            // HOURLY STATS (Real Purchases)
+            response.hourlyStats = calculateHourlyStats(logsRes.rows);
 
             // Fetch Total Groups for Date with Breakdown
             const groupsQuery = await pool.query(

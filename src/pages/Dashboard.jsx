@@ -158,6 +158,16 @@ const Dashboard = () => {
         last7Days.push({ date: dateStr, label: dayLabel, groups: dayGroups });
     }
 
+    // 2b. Hourly Data (Chart)
+    const hourlyData = [];
+    for (let h = 10; h <= 21; h++) {
+        hourlyData.push({
+            hour: `${h}:00`,
+            today: extendedStats.today?.hourlyStats?.hourly?.[h] || 0,
+            yesterday: extendedStats.yesterday?.hourlyStats?.hourly?.[h] || 0
+        });
+    }
+
     // 3. Category Data (Donut)
     const categoryData = [
         { name: 'General', value: todayStandard, color: '#94a3b8' }, // Slate 400
@@ -410,7 +420,65 @@ const Dashboard = () => {
                         </div>
                     </div>
 
-                    {/* CATEGORY ROW */}
+                    {/* HOURLY COMPARISON CHART */}
+                    <div className="bg-[#1e293b]/40 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl relative overflow-hidden group min-h-[300px]">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                <Clock size={18} className="text-blue-400" />
+                                Evolución Horaria (Hoy vs Ayer)
+                            </h3>
+                            <div className="flex items-center gap-4 text-xs font-bold uppercase">
+                                <div className="flex items-center gap-1 text-slate-400">
+                                    <span className="w-2 h-2 rounded-full bg-slate-500"></span> Ayer
+                                </div>
+                                <div className="flex items-center gap-1 text-amber-400">
+                                    <span className="w-2 h-2 rounded-full bg-amber-500"></span> Hoy
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="w-full h-[200px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={hourlyData}>
+                                    <defs>
+                                        <linearGradient id="colorToday" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                                        </linearGradient>
+                                        <linearGradient id="colorYesterday" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#64748b" stopOpacity={0.2} />
+                                            <stop offset="95%" stopColor="#64748b" stopOpacity={0} />
+                                        </linearGradient>
+                                    </defs>
+                                    <XAxis dataKey="hour" stroke="#475569" fontSize={10} tickLine={false} axisLine={false} dy={10} />
+                                    <YAxis stroke="#475569" fontSize={10} tickLine={false} axisLine={false} dx={-10} />
+                                    <RechartsTooltip
+                                        contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', color: '#fff' }}
+                                    />
+                                    <Area type="monotone" dataKey="yesterday" stroke="#64748b" strokeWidth={2} fillOpacity={1} fill="url(#colorYesterday)" />
+                                    <Area type="monotone" dataKey="today" stroke="#f59e0b" strokeWidth={3} fillOpacity={1} fill="url(#colorToday)" activeDot={{ r: 6, strokeWidth: 0, fill: '#fff' }} />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+
+                        {/* SHIFT BREAKDOWN */}
+                        <div className="flex gap-4 mt-2 border-t border-white/5 pt-4">
+                            <div className="flex-1 flex flex-col items-center bg-white/5 rounded-xl p-2">
+                                <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Mañana</span>
+                                <div className="flex items-end gap-2">
+                                    <span className="text-xl font-black text-white">{extendedStats.today?.hourlyStats?.shifts?.morning || 0}</span>
+                                    <span className="text-xs text-slate-500 mb-1">vs {extendedStats.yesterday?.hourlyStats?.shifts?.morning || 0}</span>
+                                </div>
+                            </div>
+                            <div className="flex-1 flex flex-col items-center bg-white/5 rounded-xl p-2">
+                                <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Tarde</span>
+                                <div className="flex items-end gap-2">
+                                    <span className="text-xl font-black text-white">{extendedStats.today?.hourlyStats?.shifts?.afternoon || 0}</span>
+                                    <span className="text-xs text-slate-500 mb-1">vs {extendedStats.yesterday?.hourlyStats?.shifts?.afternoon || 0}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* DONUT CHART (Category Distribution) */}
                         <div className="bg-[#1e293b]/40 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl relative min-h-[300px] flex flex-col">

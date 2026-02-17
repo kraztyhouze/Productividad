@@ -134,7 +134,29 @@ export const ProductivityProvider = ({ children }) => {
 
     const toggleClientSession = async (employeeId, isStarting) => {
         const idStr = String(employeeId);
+
+        // Find current session to get start time if stopping
+        const currentSession = activeSessions.find(s => String(s.employeeId) === idStr);
         const startTime = isStarting ? new Date().toISOString() : null;
+
+        // If stopping, log the transaction
+        if (!isStarting && currentSession && currentSession.clientStartTime) {
+            const endTime = new Date().toISOString();
+            // Log for stats
+            try {
+                await fetch('/api/transaction-logs', {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({
+                        employeeId: idStr,
+                        startTime: currentSession.clientStartTime,
+                        endTime,
+                        type: 'shopping',
+                        details: JSON.stringify({ action: 'manual_stop' })
+                    })
+                });
+            } catch (err) { console.error('Error logging transaction:', err); }
+        }
 
         setActiveSessions(prev => prev.map(s =>
             String(s.employeeId) === idStr ? { ...s, clientStartTime: startTime } : s
@@ -157,6 +179,24 @@ export const ProductivityProvider = ({ children }) => {
         const session = activeSessions[sessionIndex];
         const endTime = new Date();
         const startTime = new Date(session.startTime);
+
+        // If they were shopping, log that transaction too
+        if (session.clientStartTime) {
+            try {
+                await fetch('/api/transaction-logs', {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({
+                        employeeId: idStr,
+                        startTime: session.clientStartTime,
+                        endTime: endTime.toISOString(),
+                        type: 'shopping',
+                        details: JSON.stringify({ action: 'shift_end_auto_stop' })
+                    })
+                });
+            } catch (err) { console.error('Error logging closing transaction:', err); }
+        }
+
         const durationSeconds = (endTime - startTime) / 1000;
 
         const record = {

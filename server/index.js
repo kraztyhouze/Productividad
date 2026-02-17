@@ -1411,8 +1411,9 @@ app.get('/api/dashboard/stats', async (req, res) => {
     try {
         const response = {};
 
-        // 1. TOP BUYERS (Monthly)
+        // 1. MONTHLY STATS (Top Buyers + Time + Best Day)
         if (month) {
+            // A. Top Buyers (Groups)
             const groupsRes = await pool.query(
                 `SELECT * FROM daily_groups 
                  WHERE store_id = $1 AND key LIKE $2`,
@@ -1426,22 +1427,34 @@ app.get('/api/dashboard/stats', async (req, res) => {
             );
 
             const buyers = {};
+            const dailyTotals = {};
 
             groupsRes.rows.forEach(r => {
-                const [empId] = r.key.split('-');
-                if (!buyers[empId]) buyers[empId] = { id: empId, groups: 0, clientSeconds: 0, shiftSeconds: 0 };
-
+                const parts = r.key.split('-');
                 const g = r.standard + r.jewelry + r.recoverable;
+
+                // Max Day Stats logic
+                if (parts.length >= 3) {
+                    if (parts.length >= 4) {
+                        const dateKey = `${parts[parts.length - 3]}-${parts[parts.length - 2]}-${parts[parts.length - 1]}`;
+                        dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + g;
+                    }
+                }
+
+                // Buyers logic
+                const empId = parts[0];
+                if (!buyers[empId]) buyers[empId] = { id: empId, groups: 0, clientSeconds: 0, shiftSeconds: 0 };
                 buyers[empId].groups += g;
                 buyers[empId].clientSeconds += (r.client_seconds || 0);
             });
 
             shiftsRes.rows.forEach(r => {
-                if (buyers[r.employee_id]) {
-                    buyers[r.employee_id].shiftSeconds += (r.duration_seconds || 0);
-                } else if (!buyers[r.employee_id]) {
-                    buyers[r.employee_id] = { id: r.employee_id, groups: 0, clientSeconds: 0, shiftSeconds: 0 };
-                    buyers[r.employee_id].shiftSeconds += (r.duration_seconds || 0);
+                const empId = String(r.employee_id);
+                if (buyers[empId]) {
+                    buyers[empId].shiftSeconds += (r.duration_seconds || 0);
+                } else if (!buyers[empId]) {
+                    buyers[empId] = { id: empId, groups: 0, clientSeconds: 0, shiftSeconds: 0 };
+                    buyers[empId].shiftSeconds += (r.duration_seconds || 0);
                 }
             });
 
@@ -1453,6 +1466,28 @@ app.get('/api/dashboard/stats', async (req, res) => {
                 groupsPerHour: b.clientSeconds > 0 ? (b.groups / (b.clientSeconds / 3600)) : 0,
                 efficiency: b.shiftSeconds > 0 ? (b.clientSeconds / b.shiftSeconds) : 0
             })).sort((a, b) => b.groups - a.groups).slice(0, 10);
+
+            // B. Monthly Time Stats (Logs)
+            const monthLogsRes = await pool.query(
+                `SELECT * FROM transaction_logs 
+                 WHERE store_id = $1 
+                 AND start_time >= $2::date 
+                 AND start_time < ($2::date + INTERVAL '1 month')`,
+                [storeId, `${month}-01`]
+            );
+
+            const timeStats = calculateTimeStats(monthLogsRes.rows);
+
+            // C. Max Daily Groups
+            let maxDailyGroups = 0;
+            Object.values(dailyTotals).forEach(val => {
+                if (val > maxDailyGroups) maxDailyGroups = val;
+            });
+
+            response.monthStats = {
+                ...timeStats,
+                maxDailyGroups
+            };
         }
 
         // 2. SHOPPING TIME & CONCURRENCY (Today/Yesterday/Month)
@@ -1466,9 +1501,30 @@ app.get('/api/dashboard/stats', async (req, res) => {
                 [storeId, dateStr]
             );
 
-            response.timeStats = calculateTimeStats(logsRes.rows);
+            // Mix in ACTIVE sessions if they fall within this day (mostly for "Today")
+            const activeRes = await pool.query('SELECT * FROM active_sessions WHERE store_id = $1', [storeId]);
+            const now = new Date();
+            const startRange = new Date(dateStr);
+            const endRange = new Date(dateStr);
+            endRange.setDate(endRange.getDate() + 1);
 
-            // Fetch Total Groups for Date
+            const activeLogs = [];
+            activeRes.rows.forEach(s => {
+                if (s.client_start_time) {
+                    const st = new Date(s.client_start_time);
+                    if (st >= startRange && st < endRange) {
+                        activeLogs.push({
+                            start_time: s.client_start_time,
+                            end_time: now.toISOString(), // Assume ongoing until now
+                            employee_id: s.employee_id
+                        });
+                    }
+                }
+            });
+
+            response.timeStats = calculateTimeStats([...logsRes.rows, ...activeLogs]);
+
+            // Fetch Total Groups for Date with Breakdown
             const groupsQuery = await pool.query(
                 `SELECT standard, jewelry, recoverable FROM daily_groups 
                  WHERE store_id = $1 AND key LIKE $2`,
@@ -1476,20 +1532,20 @@ app.get('/api/dashboard/stats', async (req, res) => {
             );
 
             let totalGroups = 0;
-            groupsQuery.rows.forEach(r => totalGroups += (r.standard + r.jewelry + r.recoverable));
+            let breakdown = { standard: 0, jewelry: 0, recoverable: 0 };
+
+            groupsQuery.rows.forEach(r => {
+                totalGroups += (r.standard + r.jewelry + r.recoverable);
+                breakdown.standard += r.standard;
+                breakdown.jewelry += r.jewelry;
+                breakdown.recoverable += r.recoverable;
+            });
+
             response.totalGroups = totalGroups;
+            response.groupsBreakdown = breakdown;
         }
 
-        if (month) {
-            const monthLogsRes = await pool.query(
-                `SELECT * FROM transaction_logs 
-                 WHERE store_id = $1 
-                 AND start_time >= $2::date 
-                 AND start_time < ($2::date + INTERVAL '1 month')`,
-                [storeId, `${month}-01`]
-            );
-            response.monthStats = calculateTimeStats(monthLogsRes.rows);
-        }
+
 
         res.json(response);
 

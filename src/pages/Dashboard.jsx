@@ -266,34 +266,84 @@ const Dashboard = () => {
 
             {/* EXTENDED STATS BAR */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-[#1e293b]/40 backdrop-blur-xl rounded-2xl border border-white/5 p-4 flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Ayer</span>
-                    <div className="text-right">
-                        <span className="block text-xl font-black text-white">{extendedStats.yesterday?.totalGroups || 0} <span className="text-sm text-slate-500 font-bold">gr.</span></span>
-                        <span className="text-[10px] text-slate-500">
-                            {extendedStats.yesterday?.timeStats?.unionSeconds ? (extendedStats.yesterday.timeStats.unionSeconds / 3600).toFixed(1) : 0}h Activo
-                        </span>
+                {/* COMPARISON BOX */}
+                <div className="bg-[#1e293b]/40 backdrop-blur-xl rounded-2xl border border-white/5 p-4 flex flex-col justify-center gap-2">
+                    <div className="flex justify-between items-end border-b border-white/5 pb-2">
+                        <div>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Hoy vs Ayer</span>
+                            <span className="text-xl font-black text-white">{todayGroups} <span className="text-sm font-normal text-slate-500">vs</span> {extendedStats.yesterday?.totalGroups || 0}</span>
+                        </div>
+                        <div className="text-right">
+                            <div className={`text-xs font-bold px-2 py-1 rounded-lg ${todayGroups >= (extendedStats.yesterday?.totalGroups || 0) ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                                {extendedStats.yesterday?.totalGroups > 0 ? (((todayGroups - extendedStats.yesterday.totalGroups) / extendedStats.yesterday.totalGroups) * 100).toFixed(0) : 0}%
+                            </div>
+                        </div>
+                    </div>
+                    {/* Compact Breakdown */}
+                    <div className="grid grid-cols-3 gap-1 text-[10px] text-center">
+                        <div className="bg-slate-800/50 rounded p-1">
+                            <span className="text-slate-400 block">Joya</span>
+                            <span className="text-amber-400 font-bold">{todayJewelry} <span className="text-slate-600">/ {extendedStats.yesterday?.groupsBreakdown?.jewelry || 0}</span></span>
+                        </div>
+                        <div className="bg-slate-800/50 rounded p-1">
+                            <span className="text-slate-400 block">Std</span>
+                            <span className="text-white font-bold">{todayStandard} <span className="text-slate-600">/ {extendedStats.yesterday?.groupsBreakdown?.standard || 0}</span></span>
+                        </div>
+                        <div className="bg-slate-800/50 rounded p-1">
+                            <span className="text-slate-400 block">Recup</span>
+                            <span className="text-blue-400 font-bold">{todayRecoverable} <span className="text-slate-600">/ {extendedStats.yesterday?.groupsBreakdown?.recoverable || 0}</span></span>
+                        </div>
                     </div>
                 </div>
-                <div className="bg-[#1e293b]/40 backdrop-blur-xl rounded-2xl border border-white/5 p-4 flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Mes Actual</span>
-                    <div className="text-right">
-                        <span className="block text-xl font-black text-white">{extendedStats.monthlyTop?.reduce((acc, curr) => acc + curr.groups, 0) || 0}</span>
-                        <span className="text-[10px] text-slate-500">Compras Totales</span>
+
+                {/* MONTHLY STATS */}
+                <div className="bg-[#1e293b]/40 backdrop-blur-xl rounded-2xl border border-white/5 p-4 flex items-center justify-between relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent"></div>
+                    <div>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Mes Actual</span>
+                        <div className="flex items-baseline gap-2">
+                            <span className="block text-2xl font-black text-white">
+                                {extendedStats.monthlyTop?.reduce((acc, curr) => acc + curr.groups, 0) || 0}
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-bold uppercase">Compras</span>
+                        </div>
+                    </div>
+                    <div className="text-right z-10">
+                        <span className="block text-[10px] text-slate-400 mb-1">Mejor Día</span>
+                        <span className="text-sm font-bold text-white">{extendedStats.month?.monthStats?.maxDailyGroups || '-'}</span>
                     </div>
                 </div>
-                <div className="bg-[#1e293b]/40 backdrop-blur-xl rounded-2xl border border-white/5 p-4 flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pico Simultáneo</span>
-                    <div className="text-right">
-                        <span className="block text-xl font-black text-white flex items-center gap-2 justify-end">
-                            <Users size={16} className="text-pink-500" />
+
+                {/* PEAK USERS */}
+                <div className="bg-[#1e293b]/40 backdrop-blur-xl rounded-2xl border border-white/5 p-4 flex flex-col justify-center relative">
+                    <div className="flex justify-between items-start mb-2">
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pico Simultáneo</span>
+                        <Users size={16} className="text-pink-500" />
+                    </div>
+                    <div className="flex items-end gap-2">
+                        <span className="text-3xl font-black text-white leading-none">
                             {extendedStats.today?.timeStats?.maxConcurrent || 0}
                         </span>
-                        <span className="text-[10px] text-slate-500">
-                            {extendedStats.today?.timeStats?.peakUsers?.length > 0
-                                ? extendedStats.today.timeStats.peakUsers.map(uid => employees.find(e => String(e.id) === String(uid))?.alias).join(', ')
-                                : '-'}
-                        </span>
+                        <span className="text-[10px] text-slate-500 mb-1">Compradores a la vez</span>
+                    </div>
+                    <div className="mt-2 flex -space-x-2 overflow-hidden py-1">
+                        {extendedStats.today?.timeStats?.peakUsers?.length > 0 ? (
+                            extendedStats.today.timeStats.peakUsers.slice(0, 5).map((uid, i) => {
+                                const emp = employees.find(e => String(e.id) === String(uid));
+                                return (
+                                    <div key={i} title={emp?.alias} className="w-6 h-6 rounded-full bg-slate-700 border border-slate-800 flex items-center justify-center text-[8px] text-white font-bold">
+                                        {emp?.alias?.charAt(0) || '?'}
+                                    </div>
+                                )
+                            })
+                        ) : (
+                            <span className="text-[10px] text-slate-600 italic">Sin datos de pico</span>
+                        )}
+                        {extendedStats.today?.timeStats?.peakUsers?.length > 5 && (
+                            <div className="w-6 h-6 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[8px] text-slate-400 font-bold">
+                                +{extendedStats.today.timeStats.peakUsers.length - 5}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

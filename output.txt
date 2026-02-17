@@ -1,0 +1,22 @@
+Environment file not found at C:\Users\Juanma\.gemini\antigravity\TikTak 2.1\server\.env. Looking in current dir.
+[dotenv@17.2.3] injecting env (2) from .env -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+--- DEBUG DASHBOARD (ESM) ---
+Checking Store: store_1, Date: 2026-02-16
+
+1. QUERY: SELECT * FROM daily_groups WHERE store_id = 'store_1' AND key LIKE '%-2026-02-16'
+> Result: 3 rows
+  Sample Row: {
+  key: '7-2026-02-16',
+  standard: 14,
+  jewelry: 0,
+  recoverable: 6,
+  store_id: 'store_1',
+  no_deal: 2,
+  client_seconds: 20019
+}
+
+2. QUERY (Month): SELECT count(*) FROM daily_groups WHERE store_id = 'store_1' AND key LIKE '%-2026-02-%'
+> Result: 25 rows
+
+3. QUERY (Logs): SELECT count(*) FROM transaction_logs WHERE start_time >= '2026-02-16...'
+> Result: 62 logs

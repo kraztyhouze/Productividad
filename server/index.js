@@ -1405,115 +1405,128 @@ const calculateTimeStats = (logs) => {
 };
 
 const calculateHourlyStats = (logs) => {
-    // Breakdown by Hour (10-21)
-    const hourly = {};
-    const shifts = { morning: 0, afternoon: 0 };
+    try {
+        const hourly = {};
+        const shifts = { morning: 0, afternoon: 0 };
+        for (let i = 10; i <= 21; i++) hourly[i] = 0;
 
-    for (let i = 10; i <= 21; i++) {
-        hourly[i] = 0;
-    }
-
-    logs.forEach(log => {
-        // Only count COMPLETED SALES types
-        if (['standard', 'jewelry', 'recoverable'].includes(log.type)) {
-            const date = new Date(log.end_time);
-            const hour = date.getHours();
-
-            if (hourly[hour] !== undefined) hourly[hour]++;
-
-            // Morning vs Afternoon (Cutoff 15:00)
-            if (hour < 15) shifts.morning++;
-            else shifts.afternoon++;
+        if (Array.isArray(logs)) {
+            logs.forEach(log => {
+                if (log && ['standard', 'jewelry', 'recoverable'].includes(log.type) && log.end_time) {
+                    const date = new Date(log.end_time);
+                    if (!isNaN(date.getTime())) {
+                        const hour = date.getHours();
+                        if (hourly[hour] !== undefined) hourly[hour]++;
+                        if (hour < 15) shifts.morning++;
+                        else shifts.afternoon++;
+                    }
+                }
+            });
         }
-    });
-
-    return { hourly, shifts };
+        return { hourly, shifts };
+    } catch (e) {
+        console.error("calculateHourlyStats failed:", e);
+        return { hourly: {}, shifts: { morning: 0, afternoon: 0 } };
+    }
 };
 
 app.get('/api/dashboard/stats', async (req, res) => {
     const storeId = req.headers['x-store-id'] || 'store_1';
     const { date, month } = req.query;
 
+    console.log(`[Dashboard Stats] Request for Store: ${storeId}, Date: ${date}, Month: ${month}`);
+
     try {
         const response = {};
 
         // 1. MONTHLY STATS (Top Buyers + Time + Best Day)
+        // 1. MONTHLY STATS
         if (month) {
-            // A. Top Buyers (Groups)
-            const groupsRes = await pool.query(
-                `SELECT * FROM daily_groups 
-                 WHERE store_id = $1 AND key LIKE $2`,
-                [storeId, `%-${month}-%`]
-            );
+            try {
+                // A. Top Buyers
+                const groupsRes = await pool.query(
+                    `SELECT * FROM daily_groups WHERE store_id = $1 AND key LIKE $2`,
+                    [storeId, `%-${month}-%`]
+                );
 
-            const shiftsRes = await pool.query(
-                `SELECT employee_id, duration_seconds FROM daily_records 
-                 WHERE store_id = $1 AND date LIKE $2`,
-                [storeId, `${month}-%`]
-            );
+                const shiftsRes = await pool.query(
+                    `SELECT employee_id, duration_seconds FROM daily_records WHERE store_id = $1 AND date LIKE $2`,
+                    [storeId, `${month}-%`]
+                );
 
-            const buyers = {};
-            const dailyTotals = {};
+                const buyers = {};
+                const dailyTotals = {};
 
-            groupsRes.rows.forEach(r => {
-                const parts = r.key.split('-');
-                const g = r.standard + r.jewelry + r.recoverable;
+                groupsRes.rows.forEach(r => {
+                    if (!r.key) return;
+                    const parts = r.key.split('-');
+                    const g = (r.standard || 0) + (r.jewelry || 0) + (r.recoverable || 0);
 
-                // Max Day Stats logic
-                if (parts.length >= 3) {
-                    if (parts.length >= 4) {
-                        const dateKey = `${parts[parts.length - 3]}-${parts[parts.length - 2]}-${parts[parts.length - 1]}`;
-                        dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + g;
+                    // Max Day Stats logic
+                    if (parts.length >= 3) {
+                        const pLen = parts.length;
+                        if (pLen >= 3) {
+                            const dateKey = `${parts[pLen - 3]}-${parts[pLen - 2]}-${parts[pLen - 1]}`;
+                            dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + g;
+                        }
                     }
-                }
 
-                // Buyers logic
-                const empId = parts[0];
-                if (!buyers[empId]) buyers[empId] = { id: empId, groups: 0, clientSeconds: 0, shiftSeconds: 0 };
-                buyers[empId].groups += g;
-                buyers[empId].clientSeconds += (r.client_seconds || 0);
-            });
+                    // Buyers logic
+                    let empId = parts[0];
+                    if (parts.length >= 4) {
+                        const datePartsStartIndex = parts.length - 3;
+                        if (datePartsStartIndex > 0) {
+                            empId = parts[datePartsStartIndex - 1];
+                        }
+                    }
 
-            shiftsRes.rows.forEach(r => {
-                const empId = String(r.employee_id);
-                if (buyers[empId]) {
+                    if (!buyers[empId]) buyers[empId] = { id: empId, groups: 0, clientSeconds: 0, shiftSeconds: 0 };
+                    buyers[empId].groups += g;
+                    buyers[empId].clientSeconds += (r.client_seconds || 0);
+                });
+
+                shiftsRes.rows.forEach(r => {
+                    const empId = String(r.employee_id);
+                    if (!buyers[empId]) buyers[empId] = { id: empId, groups: 0, clientSeconds: 0, shiftSeconds: 0 };
                     buyers[empId].shiftSeconds += (r.duration_seconds || 0);
-                } else if (!buyers[empId]) {
-                    buyers[empId] = { id: empId, groups: 0, clientSeconds: 0, shiftSeconds: 0 };
-                    buyers[empId].shiftSeconds += (r.duration_seconds || 0);
-                }
-            });
+                });
 
-            response.monthlyTop = Object.values(buyers).map(b => ({
-                id: b.id,
-                groups: b.groups,
-                clientSeconds: b.clientSeconds,
-                shiftSeconds: b.shiftSeconds,
-                groupsPerHour: b.clientSeconds > 0 ? (b.groups / (b.clientSeconds / 3600)) : 0,
-                efficiency: b.shiftSeconds > 0 ? (b.clientSeconds / b.shiftSeconds) : 0
-            })).sort((a, b) => b.groups - a.groups).slice(0, 10);
+                response.monthlyTop = Object.values(buyers)
+                    .map(b => ({
+                        id: b.id,
+                        groups: b.groups,
+                        clientSeconds: b.clientSeconds,
+                        shiftSeconds: b.shiftSeconds,
+                        groupsPerHour: b.clientSeconds > 0 ? (b.groups / (b.clientSeconds / 3600)) : 0,
+                        efficiency: b.shiftSeconds > 0 ? (b.clientSeconds / b.shiftSeconds) : 0
+                    }))
+                    .sort((a, b) => b.groups - a.groups)
+                    .slice(0, 10);
 
-            // B. Monthly Time Stats (Logs)
-            const monthLogsRes = await pool.query(
-                `SELECT * FROM transaction_logs 
-                 WHERE store_id = $1 
-                 AND start_time >= $2::date 
-                 AND start_time < ($2::date + INTERVAL '1 month')`,
-                [storeId, `${month}-01`]
-            );
+                // B. Monthly Time Stats
+                const monthLogsRes = await pool.query(
+                    `SELECT * FROM transaction_logs 
+                     WHERE store_id = $1 
+                     AND start_time >= $2::date 
+                     AND start_time < ($2::date + INTERVAL '1 month')`,
+                    [storeId, `${month}-01`]
+                );
 
-            const timeStats = calculateTimeStats(monthLogsRes.rows);
+                const timeStats = calculateTimeStats(monthLogsRes.rows);
 
-            // C. Max Daily Groups
-            let maxDailyGroups = 0;
-            Object.values(dailyTotals).forEach(val => {
-                if (val > maxDailyGroups) maxDailyGroups = val;
-            });
+                // C. Max Daily Groups
+                let maxDailyGroups = 0;
+                Object.values(dailyTotals).forEach(val => {
+                    if (val > maxDailyGroups) maxDailyGroups = val;
+                });
 
-            response.monthStats = {
-                ...timeStats,
-                maxDailyGroups
-            };
+                response.monthStats = { ...timeStats, maxDailyGroups };
+
+            } catch (err) {
+                console.error("[Dashboard Stats] Monthly Error:", err);
+                response.monthlyTop = [];
+                response.monthStats = { maxDailyGroups: 0, unionSeconds: 0, maxConcurrent: 0, peakUsers: [] };
+            }
         }
 
         // 2. SHOPPING TIME & CONCURRENCY (Today/Yesterday/Month)
@@ -1526,6 +1539,7 @@ app.get('/api/dashboard/stats', async (req, res) => {
                  AND start_time < ($2::timestamp + INTERVAL '1 day')`,
                 [storeId, dateStr]
             );
+            console.log(`[Dashboard Stats] Logs Found(${dateStr}): ${logsRes.rowCount}`);
 
             // Mix in ACTIVE sessions if they fall within this day (mostly for "Today")
             const activeRes = await pool.query('SELECT * FROM active_sessions WHERE store_id = $1', [storeId]);
@@ -1559,15 +1573,17 @@ app.get('/api/dashboard/stats', async (req, res) => {
                  WHERE store_id = $1 AND key LIKE $2`,
                 [storeId, `%-${dateStr}`]
             );
+            console.log(`[Dashboard Stats] Groups Found(${dateStr}): ${groupsQuery.rowCount}`);
 
             let totalGroups = 0;
             let breakdown = { standard: 0, jewelry: 0, recoverable: 0 };
 
             groupsQuery.rows.forEach(r => {
-                totalGroups += (r.standard + r.jewelry + r.recoverable);
-                breakdown.standard += r.standard;
-                breakdown.jewelry += r.jewelry;
-                breakdown.recoverable += r.recoverable;
+                const g = (r.standard || 0) + (r.jewelry || 0) + (r.recoverable || 0);
+                totalGroups += g;
+                breakdown.standard += (r.standard || 0);
+                breakdown.jewelry += (r.jewelry || 0);
+                breakdown.recoverable += (r.recoverable || 0);
             });
 
             response.totalGroups = totalGroups;

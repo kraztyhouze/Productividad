@@ -1456,11 +1456,13 @@ app.get('/api/dashboard/stats', async (req, res) => {
 
                 const buyers = {};
                 const dailyTotals = {};
+                let totalMonthGroups = 0; // NEW: Track absolute total
 
                 groupsRes.rows.forEach(r => {
                     if (!r.key) return;
                     const parts = r.key.split('-');
                     const g = (r.standard || 0) + (r.jewelry || 0) + (r.recoverable || 0);
+                    totalMonthGroups += g; // Accumulate total
 
                     // Max Day Stats logic
                     if (parts.length >= 3) {
@@ -1520,7 +1522,7 @@ app.get('/api/dashboard/stats', async (req, res) => {
                     if (val > maxDailyGroups) maxDailyGroups = val;
                 });
 
-                response.monthStats = { ...timeStats, maxDailyGroups };
+                response.monthStats = { ...timeStats, maxDailyGroups, totalGroups: totalMonthGroups };
 
             } catch (err) {
                 console.error("[Dashboard Stats] Monthly Error:", err);

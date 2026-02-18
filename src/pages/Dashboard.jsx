@@ -36,22 +36,28 @@ const Dashboard = () => {
 
     useEffect(() => {
         const fetchStats = async () => {
-            const storeId = localStorage.getItem('tiktak_current_store') || 'store_1'; // Fallback
+            // Use currentStore from Context if available to ensure sync with sidebar selection
+            // If currentStore is null (initial load), fallback to localStorage
+            const storeId = currentStore || localStorage.getItem('tiktak_current_store') || 'store_1';
             const headers = { 'x-store-id': storeId };
-            const todayStr = new Date().toISOString().split('T')[0];
+
+            const todayDate = new Date();
+            const todayStr = todayDate.toISOString().split('T')[0];
+
+            // Correct Yesterday Calculation
             const yesterdayDate = new Date();
             yesterdayDate.setDate(yesterdayDate.getDate() - 1);
             const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
+
             const monthStr = todayStr.substring(0, 7);
 
             try {
-                // Parallel fetch
-                const [dayRes, monthRes] = await Promise.all([
-                    fetch(`/api/dashboard/stats?date=${yesterdayStr}`, { headers }),
-                    fetch(`/api/dashboard/stats?month=${monthStr}`, { headers })
+                // Parallel fetch with NO-CACHE to ensure fresh data
+                const [dayRes, monthRes, todayRes] = await Promise.all([
+                    fetch(`/api/dashboard/stats?date=${yesterdayStr}`, { headers, cache: 'no-store' }),
+                    fetch(`/api/dashboard/stats?month=${monthStr}`, { headers, cache: 'no-store' }),
+                    fetch(`/api/dashboard/stats?date=${todayStr}`, { headers, cache: 'no-store' })
                 ]);
-
-                const todayRes = await fetch(`/api/dashboard/stats?date=${todayStr}`, { headers });
 
                 const dayData = await dayRes.json();
                 const monthData = await monthRes.json();
@@ -60,16 +66,18 @@ const Dashboard = () => {
                 setExtendedStats({
                     yesterday: dayData,
                     month: monthData,
-                    today: todayData, // For union time/concurrency
+                    today: todayData,
                     monthlyTop: monthData.monthlyTop || []
                 });
             } catch (e) { console.error("Stats fetch error", e); }
         };
+
         fetchStats();
+
         // Refresh every minute
         const interval = setInterval(fetchStats, 60000);
         return () => clearInterval(interval);
-    }, []);
+    }, [currentStore]); // Re-run when store changes
 
     // --- DATA AGGREGATION HELPERS ---
     const todayStr = new Date().toISOString().split('T')[0];
@@ -313,7 +321,7 @@ const Dashboard = () => {
                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Mes Actual</span>
                         <div className="flex items-baseline gap-2">
                             <span className="block text-2xl font-black text-white">
-                                {extendedStats.monthlyTop?.reduce((acc, curr) => acc + curr.groups, 0) || 0}
+                                {extendedStats.month?.monthStats?.totalGroups || extendedStats.monthlyTop?.reduce((acc, curr) => acc + curr.groups, 0) || 0}
                             </span>
                             <span className="text-[10px] text-slate-500 font-bold uppercase">Compras</span>
                         </div>

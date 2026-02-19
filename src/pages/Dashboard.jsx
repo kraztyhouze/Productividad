@@ -13,6 +13,9 @@ import {
 } from 'recharts';
 import { useStore } from '../context/StoreContext';
 
+// Helper: format date to YYYY-MM-DD in Madrid timezone
+const formatDate = (d) => d.toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
+
 const Dashboard = () => {
     const { dailyRecords, dailyGroups, activeSessions, closedDays } = useProductivity();
     const { employees } = useTeam();
@@ -42,7 +45,7 @@ const Dashboard = () => {
             const storeId = currentStore || localStorage.getItem('tiktak_current_store') || 'store_1';
             const headers = { 'x-store-id': storeId };
 
-            const formatDate = (d) => d.toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
+            // formatDate is now defined at module scope above
 
             const todayDate = new Date();
             const todayStr = formatDate(todayDate);
@@ -100,7 +103,7 @@ const Dashboard = () => {
     }, [currentStore, selectedDate]);
 
     // --- DATA AGGREGATION ---
-    const formatDate = (d) => d.toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
+    // formatDate is defined at module scope above
     const todayStr = formatDate(new Date());
     const isToday = selectedDate === todayStr;
 

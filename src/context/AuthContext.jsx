@@ -20,14 +20,20 @@ export const AuthProvider = ({ children }) => {
         // Check local storage for persisted session
         const storedUser = localStorage.getItem('is_user');
         if (storedUser) {
-            const parsedUser = JSON.parse(storedUser);
-            // Validate that the user belongs to the current store
-            if (currentStore && parsedUser.storeId && parsedUser.storeId !== currentStore) {
-                console.warn("Session Mismatch: User belongs to", parsedUser.storeId, "but current store is", currentStore);
+            try {
+                const parsedUser = JSON.parse(storedUser);
+                // Validate that the user belongs to the current store
+                if (currentStore && parsedUser.storeId && parsedUser.storeId !== currentStore) {
+                    console.warn("Session Mismatch: User belongs to", parsedUser.storeId, "but current store is", currentStore);
+                    localStorage.removeItem('is_user');
+                    setUser(null);
+                } else {
+                    setUser(parsedUser);
+                }
+            } catch (e) {
+                console.error("Corrupt session data:", e);
                 localStorage.removeItem('is_user');
                 setUser(null);
-            } else {
-                setUser(parsedUser);
             }
         }
         setLoading(false);
@@ -75,7 +81,7 @@ export const AuthProvider = ({ children }) => {
 
     return (
         <AuthContext.Provider value={{ user, login, logout, loading, ROLES }}>
-            {!loading && children}
+            {children}
         </AuthContext.Provider>
     );
 };

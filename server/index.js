@@ -1493,10 +1493,18 @@ app.get('/api/dashboard/stats', async (req, res) => {
 
                     if (!matches) return;
 
+
                     // Aggregate
+                    // FIX: Define g (groups count)
+                    const g = r.count || 0;
+
                     if (!buyers[empId]) buyers[empId] = { id: empId, groups: 0, clientSeconds: 0, shiftSeconds: 0 };
                     buyers[empId].groups += g;
                     buyers[empId].clientSeconds += (r.client_seconds || 0);
+
+                    // FIX: Populate dailyTotals for usage below in dailySeries
+                    if (!dailyTotals[datePart]) dailyTotals[datePart] = 0;
+                    dailyTotals[datePart] += g;
 
                     totalMonthGroups += g; // Maintain total
                 });
@@ -1530,13 +1538,30 @@ app.get('/api/dashboard/stats', async (req, res) => {
 
                 const timeStats = calculateTimeStats(monthLogsRes.rows);
 
-                // C. Max Daily Groups
+                // C. Max Daily Groups & Series
                 let maxDailyGroups = 0;
-                Object.values(dailyTotals).forEach(val => {
+                const dailySeries = {}; // Map Date -> Count
+
+                Object.entries(dailyTotals).forEach(([d, val]) => {
                     if (val > maxDailyGroups) maxDailyGroups = val;
+                    dailySeries[d] = val;
                 });
 
-                response.monthStats = { ...timeStats, maxDailyGroups, totalGroups: totalMonthGroups };
+                // Fill series for entire month (1..31)
+                const seriesArray = [];
+                const [y, m] = month.split('-');
+                const daysInMonth = new Date(y, m, 0).getDate();
+
+                for (let i = 1; i <= daysInMonth; i++) {
+                    const dStr = `${month}-${String(i).padStart(2, '0')}`;
+                    seriesArray.push({
+                        date: dStr,
+                        groups: dailySeries[dStr] || 0,
+                        label: i.toString()
+                    });
+                }
+
+                response.monthStats = { ...timeStats, maxDailyGroups, totalGroups: totalMonthGroups, series: seriesArray };
 
             } catch (err) {
                 console.error("[Dashboard Stats] Monthly Error:", err);

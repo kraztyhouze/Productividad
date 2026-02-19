@@ -634,35 +634,44 @@ const Dashboard = () => {
                         </div>
                     </div>
 
-                    {/* MONTHLY LEADERBOARD */}
+                    {/* MONTHLY LEADERBOARD - Groups & Productivity */}
                     <div className="bg-[#1e293b]/60 backdrop-blur-xl rounded-[2rem] border border-white/5 p-6 shadow-xl flex-1 flex flex-col">
                         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                            <TrendingUp size={16} /> Top Mes (Productividad)
+                            <ShoppingBag size={16} /> Top Mes — Compras
                         </h3>
                         <div className="space-y-2 flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                            {extendedStats.monthlyTop.map((empData, index) => {
-                                const emp = employees.find(e => String(e.id) === String(empData.id)) || { alias: `Emp ${empData.id}` };
-                                const name = emp.alias || emp.firstName;
-                                const prod = empData.efficiency ? (empData.efficiency * 100).toFixed(0) : 0;
+                            {[...extendedStats.monthlyTop]
+                                .sort((a, b) => b.groups - a.groups)
+                                .map((empData, index) => {
+                                    const emp = employees.find(e => String(e.id) === String(empData.id)) || { alias: `Emp ${empData.id}` };
+                                    const name = emp.alias || emp.firstName;
+                                    const prod = empData.efficiency ? (empData.efficiency * 100).toFixed(0) : 0;
+                                    const hours = empData.clientSeconds ? (empData.clientSeconds / 3600).toFixed(1) : '0.0';
 
-                                return (
-                                    <div key={empData.id} className="flex items-center justify-between p-3 bg-slate-800/50 hover:bg-slate-800 rounded-xl transition-colors group cursor-default border border-white/5">
-                                        <div className="flex items-center gap-3">
-                                            <span className={`text-xs font-mono font-bold w-5 h-5 flex items-center justify-center rounded ${index === 0 ? 'bg-amber-500/20 text-amber-500' : 'text-slate-500'}`}>
-                                                {index + 1}
-                                            </span>
-                                            <div>
-                                                <p className="text-sm font-bold text-slate-200 group-hover:text-white transition-colors">{name}</p>
-                                                <p className="text-[10px] text-slate-500 font-mono">Eficiencia: <span className={prod > 70 ? 'text-green-400' : 'text-slate-400'}>{prod}%</span></p>
+                                    return (
+                                        <div key={empData.id} className="flex items-center justify-between p-3 bg-slate-800/50 hover:bg-slate-800 rounded-xl transition-colors group cursor-default border border-white/5">
+                                            <div className="flex items-center gap-3">
+                                                <span className={`text-xs font-mono font-bold w-6 h-6 flex items-center justify-center rounded-lg ${index === 0 ? 'bg-amber-500/20 text-amber-400 ring-1 ring-amber-500/30' : index === 1 ? 'bg-slate-500/20 text-slate-300' : index === 2 ? 'bg-orange-700/20 text-orange-400' : 'text-slate-500'}`}>
+                                                    {index + 1}
+                                                </span>
+                                                <div>
+                                                    <p className="text-sm font-bold text-slate-200 group-hover:text-white transition-colors">{name}</p>
+                                                    <p className="text-[10px] text-slate-500 font-mono">{hours}h comprando</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex flex-col items-end">
+                                                    <span className="text-lg font-black text-white leading-none">{empData.groups}</span>
+                                                    <span className="text-[10px] text-slate-500">grupos</span>
+                                                </div>
+                                                <div className={`flex flex-col items-center px-2 py-1 rounded-lg text-[10px] font-bold ${prod >= 70 ? 'bg-emerald-500/15 text-emerald-400' : prod >= 40 ? 'bg-amber-500/15 text-amber-400' : 'bg-slate-700/50 text-slate-400'}`}>
+                                                    <span className="text-xs">{prod}%</span>
+                                                    <span className="text-[8px] opacity-70">prod</span>
+                                                </div>
                                             </div>
                                         </div>
-                                        <div className="flex flex-col items-end">
-                                            <span className="text-sm font-bold text-white">{empData.groups} <span className="text-[10px] font-normal text-slate-500">gr.</span></span>
-                                            <span className="text-[10px] text-blue-400 font-mono">{(empData.clientSeconds / 3600).toFixed(1)}h</span>
-                                        </div>
-                                    </div>
-                                )
-                            })}
+                                    )
+                                })}
                             {extendedStats.monthlyTop.length === 0 && (
                                 <p className="text-xs text-slate-500 italic text-center py-12">Cargando datos del mes...</p>
                             )}

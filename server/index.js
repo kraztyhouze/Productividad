@@ -1431,10 +1431,14 @@ const calculateHourlyStats = (logs) => {
 };
 
 app.get('/api/dashboard/stats', async (req, res) => {
-    const storeId = req.headers['x-store-id'] || 'store_1';
+    let storeId = req.headers['x-store-id'];
+    // Robust default: Handle missing, null string, or undefined string
+    if (!storeId || storeId === 'null' || storeId === 'undefined') {
+        storeId = 'store_1';
+    }
     const { date, month } = req.query;
 
-    console.log(`[Dashboard Stats] Request for Store: ${storeId}, Date: ${date}, Month: ${month}`);
+    console.log(`[Dashboard Stats] Request - Store: '${storeId}', Date: ${date}, Month: ${month}`);
 
     try {
         const response = {};

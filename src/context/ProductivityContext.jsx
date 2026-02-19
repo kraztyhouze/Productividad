@@ -6,6 +6,11 @@ const ProductivityContext = createContext(null);
 export const ProductivityProvider = ({ children }) => {
     const { currentStore } = useStore(); // Get current store explicitly
 
+    // Helper for Local Date (YYYY-MM-DD) - Forced to Madrid to match Server
+    const formatLocal = (d) => {
+        return d.toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
+    };
+
     // --- STATE ---
     const [activeSessions, setActiveSessions] = useState([]);
     const [dailyRecords, setDailyRecords] = useState([]);
@@ -206,7 +211,7 @@ export const ProductivityProvider = ({ children }) => {
             startTime: session.startTime,
             endTime: endTime.toISOString(),
             durationSeconds: isNaN(durationSeconds) ? 0 : Math.max(0, durationSeconds), // Prevent NaN and Negative
-            date: new Date().toISOString().split('T')[0],
+            date: formatLocal(new Date()), // Use Local Date
             groups: 0
         };
 
@@ -402,7 +407,7 @@ export const ProductivityProvider = ({ children }) => {
 
         try {
             // 1. If Today, remove active session immediately
-            const isToday = new Date().toISOString().split('T')[0] === date;
+            const isToday = formatLocal(new Date()) === date;
             if (isToday) {
                 // Optimistic local update
                 setActiveSessions(prev => prev.filter(s => String(s.employeeId) !== idStr));
@@ -435,7 +440,7 @@ export const ProductivityProvider = ({ children }) => {
     };
 
     const getUnclosedPastDays = () => {
-        const today = new Date().toISOString().split('T')[0];
+        const today = formatLocal(new Date());
         const allDates = [...new Set(dailyRecords.map(r => r.date))];
         return allDates.filter(d => d < today && !closedDays.includes(d)).sort();
     };

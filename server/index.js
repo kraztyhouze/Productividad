@@ -1460,31 +1460,41 @@ app.get('/api/dashboard/stats', async (req, res) => {
 
                 groupsRes.rows.forEach(r => {
                     if (!r.key) return;
+
+                    // Robust ID extraction: Key format is {ID}-{YYYY-MM-DD}
                     const parts = r.key.split('-');
-                    const g = (r.standard || 0) + (r.jewelry || 0) + (r.recoverable || 0);
-                    totalMonthGroups += g; // Accumulate total
+                    if (parts.length < 4) return; // Invalid format
 
-                    // Max Day Stats logic
-                    if (parts.length >= 3) {
-                        const pLen = parts.length;
-                        if (pLen >= 3) {
-                            const dateKey = `${parts[pLen - 3]}-${parts[pLen - 2]}-${parts[pLen - 1]}`;
-                            dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + g;
+                    const datePart = parts.slice(-3).join('-'); // "2024-2-1" or "2024-02-01"
+                    const empId = parts.slice(0, -3).join('-');
+
+                    // Normalize date to ensure comparison works (e.g. 2024-2-1 matches 2024-02)
+                    // But usually keys are ISO. If not, we try to be smart.
+                    // Simple check: if datePart contains month string?
+                    // "2024-02". "2024-02-18" -> Yes. "2024-2-18" -> No.
+
+                    // Convert both to YYYY-MM prefix for comparison
+                    // If datePart is not standard, new Date might work
+                    let matches = false;
+                    if (datePart.includes(month)) {
+                        matches = true;
+                    } else {
+                        // Fallback validation
+                        const d = new Date(datePart);
+                        if (!isNaN(d.getTime())) {
+                            const iso = d.toISOString().split('T')[0];
+                            if (iso.startsWith(month)) matches = true;
                         }
                     }
 
-                    // Buyers logic
-                    let empId = parts[0];
-                    if (parts.length >= 4) {
-                        const datePartsStartIndex = parts.length - 3;
-                        if (datePartsStartIndex > 0) {
-                            empId = parts[datePartsStartIndex - 1];
-                        }
-                    }
+                    if (!matches) return;
 
+                    // Aggregate
                     if (!buyers[empId]) buyers[empId] = { id: empId, groups: 0, clientSeconds: 0, shiftSeconds: 0 };
                     buyers[empId].groups += g;
                     buyers[empId].clientSeconds += (r.client_seconds || 0);
+
+                    totalMonthGroups += g; // Maintain total
                 });
 
                 shiftsRes.rows.forEach(r => {
@@ -1532,8 +1542,11 @@ app.get('/api/dashboard/stats', async (req, res) => {
         }
 
         // 2. SHOPPING TIME & CONCURRENCY (Today/Yesterday/Month)
+        // 2. DAILY STATS (Shopping Time, Groups per Employee, Records)
         if (date) {
             const dateStr = date;
+
+            // A. Transaction Logs (Time)
             const logsRes = await pool.query(
                 `SELECT * FROM transaction_logs 
                  WHERE store_id = $1 
@@ -1541,9 +1554,8 @@ app.get('/api/dashboard/stats', async (req, res) => {
                  AND start_time < ($2::timestamp + INTERVAL '1 day')`,
                 [storeId, dateStr]
             );
-            console.log(`[Dashboard Stats] Logs Found(${dateStr}): ${logsRes.rowCount}`);
 
-            // Mix in ACTIVE sessions if they fall within this day (mostly for "Today")
+            // B. Active Sessions (If Today)
             const activeRes = await pool.query('SELECT * FROM active_sessions WHERE store_id = $1', [storeId]);
             const now = new Date();
             const startRange = new Date(dateStr);
@@ -1551,36 +1563,66 @@ app.get('/api/dashboard/stats', async (req, res) => {
             endRange.setDate(endRange.getDate() + 1);
 
             const activeLogs = [];
+            const activeSessionsList = []; // For frontend state reconstruction
+
             activeRes.rows.forEach(s => {
+                // For logs calculation
                 if (s.client_start_time) {
                     const st = new Date(s.client_start_time);
                     if (st >= startRange && st < endRange) {
                         activeLogs.push({
                             start_time: s.client_start_time,
-                            end_time: now.toISOString(), // Assume ongoing until now
+                            end_time: now.toISOString(),
                             employee_id: s.employee_id
                         });
                     }
                 }
+                // For frontend state
+                activeSessionsList.push({
+                    employeeId: s.employee_id,
+                    employeeName: s.employee_name,
+                    startTime: s.start_time,
+                    clientStartTime: s.client_start_time
+                });
             });
 
             response.timeStats = calculateTimeStats([...logsRes.rows, ...activeLogs]);
-
-            // HOURLY STATS (Real Purchases)
             response.hourlyStats = calculateHourlyStats(logsRes.rows);
 
-            // Fetch Total Groups for Date with Breakdown
+            // C. Daily Groups Breakdown (Per Employee)
+            // Fetch everything for the date to build the table
             const groupsQuery = await pool.query(
-                `SELECT standard, jewelry, recoverable FROM daily_groups 
+                `SELECT key, standard, jewelry, recoverable, no_deal, client_seconds FROM daily_groups 
                  WHERE store_id = $1 AND key LIKE $2`,
                 [storeId, `%-${dateStr}`]
             );
-            console.log(`[Dashboard Stats] Groups Found(${dateStr}): ${groupsQuery.rowCount}`);
 
+            const employeeGroups = {};
             let totalGroups = 0;
-            let breakdown = { standard: 0, jewelry: 0, recoverable: 0 };
+            const breakdown = { standard: 0, jewelry: 0, recoverable: 0 };
 
             groupsQuery.rows.forEach(r => {
+                // Robust Parse: key is {ID}-{DATE}
+                // We split by '-' and assume everything before the date part is ID.
+                // The date part is the last 3 tokens (YYYY-MM-DD)? No, ISO date is 3 tokens.
+                // key: "55-2024-02-18". "abc-def-2024-02-18".
+                const parts = r.key.split('-');
+                if (parts.length < 4) return; // invalid key format? YYYY-MM-DD is 3 parts. +1 ID = 4 parts.
+
+                const datePart = parts.slice(-3).join('-'); // Reconstruct YYYY-MM-DD
+                const empId = parts.slice(0, -3).join('-'); // Reconstruct ID
+
+                if (datePart !== dateStr) return; // Should match query, but double check
+
+                employeeGroups[r.key] = {
+                    standard: r.standard || 0,
+                    jewelry: r.jewelry || 0,
+                    recoverable: r.recoverable || 0,
+                    noDeal: r.no_deal || 0,
+                    clientSeconds: r.client_seconds || 0
+                };
+                // Frontend expects keys like "55-2024-02-18' (which is r.key) mapping to values.
+
                 const g = (r.standard || 0) + (r.jewelry || 0) + (r.recoverable || 0);
                 totalGroups += g;
                 breakdown.standard += (r.standard || 0);
@@ -1588,8 +1630,34 @@ app.get('/api/dashboard/stats', async (req, res) => {
                 breakdown.recoverable += (r.recoverable || 0);
             });
 
-            response.totalGroups = totalGroups;
-            response.groupsBreakdown = breakdown;
+            // D. Daily Records (Shifts)
+            const recordsQuery = await pool.query(
+                `SELECT id, employee_id, employee_name, start_time, end_time, duration_seconds, date 
+                 FROM daily_records 
+                 WHERE store_id = $1 AND date = $2`,
+                [storeId, dateStr]
+            );
+
+            // Map to frontend format
+            const dailyRecordsList = recordsQuery.rows.map(r => ({
+                id: r.id, // Ensure BigInt handling if needed, but JSON usually OK if not huge
+                employeeId: r.employee_id,
+                employeeName: r.employee_name,
+                startTime: r.start_time,
+                endTime: r.end_time,
+                durationSeconds: r.duration_seconds,
+                date: r.date,
+                groups: 0 // Legacy field
+            }));
+
+            // Response construction for Dashboard
+            response.dailyStats = {
+                employeeGroups, // { "55-2024...": { ... } }
+                dailyRecords: dailyRecordsList,
+                activeSessions: activeSessionsList, // Only meaningful for Today
+                totalGroups,
+                breakdown
+            };
         }
 
 

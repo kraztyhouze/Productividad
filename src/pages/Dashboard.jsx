@@ -19,6 +19,7 @@ const Dashboard = () => {
     const { user } = useAuth();
 
     const [currentTime, setCurrentTime] = useState(new Date());
+    const [selectedDate, setSelectedDate] = useState(formatDate(new Date())); // Default to today
 
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -34,53 +35,82 @@ const Dashboard = () => {
     const { currentStore } = useStore(); // Need this for headers if calling manually, but we can reuse context helper if exposed or just fetch.
     // Dashboard doesn't import useStore directly but useProductivity, let's just use fetch relative.
 
+    const [viewedData, setViewedData] = useState(null);
+
     useEffect(() => {
         const fetchStats = async () => {
-            // Use currentStore from Context if available to ensure sync with sidebar selection
-            // If currentStore is null (initial load), fallback to localStorage
             const storeId = currentStore || localStorage.getItem('tiktak_current_store') || 'store_1';
             const headers = { 'x-store-id': storeId };
 
-            const todayDate = new Date();
-            const todayStr = todayDate.toISOString().split('T')[0];
+            const formatDate = (d) => d.toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
 
-            // Correct Yesterday Calculation
+            const todayDate = new Date();
+            const todayStr = formatDate(todayDate);
             const yesterdayDate = new Date();
             yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-            const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
-
+            const yesterdayStr = formatDate(yesterdayDate);
             const monthStr = todayStr.substring(0, 7);
 
             try {
-                // Parallel fetch with NO-CACHE to ensure fresh data
-                const [dayRes, monthRes, todayRes] = await Promise.all([
+                // 1. Always fetch Yesterday & Month (for Cards/Charts)
+                const [dayRes, monthRes] = await Promise.all([
                     fetch(`/api/dashboard/stats?date=${yesterdayStr}`, { headers, cache: 'no-store' }),
-                    fetch(`/api/dashboard/stats?month=${monthStr}`, { headers, cache: 'no-store' }),
-                    fetch(`/api/dashboard/stats?date=${todayStr}`, { headers, cache: 'no-store' })
+                    fetch(`/api/dashboard/stats?month=${monthStr}`, { headers, cache: 'no-store' })
                 ]);
 
                 const dayData = await dayRes.json();
                 const monthData = await monthRes.json();
-                const todayData = await todayRes.json();
+
+                // 2. Fetch Selected Date Data (for Main View)
+                let currentViewData = null;
+                if (selectedDate === todayStr) {
+                    // Start empty, will use Context
+                    currentViewData = null;
+                } else if (selectedDate === yesterdayStr) {
+                    currentViewData = dayData.dailyStats;
+                } else {
+                    const selRes = await fetch(`/api/dashboard/stats?date=${selectedDate}`, { headers, cache: 'no-store' });
+                    const selJson = await selRes.json();
+                    currentViewData = selJson.dailyStats;
+                }
+
+                // 3. Today's Context-equivalent data (for "Today" card metrics if needed from API, but we use Context)
+                const todayRes = await fetch(`/api/dashboard/stats?date=${todayStr}`, { headers, cache: 'no-store' });
+                const todayJson = await todayRes.json();
 
                 setExtendedStats({
                     yesterday: dayData,
                     month: monthData,
-                    today: todayData,
+                    today: todayJson,
                     monthlyTop: monthData.monthlyTop || []
                 });
+
+                if (selectedDate !== todayStr) {
+                    setViewedData(currentViewData);
+                } else {
+                    setViewedData(null); // Clear viewing data to fallback to Context
+                }
+
             } catch (e) { console.error("Stats fetch error", e); }
         };
 
         fetchStats();
-
-        // Refresh every minute
         const interval = setInterval(fetchStats, 60000);
         return () => clearInterval(interval);
-    }, [currentStore]); // Re-run when store changes
+    }, [currentStore, selectedDate]);
 
-    // --- DATA AGGREGATION HELPERS ---
-    const todayStr = new Date().toISOString().split('T')[0];
+    // --- DATA AGGREGATION ---
+    const formatDate = (d) => d.toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
+    const todayStr = formatDate(new Date());
+    const isToday = selectedDate === todayStr;
+
+    // Source Selection: Context (Live) if Today, else API (ViewedData)
+    // Note: If viewing today, we PREFER Context for instant updates.
+    const sourceGroups = isToday ? dailyGroups : (viewedData?.employeeGroups || {});
+    const sourceRecords = isToday ? dailyRecords : (viewedData?.dailyRecords || []);
+    // Active sessions only relevant for Today really, but if viewing past, we use logs.
+    const sourceSessions = (isToday ? activeSessions : (viewedData?.activeSessions || []));
+
 
     // 1. Calculate Today's Metrics
     let todayGroups = 0;
@@ -92,10 +122,11 @@ const Dashboard = () => {
     let todayNoDeals = 0;       // Missed opportunities
 
     // From Daily Groups (Completed Transactions)
-    Object.keys(dailyGroups).forEach(key => {
-        const [empIdStr, date] = key.split(/-(.+)/);
+    Object.keys(sourceGroups).forEach(key => {
+        // Safe split for key format ID-YYYY-MM-DD
+        const date = key.slice(-10);
         if (date === todayStr) {
-            const raw = dailyGroups[key];
+            const raw = sourceGroups[key];
             const data = typeof raw === 'number'
                 ? { standard: raw, jewelry: 0, recoverable: 0, clientSeconds: 0, noDeal: 0 }
                 : {
@@ -116,15 +147,15 @@ const Dashboard = () => {
     });
 
     // From Daily Records (Shift Time - Finished)
-    dailyRecords.forEach(r => {
+    sourceRecords.forEach(r => {
         if (r.date === todayStr) {
             todayShiftSeconds += r.durationSeconds;
         }
     });
 
     // From Active Sessions (Live Data)
-    if (activeSessions) {
-        activeSessions.forEach(s => {
+    if (sourceSessions) {
+        sourceSessions.forEach(s => {
             const duration = (currentTime - new Date(s.startTime)) / 1000;
             todayShiftSeconds += duration;
 
@@ -150,7 +181,7 @@ const Dashboard = () => {
     for (let i = 6; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
-        const dateStr = d.toISOString().split('T')[0];
+        const dateStr = formatDate(d);
         const dayLabel = d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' });
 
         let dayGroups = 0;
@@ -184,7 +215,7 @@ const Dashboard = () => {
     ].filter(d => d.value > 0);
 
     // 4. Leaderboard (Groups Today)
-    const activeEmpIds = new Set(activeSessions?.map(s => parseInt(s.employeeId)) || []);
+    const activeEmpIds = new Set(sourceSessions?.map(s => parseInt(s.employeeId)) || []);
 
     // We want all employees who have activity today OR are currently active
     const leaderboard = employees
@@ -193,7 +224,7 @@ const Dashboard = () => {
             // Calculate specific groups for this employee today
             let empGroups = 0;
             const key = `${emp.id}-${todayStr}`;
-            const raw = dailyGroups[key];
+            const raw = sourceGroups[key];
             if (raw) {
                 empGroups = typeof raw === 'number' ? raw : ((raw.standard || 0) + (raw.jewelry || 0) + (raw.recoverable || 0));
             }
@@ -575,8 +606,8 @@ const Dashboard = () => {
                         </h3>
 
                         <div className="space-y-3 min-h-[100px]">
-                            {activeSessions && activeSessions.filter(s => s.clientStartTime).length > 0 ? (
-                                activeSessions.filter(s => s.clientStartTime).map(s => {
+                            {sourceSessions && sourceSessions.filter(s => s.clientStartTime).length > 0 ? (
+                                sourceSessions.filter(s => s.clientStartTime).map(s => {
                                     const mins = Math.floor((currentTime - new Date(s.clientStartTime)) / 60000);
                                     return (
                                         <div key={s.employeeId} className="flex items-center gap-4 p-3 bg-slate-800 rounded-2xl border border-white/5 shadow-lg animate-in slide-in-from-right duration-300">

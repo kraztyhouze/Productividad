@@ -494,13 +494,14 @@ app.delete('/api/closed-days/:date', async (req, res) => {
 app.get('/api/sync/productivity', async (req, res) => {
     const storeId = req.headers['x-store-id'] || 'store_1';
     try {
-        const [sessions, records, groups, closed, incidents, families] = await Promise.all([
+        const [sessions, records, groups, closed, incidents, families, logs] = await Promise.all([
             pool.query('SELECT TRIM(employee_id) as "employeeId", employee_name as "employeeName", start_time as "startTime", client_start_time as "clientStartTime" FROM active_sessions WHERE store_id = $1', [storeId]),
             pool.query('SELECT id, employee_id as "employeeId", employee_name as "employeeName", start_time as "startTime", end_time as "endTime", duration_seconds as "durationSeconds", date, groups_count as "groups" FROM daily_records WHERE store_id = $1 ORDER BY start_time DESC', [storeId]),
             pool.query('SELECT * FROM daily_groups WHERE store_id = $1', [storeId]),
             pool.query('SELECT * FROM closed_days WHERE store_id = $1', [storeId]),
             pool.query('SELECT * FROM day_incidents WHERE store_id = $1', [storeId]),
-            pool.query('SELECT * FROM product_families WHERE store_id = $1 ORDER BY id DESC', [storeId])
+            pool.query('SELECT * FROM product_families WHERE store_id = $1 ORDER BY id DESC', [storeId]),
+            pool.query("SELECT * FROM transaction_logs WHERE store_id = $1 AND start_time > NOW() - INTERVAL '60 days' ORDER BY start_time DESC", [storeId])
         ]);
 
         const dailyGroupsMap = {};
@@ -523,7 +524,8 @@ app.get('/api/sync/productivity', async (req, res) => {
             dailyGroups: dailyGroupsMap,
             closedDays: closed.rows.map(d => d.date),
             dayIncidents: dayIncidentsMap,
-            productFamilies: families.rows
+            productFamilies: families.rows,
+            transactionLogs: logs.rows
         });
     } catch (err) {
         res.status(500).json({ error: err.message });

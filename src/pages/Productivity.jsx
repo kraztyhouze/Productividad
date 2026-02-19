@@ -3,7 +3,7 @@ import { useProductivity } from '../context/ProductivityContext';
 import { useTeam } from '../context/TeamContext';
 import { useAuth, ROLES } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
-import { ShoppingBag, Clock, RefreshCw, Trash2, UserPlus, Check, X, Watch, Pencil, BarChart2, Box, Save, Settings, Megaphone, AlertTriangle, UserX, Activity } from 'lucide-react';
+import { ShoppingBag, Clock, RefreshCw, Trash2, UserPlus, Check, X, Watch, Pencil, BarChart2, Box, Save, Settings, Megaphone, AlertTriangle, UserX, Activity, LayoutGrid, List } from 'lucide-react';
 import { format } from 'date-fns';
 import InfoPanel from '../components/Productivity/InfoPanel';
 import CloseDayModal from '../components/Productivity/CloseDayModal';
@@ -12,6 +12,8 @@ import EditShiftTimeModal from '../components/Productivity/EditShiftTimeModal';
 import EditStatsModal from '../components/Productivity/EditStatsModal';
 import NoDealModal from '../components/Productivity/NoDealModal';
 import VisualLocationsModal from '../components/Productivity/VisualLocationsModal';
+import ProductivityTimeline from '../components/Productivity/ProductivityTimeline';
+import AnomalyPanel from '../components/Productivity/AnomalyPanel';
 
 
 // REJECTION_REASONS removed as per request to simplify flow
@@ -24,7 +26,7 @@ const Productivity = () => {
         updateRecord, addManualRecord, deleteEmployeeDayData,
         productFamilies, addProductFamily, removeProductFamily,
         addNoDealDetail, toggleClientSession,
-        goldPrice, updateGoldPrice, updateEmployeeShiftTime, logTransaction
+        goldPrice, updateGoldPrice, updateEmployeeShiftTime, logTransaction, transactionLogs // Added transactionLogs
     } = useProductivity();
 
     const { employees } = useTeam();
@@ -38,6 +40,7 @@ const Productivity = () => {
     const [showManualModal, setShowManualModal] = useState(false);
     const [needInput, setNeedInput] = useState("");
     const [overstockInput, setOverstockInput] = useState("");
+    const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'timeline'
 
     // Location Categories
     const LOCATION_CATEGORIES = ['LETRAS', 'VOLÚMENES', 'PATINETES', 'ALMACEN / PARED', 'RESERVA'];
@@ -394,6 +397,23 @@ const Productivity = () => {
                                     {isToday ? "Gestiona tus clientes en tiempo real." : `Viendo registros del día ${selectedDate}`}
                                 </p>
                             </div>
+
+                            {/* VIEW TOGGLE */}
+                            <div className="flex bg-slate-900/50 p-1 rounded-lg border border-white/5 mr-4">
+                                <button
+                                    onClick={() => setViewMode('grid')}
+                                    className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-pink-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                                >
+                                    <LayoutGrid size={16} />
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('timeline')}
+                                    className={`p-1.5 rounded-md transition-all ${viewMode === 'timeline' ? 'bg-pink-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                                >
+                                    <List size={16} />
+                                </button>
+                            </div>
+
                             <div className="text-right flex gap-4 items-center">
                                 {isManagerial && (
                                     <>
@@ -414,70 +434,79 @@ const Productivity = () => {
                         </div>
 
                         <div className="grid grid-cols-4 xl:grid-cols-5 gap-3 overflow-y-auto custom-scrollbar flex-1 content-start p-2 -mx-2">
-                            {employees.filter(e => e.isBuyer).map(emp => {
-                                const session = activeSessions.find(s => String(s.employeeId) === String(emp.id));
-                                const isClientActive = !!clientSessions[emp.id];
-                                const isSessionActive = !!session || isClientActive;
+                            {viewMode === 'timeline' ? (
+                                <ProductivityTimeline
+                                    selectedDate={selectedDate}
+                                    dailyRecords={dailyRecords}
+                                    transactionLogs={transactionLogs}
+                                    activeSessions={activeSessions}
+                                    employees={employees.filter(e => e.isBuyer)}
+                                />
+                            ) : (
+                                employees.filter(e => e.isBuyer).map(emp => {
+                                    const session = activeSessions.find(s => String(s.employeeId) === String(emp.id));
+                                    const isClientActive = !!clientSessions[emp.id];
+                                    const isSessionActive = !!session || isClientActive;
 
-                                return (
-                                    <div
-                                        key={emp.id}
-                                        onClick={() => {
-                                            if (!isToday) return;
-                                            if (isClientActive) { setActiveClientModal(emp.id); return; }
-                                            if (!isSessionActive) { startSession(emp.id, `${emp.firstName} ${emp.lastName}`); return; }
-                                            startClient(emp.id);
-                                        }}
-                                        className={`relative rounded-2xl p-2 flex flex-col gap-1 transition-all duration-300 border h-28 overflow-hidden group select-none cursor-pointer 
+                                    return (
+                                        <div
+                                            key={emp.id}
+                                            onClick={() => {
+                                                if (!isToday) return;
+                                                if (isClientActive) { setActiveClientModal(emp.id); return; }
+                                                if (!isSessionActive) { startSession(emp.id, `${emp.firstName} ${emp.lastName}`); return; }
+                                                startClient(emp.id);
+                                            }}
+                                            className={`relative rounded-2xl p-2 flex flex-col gap-1 transition-all duration-300 border h-28 overflow-hidden group select-none cursor-pointer 
                                         ${isClientActive ? 'bg-amber-500 border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.4)] scale-[1.02] z-10' :
-                                                isSessionActive ? 'bg-slate-800 border-pink-500/50 hover:border-pink-500' :
-                                                    'bg-slate-800/40 border-white/5 opacity-60 hover:opacity-100 hover:bg-slate-800'
-                                            }`}
-                                    >
-                                        {isSessionActive && !isClientActive && (isManagerial || emp.id === user?.id || user?.role === ROLES.KIOSK) && (
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); if (confirm('¿Terminar turno de ' + emp.alias + '?')) endSession(emp.id); }}
-                                                className="absolute top-2 right-2 p-1.5 text-slate-400 hover:text-white bg-black/20 hover:bg-red-500 rounded-full z-20 transition-all backdrop-blur-sm"
-                                            >
-                                                <X size={14} />
-                                            </button>
-                                        )}
+                                                    isSessionActive ? 'bg-slate-800 border-pink-500/50 hover:border-pink-500' :
+                                                        'bg-slate-800/40 border-white/5 opacity-60 hover:opacity-100 hover:bg-slate-800'
+                                                }`}
+                                        >
+                                            {isSessionActive && !isClientActive && (isManagerial || emp.id === user?.id || user?.role === ROLES.KIOSK) && (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); if (confirm('¿Terminar turno de ' + emp.alias + '?')) endSession(emp.id); }}
+                                                    className="absolute top-2 right-2 p-1.5 text-slate-400 hover:text-white bg-black/20 hover:bg-red-500 rounded-full z-20 transition-all backdrop-blur-sm"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            )}
 
-                                        {!isSessionActive ? (
-                                            <div className="flex-1 flex flex-col items-center justify-center gap-2 group-hover:scale-105 transition-transform opacity-70 group-hover:opacity-100">
-                                                <div className="w-10 h-10 rounded-xl bg-slate-700 border-2 border-slate-600 flex items-center justify-center text-sm font-bold text-slate-400 group-hover:border-pink-500 group-hover:text-pink-500 transition-colors">
-                                                    {emp.firstName.substring(0, 1)}
-                                                </div>
-                                                <p className="text-xl font-black text-slate-400 group-hover:text-white uppercase tracking-tight">{emp.alias || emp.firstName}</p>
-                                            </div>
-                                        ) : (
-                                            <div className="flex-1 flex flex-col h-full w-full relative">
-                                                <div className="flex items-center gap-2 mb-2 px-1 relative z-10">
-                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold border shadow-lg ${isClientActive ? 'bg-black text-amber-500 border-black' : 'bg-pink-600 border-pink-500 text-white'}`}>
+                                            {!isSessionActive ? (
+                                                <div className="flex-1 flex flex-col items-center justify-center gap-2 group-hover:scale-105 transition-transform opacity-70 group-hover:opacity-100">
+                                                    <div className="w-10 h-10 rounded-xl bg-slate-700 border-2 border-slate-600 flex items-center justify-center text-sm font-bold text-slate-400 group-hover:border-pink-500 group-hover:text-pink-500 transition-colors">
                                                         {emp.firstName.substring(0, 1)}
                                                     </div>
-                                                    <p className={`font-black text-lg truncate leading-none uppercase tracking-tight ${isClientActive ? 'text-black' : 'text-white'}`}>
-                                                        {emp.alias || emp.firstName}
-                                                    </p>
+                                                    <p className="text-xl font-black text-slate-400 group-hover:text-white uppercase tracking-tight">{emp.alias || emp.firstName}</p>
                                                 </div>
-                                                <div className="flex-1 flex items-center justify-center">
-                                                    {isClientActive ? (
-                                                        <div className="flex flex-col items-center animate-pulse">
-                                                            <Clock size={32} className="text-black mb-1" />
-                                                            <span className="font-black text-black text-sm uppercase tracking-widest">En Curso</span>
+                                            ) : (
+                                                <div className="flex-1 flex flex-col h-full w-full relative">
+                                                    <div className="flex items-center gap-2 mb-2 px-1 relative z-10">
+                                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold border shadow-lg ${isClientActive ? 'bg-black text-amber-500 border-black' : 'bg-pink-600 border-pink-500 text-white'}`}>
+                                                            {emp.firstName.substring(0, 1)}
                                                         </div>
-                                                    ) : (
-                                                        <div className="flex flex-col items-center opacity-50 group-hover:opacity-100 transition-opacity">
-                                                            <UserPlus size={32} className="text-pink-500 mb-1" />
-                                                            <span className="font-bold text-slate-400 text-xs uppercase tracking-widest group-hover:text-white transition-colors">Atender</span>
-                                                        </div>
-                                                    )}
+                                                        <p className={`font-black text-lg truncate leading-none uppercase tracking-tight ${isClientActive ? 'text-black' : 'text-white'}`}>
+                                                            {emp.alias || emp.firstName}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex-1 flex items-center justify-center">
+                                                        {isClientActive ? (
+                                                            <div className="flex flex-col items-center animate-pulse">
+                                                                <Clock size={32} className="text-black mb-1" />
+                                                                <span className="font-black text-black text-sm uppercase tracking-widest">En Curso</span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex flex-col items-center opacity-50 group-hover:opacity-100 transition-opacity">
+                                                                <UserPlus size={32} className="text-pink-500 mb-1" />
+                                                                <span className="font-bold text-slate-400 text-xs uppercase tracking-widest group-hover:text-white transition-colors">Atender</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
+                                            )}
+                                        </div>
+                                    );
+                                }))}
                         </div>
                     </div>
                 </div>
@@ -571,7 +600,14 @@ const Productivity = () => {
 
             {/* BOTTOM SECTION: DETAILED TABLE */}
             <div className="flex-[1] bg-[#1e293b]/60 backdrop-blur-xl rounded-[2.5rem] border border-white/5 p-6 min-h-0 shadow-xl flex flex-col">
-                <div className="overflow-y-auto custom-scrollbar flex-1">
+                <AnomalyPanel
+                    dailyStats={dailyStats}
+                    transactionLogs={transactionLogs}
+                    employees={employees}
+                    selectedDate={selectedDate}
+                />
+
+                <div className="overflow-y-auto custom-scrollbar flex-1 mt-4">
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="text-xs font-bold text-slate-400 uppercase border-b border-white/5">

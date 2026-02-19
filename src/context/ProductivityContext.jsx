@@ -18,6 +18,7 @@ export const ProductivityProvider = ({ children }) => {
     const [closedDays, setClosedDays] = useState([]);
     const [dayIncidents, setDayIncidents] = useState({});
     const [productFamilies, setProductFamilies] = useState([]);
+    const [transactionLogs, setTransactionLogs] = useState([]);
     const [goldPrice, setGoldPrice] = useState('0'); // Default to 0 or safe string
 
     // Helper for Multi-Store Headers
@@ -51,6 +52,7 @@ export const ProductivityProvider = ({ children }) => {
             setClosedDays(data.closedDays || []);
             setDayIncidents(data.dayIncidents || {});
             setProductFamilies(data.productFamilies || []);
+            setTransactionLogs(data.transactionLogs || []);
         } catch (error) {
             console.error("Error loading sync data:", error);
         }
@@ -65,6 +67,7 @@ export const ProductivityProvider = ({ children }) => {
         setClosedDays([]);
         setDayIncidents({});
         setProductFamilies([]);
+        setTransactionLogs([]);
 
         // 2. Load new store data
         if (currentStore) {
@@ -507,6 +510,7 @@ export const ProductivityProvider = ({ children }) => {
                     fetchData(); // Sync states (both noDeals list and groups counts)
                 } catch (err) { console.error(err); }
             },
+            transactionLogs, // Exposed for Timeline
             goldPrice,
             updateGoldPrice,
             logTransaction: async (employeeId, startTime, endTime, type, details) => {

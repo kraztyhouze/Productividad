@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBag, Clock, UserPlus, Zap, Skull, Crown, Star, Flame, X, Gift, Music, Binary, Sparkles } from 'lucide-react';
+import { ShoppingBag, Clock, UserPlus, Zap, Skull, Crown, Star, Flame, X, Gift, Music, Binary, Sparkles, Trash2 } from 'lucide-react';
 
 const EffectRenderer = ({ effectId, onComplete }) => {
     useEffect(() => {
@@ -116,6 +116,7 @@ const GamifiedCard = ({
     onClick,
     onEndSession,
     onOpenRewards,
+    onResetGamification,
     isManagerial,
     user
 }) => {
@@ -200,6 +201,19 @@ const GamifiedCard = ({
                 }
             `}
         >
+            {/* RESET PROFILE BUTTON (Manager Only) */}
+            {isManagerial && onResetGamification && (
+                <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={(e) => { e.stopPropagation(); onResetGamification(emp.id); }}
+                    className="absolute top-2 left-2 p-1.5 text-slate-500 hover:text-red-500 bg-black/10 hover:bg-black/30 rounded-full z-30 transition-all backdrop-blur-sm opacity-0 group-hover:opacity-100"
+                    title="RESETEAR PERFIL COMPLETAMENTE"
+                >
+                    <Trash2 size={12} />
+                </motion.button>
+            )}
+
             {/* Visual Effect Overlay */}
             <AnimatePresence>
                 {activeEffect && (

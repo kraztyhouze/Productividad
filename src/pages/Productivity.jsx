@@ -341,6 +341,29 @@ const Productivity = () => {
     // ... (Keep existing helpers like calculateShopActiveTime, etc. simplified for brevity if logic unchanged)
     // I will inline the simple ones needed for display.
 
+    const handleResetGamification = async (empId) => {
+        if (!confirm("¿ESTÁS SEGURO? Esto reiniciará por completo el nivel, experiencia y objetos del empleado. Esta acción no se puede deshacer.")) return;
+
+        try {
+            const storeId = currentStore || 'store_1';
+            const res = await fetch(`/api/employees/${empId}/reset-gamification`, {
+                method: 'POST',
+                headers: { 'x-store-id': storeId }
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                updateEmployee(empId, { gamification: data.employee.gamification });
+                alert("Perfil reseteado correctamente.");
+            } else {
+                alert("Error al resetear perfil.");
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Error de conexión.");
+        }
+    };
+
     return (
         <div className="flex flex-col h-full overflow-hidden relative gap-4">
 
@@ -498,6 +521,7 @@ const Productivity = () => {
                                                 if (confirm(`¿Terminar turno de ${emp.alias || emp.firstName}?`)) endSession(id);
                                             }}
                                             onOpenRewards={(id) => setRewardModalEmployeeId(id)}
+                                            onResetGamification={handleResetGamification}
                                             isManagerial={isManagerial}
                                             user={user}
                                         />

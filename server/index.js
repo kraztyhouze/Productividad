@@ -433,6 +433,42 @@ app.put('/api/employees/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }) }
 });
 
+app.post('/api/employees/:id/reset-gamification', async (req, res) => {
+    const { id } = req.params;
+    const storeId = req.headers['x-store-id'] || 'store_1';
+
+    // Reset State
+    const initialGamification = {
+        xp: 0,
+        level: 1,
+        maxLevel: 1,
+        coins: 0,
+        pendingRewards: 0,
+        unlockedAvatars: [],
+        unlockedEffects: [],
+        currentAvatar: null,
+        avatarUrl: null,
+        medals: []
+        // We keep medals? User said "resetear el perfil... start from 0". 
+        // "Reset profile... back to level 1... remove unlocked avatars".
+        // Medals are achievements, usually kept, but "experience 0 and level 1" implies hard reset.  
+        // I'll reset everything for a complete "fresh start" as requested.
+    };
+
+    try {
+        const result = await pool.query(
+            'UPDATE employees SET gamification = $1 WHERE id = $2 AND store_id = $3 RETURNING *',
+            [initialGamification, id, storeId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Employee not found' });
+        }
+
+        res.json({ message: 'Gamification profile reset successfully', employee: result.rows[0] });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.delete('/api/employees/:id', async (req, res) => {
     const { id } = req.params;
     try {

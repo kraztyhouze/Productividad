@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { AlertTriangle, ChevronDown, ChevronRight, Skull, Zap, Clock, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, Skull, Zap, Clock, ShieldAlert, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 
-const AnomalyPanel = ({ dailyStats, transactionLogs, employees, selectedDate }) => {
+const AnomalyPanel = ({ dailyStats, transactionLogs, employees, selectedDate, isManagerial }) => {
     const [isExpanded, setIsExpanded] = useState(false);
+    const [dismissedIds, setDismissedIds] = useState(new Set());
 
     // 1. Analyze logs for specific session anomalies
     const sessionAnomalies = useMemo(() => {
@@ -17,9 +18,11 @@ const AnomalyPanel = ({ dailyStats, transactionLogs, employees, selectedDate }) 
 
             const durationMin = (end - start) / 60000;
             const empName = employees.find(e => String(e.id) === String(log.employee_id))?.alias || `Emp #${log.employee_id}`;
+            const anomalyId = `${log.employee_id}-${log.start_time}-${log.type}`;
 
             if (durationMin > 90) {
                 anomalies.push({
+                    id: anomalyId,
                     type: 'GHOST',
                     severity: 'high',
                     text: `Sesión fantasma de ${empName} (${Math.round(durationMin)} min).`,
@@ -30,6 +33,7 @@ const AnomalyPanel = ({ dailyStats, transactionLogs, employees, selectedDate }) 
             const isSales = ['standard', 'jewelry', 'recoverable'].includes(log.type);
             if (isSales && durationMin < 3) {
                 anomalies.push({
+                    id: anomalyId,
                     type: 'FLASH',
                     severity: 'medium',
                     text: `Venta ultrarrápida de ${empName} (< 3 min).`,
@@ -44,18 +48,11 @@ const AnomalyPanel = ({ dailyStats, transactionLogs, employees, selectedDate }) 
     const statsAnomalies = useMemo(() => {
         const anomalies = [];
         Object.keys(dailyStats).forEach(empId => {
-            const stat = dailyStats[empId]; // { totalSeconds, sessions, name }
-            // Note: dailyStats in Productivity.jsx structure might be different?
-            // Checking Productivity.jsx: dailyStats[empId] = { totalSeconds, sessions, name }
-            // And data comes from getGroupCounts(empId, selectedDate).
-            // I need access to group counts here too? 
-            // Productivity.jsx lines 601-626 calculates critical metrics.
-            // I should probably move that logic here OR pass the full calculated dataset.
-            // For now, I'll rely on session anomalies which are more "integrity" related.
-
+            const stat = dailyStats[empId];
             const hours = stat.totalSeconds / 3600;
             if (hours > 12) {
                 anomalies.push({
+                    id: `overwork-${empId}`,
                     type: 'OVERWORK',
                     severity: 'medium',
                     text: `${stat.name} lleva > 12 horas en turno.`,
@@ -66,8 +63,18 @@ const AnomalyPanel = ({ dailyStats, transactionLogs, employees, selectedDate }) 
         return anomalies;
     }, [dailyStats]);
 
-    const allAnomalies = [...sessionAnomalies, ...statsAnomalies];
+    // Filter dismissed anomalies
+    const allAnomalies = [...sessionAnomalies, ...statsAnomalies].filter(a => !dismissedIds.has(a.id));
     const highSeverity = allAnomalies.filter(a => a.severity === 'high').length;
+
+    const handleDismiss = (anomalyId) => {
+        setDismissedIds(prev => new Set([...prev, anomalyId]));
+    };
+
+    const handleDismissAll = () => {
+        const allIds = allAnomalies.map(a => a.id);
+        setDismissedIds(prev => new Set([...prev, ...allIds]));
+    };
 
     if (allAnomalies.length === 0) return null;
 
@@ -90,13 +97,24 @@ const AnomalyPanel = ({ dailyStats, transactionLogs, employees, selectedDate }) 
                         </p>
                     </div>
                 </div>
-                {isExpanded ? <ChevronDown size={16} className="text-slate-500" /> : <ChevronRight size={16} className="text-slate-500" />}
+                <div className="flex items-center gap-2">
+                    {isManagerial && isExpanded && (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); handleDismissAll(); }}
+                            className="text-[10px] text-slate-400 hover:text-red-400 px-2 py-1 bg-slate-800/50 rounded border border-white/10 hover:border-red-500/30 transition-colors"
+                            title="Descartar todas las advertencias"
+                        >
+                            Descartar Todo
+                        </button>
+                    )}
+                    {isExpanded ? <ChevronDown size={16} className="text-slate-500" /> : <ChevronRight size={16} className="text-slate-500" />}
+                </div>
             </div>
 
             {isExpanded && (
                 <div className="bg-[#0f172a]/50 p-3 flex flex-col gap-2 max-h-40 overflow-y-auto custom-scrollbar">
-                    {allAnomalies.map((a, i) => (
-                        <div key={i} className="flex items-center gap-3 p-2 rounded hover:bg-white/5 border-b border-white/5 last:border-0">
+                    {allAnomalies.map((a) => (
+                        <div key={a.id} className="flex items-center gap-3 p-2 rounded hover:bg-white/5 border-b border-white/5 last:border-0">
                             {a.type === 'GHOST' && <Skull size={14} className="text-indigo-400 shrink-0" />}
                             {a.type === 'FLASH' && <Zap size={14} className="text-yellow-400 shrink-0" />}
                             {a.type === 'OVERWORK' && <Clock size={14} className="text-slate-400 shrink-0" />}
@@ -107,6 +125,15 @@ const AnomalyPanel = ({ dailyStats, transactionLogs, employees, selectedDate }) 
                             <span className="text-[9px] font-mono text-slate-500 bg-slate-900 px-1 py-0.5 rounded border border-white/5">
                                 {a.time}
                             </span>
+                            {isManagerial && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); handleDismiss(a.id); }}
+                                    className="p-1 rounded hover:bg-red-500/20 text-slate-500 hover:text-red-400 transition-colors"
+                                    title="Descartar esta advertencia"
+                                >
+                                    <Trash2 size={12} />
+                                </button>
+                            )}
                         </div>
                     ))}
                 </div>

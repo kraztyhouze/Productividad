@@ -248,27 +248,20 @@ export const ProductivityProvider = ({ children }) => {
     const updateDailyGroups = async (employeeId, date, updates) => {
         const key = `${employeeId}-${date}`;
 
-        let newState = {};
-        setDailyGroups(prev => {
-            const current = prev[key];
-            const safeCurrent = typeof current === 'number'
-                ? { standard: current, jewelry: 0, recoverable: 0 }
-                : (current || { standard: 0, jewelry: 0, recoverable: 0 });
+        // 1. Calculate newState safely using current scope state (or default)
+        const current = dailyGroups[key] || { standard: 0, jewelry: 0, recoverable: 0, noDeal: 0, clientSeconds: 0 };
+        const newState = { ...current, ...updates };
 
-            const safeUpdates = typeof updates === 'number'
-                ? { standard: updates }
-                : updates;
-
-            newState = { ...safeCurrent, ...safeUpdates };
-            return { ...prev, [key]: newState };
-        });
+        // 2. Optimistic Update
+        setDailyGroups(prev => ({ ...prev, [key]: newState }));
 
         try {
-            await fetch('/api/daily-groups', {
+            const res = await fetch('/api/daily-groups', {
                 method: 'POST',
                 headers: getHeaders(),
                 body: JSON.stringify({ key, data: newState })
             });
+            if (res.ok) return await res.json();
         } catch (err) {
             console.error("Error updating groups", err);
         }
@@ -515,11 +508,12 @@ export const ProductivityProvider = ({ children }) => {
             updateGoldPrice,
             logTransaction: async (employeeId, startTime, endTime, type, details) => {
                 try {
-                    await fetch('/api/transaction-logs', {
+                    const res = await fetch('/api/transaction-logs', {
                         method: 'POST',
                         headers: getHeaders(),
                         body: JSON.stringify({ employeeId, startTime, endTime, type, details })
                     });
+                    if (res.ok) return await res.json();
                 } catch (err) { console.error('Error logging transaction:', err); }
             }
         }}>

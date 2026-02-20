@@ -81,16 +81,20 @@ const Team = () => {
 
     // --- Filtering Logic ---
     const filteredEmployees = employees.filter(emp => {
+        const role = emp.role || '';
+        const firstName = emp.firstName || '';
+        const alias = emp.alias || '';
+
         const matchesSearch =
-            emp.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (emp.alias && emp.alias.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            emp.role.toLowerCase().includes(searchTerm.toLowerCase());
+            firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            alias.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            role.toLowerCase().includes(searchTerm.toLowerCase());
 
         if (!matchesSearch) return false;
 
         if (activeFilter === 'buyers') return emp.isBuyer;
-        if (activeFilter === 'responsibles') return emp.role.includes('Responsable') || emp.role === 'Gerente';
-        if (activeFilter === 'store') return !emp.role.includes('Responsable') && emp.role !== 'Gerente' && emp.role !== 'Puesto Compras';
+        if (activeFilter === 'responsibles') return role.includes('Responsable') || role === 'Gerente';
+        if (activeFilter === 'store') return !role.includes('Responsable') && role !== 'Gerente' && role !== 'Puesto Compras';
 
         return true;
     }).sort((a, b) => (a.order || 0) - (b.order || 0));

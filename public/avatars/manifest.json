@@ -1,0 +1,248 @@
+{
+  "dragonball": [
+    {
+      "name": "Goku",
+      "file": "/avatars/dragonball/goku.webp"
+    },
+    {
+      "name": "Vegeta",
+      "file": "/avatars/dragonball/vegeta.webp"
+    },
+    {
+      "name": "Gohan",
+      "file": "/avatars/dragonball/gohan.webp"
+    },
+    {
+      "name": "Piccolo",
+      "file": "/avatars/dragonball/piccolo.webp"
+    },
+    {
+      "name": "Freezer",
+      "file": "/avatars/dragonball/freezer.webp"
+    },
+    {
+      "name": "Trunks",
+      "file": "/avatars/dragonball/trunks.webp"
+    },
+    {
+      "name": "Broly",
+      "file": "/avatars/dragonball/broly.webp"
+    },
+    {
+      "name": "Beerus",
+      "file": "/avatars/dragonball/beerus.webp"
+    },
+    {
+      "name": "Cell",
+      "file": "/avatars/dragonball/cell.webp"
+    },
+    {
+      "name": "MajinBuu",
+      "file": "/avatars/dragonball/majinbuu.webp"
+    },
+    {
+      "name": "Gogeta",
+      "file": "/avatars/dragonball/gogeta.webp"
+    },
+    {
+      "name": "Jiren",
+      "file": "/avatars/dragonball/jiren.webp"
+    }
+  ],
+  "marvel": [
+    {
+      "name": "Iron Man",
+      "file": "/avatars/marvel/iron_man.jpg"
+    },
+    {
+      "name": "Spider-Man",
+      "file": "/avatars/marvel/spider_man.jpg"
+    },
+    {
+      "name": "Thor",
+      "file": "/avatars/marvel/thor.jpg"
+    },
+    {
+      "name": "Hulk",
+      "file": "/avatars/marvel/hulk.jpg"
+    },
+    {
+      "name": "Wolverine",
+      "file": "/avatars/marvel/wolverine.jpg"
+    },
+    {
+      "name": "Deadpool",
+      "file": "/avatars/marvel/deadpool.jpg"
+    },
+    {
+      "name": "Captain America",
+      "file": "/avatars/marvel/captain_america.jpg"
+    },
+    {
+      "name": "Thanos",
+      "file": "/avatars/marvel/thanos.jpg"
+    },
+    {
+      "name": "Venom",
+      "file": "/avatars/marvel/venom.jpg"
+    },
+    {
+      "name": "Black Panther",
+      "file": "/avatars/marvel/black_panther.jpg"
+    },
+    {
+      "name": "Doctor Strange",
+      "file": "/avatars/marvel/doctor_strange.jpg"
+    },
+    {
+      "name": "Loki",
+      "file": "/avatars/marvel/loki.jpg"
+    }
+  ],
+  "disney": [
+    {
+      "name": "Mickey Mouse",
+      "file": "/avatars/disney/mickey_mouse.png"
+    },
+    {
+      "name": "Simba",
+      "file": "/avatars/disney/simba.png"
+    },
+    {
+      "name": "Stitch",
+      "file": "/avatars/disney/stitch.png"
+    },
+    {
+      "name": "Elsa",
+      "file": "/avatars/disney/elsa.png"
+    },
+    {
+      "name": "Buzz Lightyear",
+      "file": "/avatars/disney/buzz_lightyear.png"
+    },
+    {
+      "name": "Genie",
+      "file": "/avatars/disney/genie.png"
+    },
+    {
+      "name": "Baymax",
+      "file": "/avatars/disney/baymax.png"
+    },
+    {
+      "name": "Moana",
+      "file": "/avatars/disney/moana.png"
+    },
+    {
+      "name": "Maui",
+      "file": "/avatars/disney/maui.png"
+    },
+    {
+      "name": "Rapunzel",
+      "file": "/avatars/disney/rapunzel.png"
+    },
+    {
+      "name": "Jack Sparrow",
+      "file": "/avatars/disney/jack_sparrow.png"
+    }
+  ],
+  "musica": [
+    {
+      "name": "Guitarra",
+      "file": "/avatars/musica/guitarra.svg"
+    },
+    {
+      "name": "Piano",
+      "file": "/avatars/musica/piano.svg"
+    },
+    {
+      "name": "Micrófono",
+      "file": "/avatars/musica/micr_fono.svg"
+    },
+    {
+      "name": "Batería",
+      "file": "/avatars/musica/bater_a.svg"
+    },
+    {
+      "name": "Saxofón",
+      "file": "/avatars/musica/saxof_n.svg"
+    },
+    {
+      "name": "Violín",
+      "file": "/avatars/musica/viol_n.svg"
+    },
+    {
+      "name": "DJ",
+      "file": "/avatars/musica/dj.svg"
+    },
+    {
+      "name": "Trompeta",
+      "file": "/avatars/musica/trompeta.svg"
+    },
+    {
+      "name": "Notas",
+      "file": "/avatars/musica/notas.svg"
+    },
+    {
+      "name": "Rockstar",
+      "file": "/avatars/musica/rockstar.svg"
+    },
+    {
+      "name": "Cantante",
+      "file": "/avatars/musica/cantante.svg"
+    },
+    {
+      "name": "Compositor",
+      "file": "/avatars/musica/compositor.svg"
+    }
+  ],
+  "futbol": [
+    {
+      "name": "Balón",
+      "file": "/avatars/futbol/bal_n.svg"
+    },
+    {
+      "name": "Portero",
+      "file": "/avatars/futbol/portero.svg"
+    },
+    {
+      "name": "Bota de Oro",
+      "file": "/avatars/futbol/bota_de_oro.svg"
+    },
+    {
+      "name": "Trofeo",
+      "file": "/avatars/futbol/trofeo.svg"
+    },
+    {
+      "name": "Camiseta 10",
+      "file": "/avatars/futbol/camiseta_10.svg"
+    },
+    {
+      "name": "Estadio",
+      "file": "/avatars/futbol/estadio.svg"
+    },
+    {
+      "name": "Banderín",
+      "file": "/avatars/futbol/bander_n.svg"
+    },
+    {
+      "name": "Silbato",
+      "file": "/avatars/futbol/silbato.svg"
+    },
+    {
+      "name": "Medalla",
+      "file": "/avatars/futbol/medalla.svg"
+    },
+    {
+      "name": "Gol",
+      "file": "/avatars/futbol/gol.svg"
+    },
+    {
+      "name": "Tarjeta Roja",
+      "file": "/avatars/futbol/tarjeta_roja.svg"
+    },
+    {
+      "name": "Campeón",
+      "file": "/avatars/futbol/campe_n.svg"
+    }
+  ]
+}

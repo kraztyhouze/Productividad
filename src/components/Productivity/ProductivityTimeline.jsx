@@ -131,19 +131,19 @@ const ProductivityTimeline = ({
             </h3>
 
             <div className="flex-1 overflow-x-auto custom-scrollbar relative">
-                <div className="min-w-[800px] relative pb-4">
+                <div className="w-full relative pb-4">
 
                     {/* Time Header */}
-                    <div className="flex border-b border-white/10 mb-4 pb-2 relative h-6 text-xs text-slate-500 font-mono">
+                    <div className="flex border-b border-white/10 mb-4 pb-2 relative h-8 text-sm text-slate-400 font-mono">
                         {/* Name Column Spacer */}
-                        <div className="w-32 shrink-0 sticky left-0 bg-[#1e293b] z-20"></div>
+                        <div className="w-44 shrink-0 sticky left-0 bg-[#1e293b] z-20"></div>
 
                         {/* Timeline Area */}
                         <div className="flex-1 relative">
                             {gridLines.map(h => (
                                 <div
                                     key={h}
-                                    className="absolute top-0 bottom-0 border-l border-white/5 flex flex-col items-start pl-1 h-full"
+                                    className="absolute top-0 bottom-0 border-l border-slate-600/60 flex flex-col items-start pl-1 h-full"
                                     style={{ left: `${((h * 3600 - startHour * 3600) / totalSeconds) * 100}%` }}
                                 >
                                     <span>{h}:00</span>
@@ -153,7 +153,7 @@ const ProductivityTimeline = ({
                     </div>
 
                     {/* Employee Rows */}
-                    <div className="flex flex-col gap-6">
+                    <div className="flex flex-col gap-4">
                         {timelineEmployees.map(emp => {
                             // Data for this employee
                             const shifts = dateRecords.filter(r => String(r.employeeId) === String(emp.id));
@@ -165,18 +165,18 @@ const ProductivityTimeline = ({
                             return (
                                 <div key={emp.id} className="flex relative group hover:bg-white/5 p-2 rounded-xl transition-colors">
                                     {/* Name Column */}
-                                    <div className="w-32 shrink-0 sticky left-0 z-10 flex flex-col justify-center pr-4">
-                                        <p className="font-bold text-slate-200 truncate">{emp.alias || emp.firstName}</p>
-                                        <p className="text-[10px] text-slate-500">{shifts.length} turnos, {logs.length} ops</p>
+                                    <div className="w-44 shrink-0 sticky left-0 z-10 flex flex-col justify-center pr-4 bg-[#1e293b]/80 backdrop-blur-sm">
+                                        <p className="font-bold text-sm text-slate-200 truncate">{emp.alias || emp.firstName}</p>
+                                        <p className="text-xs text-slate-400 mt-0.5">{shifts.length} turnos · {logs.length} ops</p>
                                     </div>
 
                                     {/* Timeline Track */}
-                                    <div className="flex-1 relative h-12 bg-slate-900/50 rounded-lg overflow-hidden border border-white/5">
+                                    <div className="flex-1 relative h-20 bg-slate-900/60 rounded-lg overflow-hidden border border-slate-600/40">
                                         {/* Grid Lines Overlay */}
                                         {gridLines.map(h => (
                                             <div
                                                 key={`grid-${h}`}
-                                                className="absolute top-0 bottom-0 border-l border-white/5"
+                                                className="absolute top-0 bottom-0 border-l border-slate-600/40"
                                                 style={{ left: `${((h * 3600 - startHour * 3600) / totalSeconds) * 100}%` }}
                                             />
                                         ))}
@@ -221,13 +221,13 @@ const ProductivityTimeline = ({
                                             return (
                                                 <div
                                                     key={idx}
-                                                    className={`absolute top-2 bottom-2 rounded-md border border-white/10 shadow-sm cursor-help hover:z-20 hover:scale-105 transition-all flex items-center justify-center
+                                                    className={`absolute top-3 bottom-3 rounded-md border border-white/10 shadow-sm cursor-help hover:z-20 hover:scale-[1.03] transition-all flex items-center justify-center text-[10px] font-bold text-white/80
                                                         ${anomaly ? anomaly.color + ' border-transparent' : 'bg-emerald-500/80 border-emerald-400/50'}
                                                     `}
                                                     style={{
                                                         left: `${getPosition(log.start_time)}%`,
                                                         width: `${getWidth(log.start_time, log.end_time)}%`,
-                                                        minWidth: '4px'
+                                                        minWidth: '8px'
                                                     }}
                                                     title={`${log.type} | ${format(new Date(log.start_time), 'HH:mm')} (${Math.round((new Date(log.end_time) - new Date(log.start_time)) / 60000)}m) ${anomaly ? '- ' + anomaly.text : ''}`}
                                                 >

@@ -658,8 +658,13 @@ const Productivity = () => {
                             </tr>
                         </thead>
                         <tbody className="text-sm divide-y divide-white/5">
-                            {Object.keys(dailyStats).map(empId => {
+                            {Object.keys(dailyStats).sort((a, b) => {
+                                const nA = employees.find(e => e.id == a)?.firstName || '';
+                                const nB = employees.find(e => e.id == b)?.firstName || '';
+                                return nA.localeCompare(nB);
+                            }).map(empId => {
                                 const stat = dailyStats[empId];
+
                                 const data = getGroupCounts(empId, selectedDate);
                                 const hitRate = data.totalInteractions > 0 ? ((data.totalSold / data.totalInteractions) * 100).toFixed(0) : 0;
                                 const avgTime = data.totalInteractions > 0 ? (data.clientSeconds / data.totalInteractions).toFixed(0) : 0;

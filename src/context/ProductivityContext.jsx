@@ -48,7 +48,38 @@ export const ProductivityProvider = ({ children }) => {
 
             setActiveSessions(data.activeSessions || []);
             setDailyRecords(data.dailyRecords || []);
-            setDailyGroups(data.dailyGroups || {});
+
+            // NORMALIZE DAILY GROUPS KEYS (Fix for "JMH/RML Mixup")
+            const rawGroups = data.dailyGroups || {};
+            const normalizedGroups = {};
+            Object.keys(rawGroups).forEach(k => {
+                // k format: "{ID}-{YYYY}-{MM}-{DD}" or "{ID}-{DATE}"
+                // Split carefully
+                const parts = k.split('-');
+                if (parts.length >= 4) {
+                    const datePart = parts.slice(-3).join('-');
+                    const idPart = parts.slice(0, -3).join('-');
+                    const cleanId = String(parseInt(idPart) || idPart).trim(); // Attempt clean numeric ID
+
+                    const newKey = `${cleanId}-${datePart}`;
+                    // Merge if duplicate (sum up) to avoid data loss
+                    if (normalizedGroups[newKey]) {
+                        normalizedGroups[newKey] = {
+                            standard: (normalizedGroups[newKey].standard || 0) + (rawGroups[k].standard || 0),
+                            jewelry: (normalizedGroups[newKey].jewelry || 0) + (rawGroups[k].jewelry || 0),
+                            recoverable: (normalizedGroups[newKey].recoverable || 0) + (rawGroups[k].recoverable || 0),
+                            noDeal: (normalizedGroups[newKey].noDeal || 0) + (rawGroups[k].noDeal || 0),
+                            clientSeconds: (normalizedGroups[newKey].clientSeconds || 0) + (rawGroups[k].clientSeconds || 0)
+                        };
+                    } else {
+                        normalizedGroups[newKey] = rawGroups[k];
+                    }
+                } else {
+                    normalizedGroups[k] = rawGroups[k];
+                }
+            });
+            setDailyGroups(normalizedGroups);
+
             setClosedDays(data.closedDays || []);
             setDayIncidents(data.dayIncidents || {});
             setProductFamilies(data.productFamilies || []);
@@ -246,7 +277,9 @@ export const ProductivityProvider = ({ children }) => {
     };
 
     const updateDailyGroups = async (employeeId, date, updates) => {
-        const key = `${employeeId}-${date}`;
+        // SANITIZE ID: ensure it is a clean string (e.g. " 55 " -> "55")
+        const cleanId = String(parseInt(employeeId) || employeeId).trim();
+        const key = `${cleanId}-${date}`;
 
         // 1. Calculate newState safely using current scope state (or default)
         const current = dailyGroups[key] || { standard: 0, jewelry: 0, recoverable: 0, noDeal: 0, clientSeconds: 0 };

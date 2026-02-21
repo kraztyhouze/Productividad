@@ -746,11 +746,30 @@ app.post('/api/active-sessions', async (req, res) => {
 
 app.put('/api/active-sessions/:displayId', async (req, res) => {
     const { displayId } = req.params;
-    const { clientStartTime } = req.body;
+    const { clientStartTime, startTime } = req.body;
     const storeId = req.headers['x-store-id'] || 'store_1';
     // Note: displayId (employeeId) might be duplicate across stores, so strictly filter by store_id too.
     try {
-        const result = await pool.query('UPDATE active_sessions SET client_start_time = $1 WHERE TRIM(employee_id) = $2 AND store_id = $3', [clientStartTime, displayId, storeId]);
+        let query = 'UPDATE active_sessions SET ';
+        const params = [];
+        let pIndex = 1;
+
+        if (clientStartTime !== undefined) {
+            query += `client_start_time = $${pIndex++}, `;
+            params.push(clientStartTime);
+        }
+        if (startTime !== undefined) {
+            query += `start_time = $${pIndex++}, `;
+            params.push(startTime);
+        }
+
+        if (params.length === 0) return res.json({ message: 'No updates provided' });
+
+        query = query.slice(0, -2);
+        query += ` WHERE TRIM(employee_id) = $${pIndex++} AND store_id = $${pIndex}`;
+        params.push(displayId, storeId);
+
+        await pool.query(query, params);
         res.json({ message: 'Session updated' });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -787,24 +806,12 @@ app.post('/api/daily-records', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/daily-records/:id', async (req, res) => {
-    const { id } = req.params;
-    const { durationSeconds } = req.body;
-    // ID is huge random int, unlikely to collide, but safe to ignore store_id check here implicitly or add it if needed? 
-    // Usually ID is PK, so it's unique enough.
-    try {
-        await pool.query('UPDATE daily_records SET duration_seconds=$1 WHERE id=$2', [durationSeconds, id]);
-        res.json({ message: 'Record updated' });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-
 app.delete('/api/daily-records/:id', async (req, res) => {
     const { id } = req.params;
     try {
-        const check = await pool.query('SELECT "employeeId" FROM daily_records WHERE id = $1', [id]);
+        const check = await pool.query('SELECT employee_id FROM daily_records WHERE id = $1', [id]);
         if (check.rows.length > 0) {
-            const empId = check.rows[0].employeeId;
+            const empId = check.rows[0].employee_id;
             await pool.query('DELETE FROM daily_records WHERE id = $1', [id]);
             // Recalculate
             await recalculateGamification(empId);
@@ -874,9 +881,9 @@ app.delete('/api/daily-groups/:key', async (req, res) => {
     try {
         const check = await pool.query('SELECT * FROM daily_groups WHERE key=$1 AND store_id=$2', [key, storeId]);
         if (check.rows.length > 0) {
+            await pool.query('DELETE FROM daily_groups WHERE key=$1 AND store_id=$2', [key, storeId]);
             // Recalculate everything
             await recalculateGamification(employeeId);
-            await pool.query('DELETE FROM daily_groups WHERE key=$1 AND store_id=$2', [key, storeId]);
             res.json({ message: 'Groups deleted and XP adjusted' });
         } else {
             res.json({ message: 'Record not found' });
@@ -932,6 +939,18 @@ app.post('/api/transaction-logs', async (req, res) => {
             }
         }
         res.json(responseData);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/transaction-logs/employee/:employeeId/:date', async (req, res) => {
+    const { employeeId, date } = req.params;
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    try {
+        await pool.query(
+            "DELETE FROM transaction_logs WHERE employee_id = $1 AND store_id = $2 AND start_time::text LIKE $3",
+            [employeeId, storeId, `${date}%`]
+        );
+        res.json({ message: 'Logs deleted for employee on date' });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

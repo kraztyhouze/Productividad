@@ -330,54 +330,50 @@ export const ProductivityProvider = ({ children }) => {
     const updateEmployeeShiftTime = async (employeeId, date, newTotalSeconds) => {
         const idStr = String(employeeId);
 
-        // Find all records for this employee on this date
-        const employeeRecords = dailyRecords.filter(r =>
-            String(r.employeeId) === idStr && r.date === date
-        );
+        const employeeRecords = dailyRecords.filter(r => String(r.employeeId) === idStr && r.date === date);
+        const activeSession = formatLocal(new Date()) === date ? activeSessions.find(s => String(s.employeeId) === idStr) : null;
+        const activeDuration = activeSession ? (new Date() - new Date(activeSession.startTime)) / 1000 : 0;
+        const currentClosedTotal = employeeRecords.reduce((sum, r) => sum + (r.durationSeconds || 0), 0);
+
+        const targetClosedTotal = Math.max(0, newTotalSeconds - activeDuration);
 
         if (employeeRecords.length === 0) {
-            console.warn('No records found for employee on this date');
+            if (activeSession) {
+                const newStartTime = new Date(Date.now() - newTotalSeconds * 1000).toISOString();
+                setActiveSessions(prev => prev.map(s => String(s.employeeId) === idStr ? { ...s, startTime: newStartTime } : s));
+                try {
+                    await fetch(`/api/active-sessions/${idStr}`, { method: 'PUT', headers: getHeaders(), body: JSON.stringify({ startTime: newStartTime }) });
+                } catch (e) { console.error(e); }
+            } else {
+                console.warn('No records found for employee on this date');
+            }
             return;
         }
 
-        // Calculate current total
-        const currentTotal = employeeRecords.reduce((sum, r) => sum + (r.durationSeconds || 0), 0);
-
-        if (currentTotal === 0) {
-            console.warn('Current total is 0, cannot proportionally adjust');
+        if (currentClosedTotal === 0 && targetClosedTotal > 0) {
+            console.warn('Current closed total is 0, cannot proportionally adjust');
             return;
         }
 
-        // Calculate scaling factor
-        const scaleFactor = newTotalSeconds / currentTotal;
-
-        // Update all records proportionally
+        const scaleFactor = targetClosedTotal === 0 ? 0 : targetClosedTotal / currentClosedTotal;
         const updates = employeeRecords.map(record => ({
             id: record.id,
-            newDuration: Math.round(record.durationSeconds * scaleFactor)
+            newDuration: Math.round((record.durationSeconds || 0) * scaleFactor)
         }));
 
-        // Optimistic UI update
         setDailyRecords(prev => prev.map(r => {
             const update = updates.find(u => u.id === r.id);
-            if (update) {
-                return { ...r, durationSeconds: update.newDuration };
-            }
+            if (update) return { ...r, durationSeconds: update.newDuration };
             return r;
         }));
 
-        // Send updates to server
         try {
             await Promise.all(updates.map(({ id, newDuration }) =>
-                fetch(`/api/daily-records/${id}`, {
-                    method: 'PUT',
-                    headers: getHeaders(),
-                    body: JSON.stringify({ durationSeconds: newDuration })
-                })
+                fetch(`/api/daily-records/${id}`, { method: 'PUT', headers: getHeaders(), body: JSON.stringify({ durationSeconds: newDuration }) })
             ));
+            fetchData();
         } catch (err) {
             console.error('Error updating shift time:', err);
-            // Revert on error
             fetchData();
         }
     };
@@ -458,7 +454,11 @@ export const ProductivityProvider = ({ children }) => {
 
             await fetch(`/api/daily-groups/${groupKey}`, { method: 'DELETE', headers: getHeaders() });
 
-            // 4. Force Sync
+            // 4. Remove Transaction Logs locally and recursively delete
+            setTransactionLogs(prev => prev.filter(l => !(String(l.employee_id) === idStr && String(l.start_time).startsWith(date))));
+            await fetch(`/api/transaction-logs/employee/${idStr}/${date}`, { method: 'DELETE', headers: getHeaders() });
+
+            // 5. Force Sync
             await fetchData();
 
         } catch (err) {

@@ -1,0 +1,162 @@
+﻿diff --git a/src/context/ProductivityContext.jsx b/src/context/ProductivityContext.jsx
+index 52539b3..5ccf1ae 100644
+--- a/src/context/ProductivityContext.jsx
++++ b/src/context/ProductivityContext.jsx
+@@ -6,6 +6,11 @@ const ProductivityContext = createContext(null);
+ export const ProductivityProvider = ({ children }) => {
+     const { currentStore } = useStore(); // Get current store explicitly
+ 
++    // Helper for Local Date (YYYY-MM-DD) - Forced to Madrid to match Server
++    const formatLocal = (d) => {
++        return d.toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
++    };
++
+     // --- STATE ---
+     const [activeSessions, setActiveSessions] = useState([]);
+     const [dailyRecords, setDailyRecords] = useState([]);
+@@ -13,6 +18,7 @@ export const ProductivityProvider = ({ children }) => {
+     const [closedDays, setClosedDays] = useState([]);
+     const [dayIncidents, setDayIncidents] = useState({});
+     const [productFamilies, setProductFamilies] = useState([]);
++    const [transactionLogs, setTransactionLogs] = useState([]);
+     const [goldPrice, setGoldPrice] = useState('0'); // Default to 0 or safe string
+ 
+     // Helper for Multi-Store Headers
+@@ -42,10 +48,42 @@ export const ProductivityProvider = ({ children }) => {
+ 
+             setActiveSessions(data.activeSessions || []);
+             setDailyRecords(data.dailyRecords || []);
+-            setDailyGroups(data.dailyGroups || {});
++
++            // NORMALIZE DAILY GROUPS KEYS (Fix for "JMH/RML Mixup")
++            const rawGroups = data.dailyGroups || {};
++            const normalizedGroups = {};
++            Object.keys(rawGroups).forEach(k => {
++                // k format: "{ID}-{YYYY}-{MM}-{DD}" or "{ID}-{DATE}"
++                // Split carefully
++                const parts = k.split('-');
++                if (parts.length >= 4) {
++                    const datePart = parts.slice(-3).join('-');
++                    const idPart = parts.slice(0, -3).join('-');
++                    const cleanId = String(parseInt(idPart) || idPart).trim(); // Attempt clean numeric ID
++
++                    const newKey = `${cleanId}-${datePart}`;
++                    // Merge if duplicate (sum up) to avoid data loss
++                    if (normalizedGroups[newKey]) {
++                        normalizedGroups[newKey] = {
++                            standard: (normalizedGroups[newKey].standard || 0) + (rawGroups[k].standard || 0),
++                            jewelry: (normalizedGroups[newKey].jewelry || 0) + (rawGroups[k].jewelry || 0),
++                            recoverable: (normalizedGroups[newKey].recoverable || 0) + (rawGroups[k].recoverable || 0),
++                            noDeal: (normalizedGroups[newKey].noDeal || 0) + (rawGroups[k].noDeal || 0),
++                            clientSeconds: (normalizedGroups[newKey].clientSeconds || 0) + (rawGroups[k].clientSeconds || 0)
++                        };
++                    } else {
++                        normalizedGroups[newKey] = rawGroups[k];
++                    }
++                } else {
++                    normalizedGroups[k] = rawGroups[k];
++                }
++            });
++            setDailyGroups(normalizedGroups);
++
+             setClosedDays(data.closedDays || []);
+             setDayIncidents(data.dayIncidents || {});
+             setProductFamilies(data.productFamilies || []);
++            setTransactionLogs(data.transactionLogs || []);
+         } catch (error) {
+             console.error("Error loading sync data:", error);
+         }
+@@ -60,6 +98,7 @@ export const ProductivityProvider = ({ children }) => {
+         setClosedDays([]);
+         setDayIncidents({});
+         setProductFamilies([]);
++        setTransactionLogs([]);
+ 
+         // 2. Load new store data
+         if (currentStore) {
+@@ -206,7 +245,7 @@ export const ProductivityProvider = ({ children }) => {
+             startTime: session.startTime,
+             endTime: endTime.toISOString(),
+             durationSeconds: isNaN(durationSeconds) ? 0 : Math.max(0, durationSeconds), // Prevent NaN and Negative
+-            date: new Date().toISOString().split('T')[0],
++            date: formatLocal(new Date()), // Use Local Date
+             groups: 0
+         };
+ 
+@@ -238,29 +277,24 @@ export const ProductivityProvider = ({ children }) => {
+     };
+ 
+     const updateDailyGroups = async (employeeId, date, updates) => {
+-        const key = `${employeeId}-${date}`;
+-
+-        let newState = {};
+-        setDailyGroups(prev => {
+-            const current = prev[key];
+-            const safeCurrent = typeof current === 'number'
+-                ? { standard: current, jewelry: 0, recoverable: 0 }
+-                : (current || { standard: 0, jewelry: 0, recoverable: 0 });
++        // SANITIZE ID: ensure it is a clean string (e.g. " 55 " -> "55")
++        const cleanId = String(parseInt(employeeId) || employeeId).trim();
++        const key = `${cleanId}-${date}`;
+ 
+-            const safeUpdates = typeof updates === 'number'
+-                ? { standard: updates }
+-                : updates;
++        // 1. Calculate newState safely using current scope state (or default)
++        const current = dailyGroups[key] || { standard: 0, jewelry: 0, recoverable: 0, noDeal: 0, clientSeconds: 0 };
++        const newState = { ...current, ...updates };
+ 
+-            newState = { ...safeCurrent, ...safeUpdates };
+-            return { ...prev, [key]: newState };
+-        });
++        // 2. Optimistic Update
++        setDailyGroups(prev => ({ ...prev, [key]: newState }));
+ 
+         try {
+-            await fetch('/api/daily-groups', {
++            const res = await fetch('/api/daily-groups', {
+                 method: 'POST',
+                 headers: getHeaders(),
+                 body: JSON.stringify({ key, data: newState })
+             });
++            if (res.ok) return await res.json();
+         } catch (err) {
+             console.error("Error updating groups", err);
+         }
+@@ -402,7 +436,7 @@ export const ProductivityProvider = ({ children }) => {
+ 
+         try {
+             // 1. If Today, remove active session immediately
+-            const isToday = new Date().toISOString().split('T')[0] === date;
++            const isToday = formatLocal(new Date()) === date;
+             if (isToday) {
+                 // Optimistic local update
+                 setActiveSessions(prev => prev.filter(s => String(s.employeeId) !== idStr));
+@@ -435,7 +469,7 @@ export const ProductivityProvider = ({ children }) => {
+     };
+ 
+     const getUnclosedPastDays = () => {
+-        const today = new Date().toISOString().split('T')[0];
++        const today = formatLocal(new Date());
+         const allDates = [...new Set(dailyRecords.map(r => r.date))];
+         return allDates.filter(d => d < today && !closedDays.includes(d)).sort();
+     };
+@@ -502,15 +536,17 @@ export const ProductivityProvider = ({ children }) => {
+                     fetchData(); // Sync states (both noDeals list and groups counts)
+                 } catch (err) { console.error(err); }
+             },
++            transactionLogs, // Exposed for Timeline
+             goldPrice,
+             updateGoldPrice,
+             logTransaction: async (employeeId, startTime, endTime, type, details) => {
+                 try {
+-                    await fetch('/api/transaction-logs', {
++                    const res = await fetch('/api/transaction-logs', {
+                         method: 'POST',
+                         headers: getHeaders(),
+                         body: JSON.stringify({ employeeId, startTime, endTime, type, details })
+                     });
++                    if (res.ok) return await res.json();
+                 } catch (err) { console.error('Error logging transaction:', err); }
+             }
+         }}>

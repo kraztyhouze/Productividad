@@ -1,0 +1,569 @@
+﻿commit dea26bf772799dbf556bacb5b84d4fcf5076f3c9
+Author: Juanma <tu_email@ejemplo.com>
+Date:   Thu Feb 12 07:39:22 2026 +0100
+
+    feat: enhance no-purchase tracking (Joyer├¡a/Otros) and implement auto-close session feature
+
+diff --git a/src/pages/Productivity.jsx b/src/pages/Productivity.jsx
+index d6efcbb..4fc07b0 100644
+--- a/src/pages/Productivity.jsx
++++ b/src/pages/Productivity.jsx
+@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
+ import { useProductivity } from '../context/ProductivityContext';
+ import { useTeam } from '../context/TeamContext';
+ import { useAuth, ROLES } from '../context/AuthContext';
+-import { ShoppingBag, Clock, RefreshCw, Trash2, UserPlus, Check, X, Watch, Pencil, BarChart2, Box } from 'lucide-react';
++import { ShoppingBag, Clock, RefreshCw, Trash2, UserPlus, Check, X, Watch, Pencil, BarChart2, Box, Save, Settings } from 'lucide-react';
+ import InfoPanel from '../components/Productivity/InfoPanel';
+ import CloseDayModal from '../components/Productivity/CloseDayModal';
+ import EditTimeModal from '../components/Productivity/EditTimeModal';
+@@ -64,8 +64,33 @@ const Productivity = () => {
+     const [editingRecord, setEditingRecord] = useState(null);
+     const [editingShiftTime, setEditingShiftTime] = useState(null);
+     const [editingStats, setEditingStats] = useState(null);
++
+     const [noDealDetail, setNoDealDetail] = useState(null);
+ 
++    // Auto-Close Settings
++    const [closingHours, setClosingHours] = useState({ midday: '', night: '' });
++
++    // Fetch Closing Hours
++    useEffect(() => {
++        fetch('/api/settings/closing-hours')
++            .then(res => res.json())
++            .then(data => setClosingHours({ midday: data.midday_close || '', night: data.night_close || '' }))
++            .catch(err => console.error("Error fetching closing hours", err));
++    }, []);
++
++    const handleSaveClosingHours = async () => {
++        try {
++            await fetch('/api/settings/closing-hours', {
++                method: 'POST',
++                headers: { 'Content-Type': 'application/json' },
++                body: JSON.stringify({ midday_close: closingHours.midday, night_close: closingHours.night })
++            });
++            alert('Horarios de cierre autom├ítico actualizados.');
++        } catch (err) {
++            alert('Error al guardar horarios.');
++        }
++    };
++
+     const [externalPrices, setExternalPrices] = useState(null);
+     const [showGoldDetails, setShowGoldDetails] = useState(false);
+ 
+@@ -263,102 +288,142 @@ const Productivity = () => {
+ 
+             {/* TOP SECTION: TEAM GRID */}
+             <div className="flex-[3] flex gap-6 min-h-0">
+-                <div className="w-2/3 bg-[#1e293b]/60 backdrop-blur-xl rounded-[2.5rem] p-6 border border-white/5 flex flex-col shadow-2xl relative">
+-                    {/* ... (Team Grid Header & Content - unchanged) ... */}
+-                    <div className="flex justify-between items-center mb-6">
+-                        <div>
+-                            <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
+-                                <ShoppingBag className="text-pink-500" size={24} />
+-                                Productividad & Kiosco
+-                            </h1>
+-                            <p className="text-slate-400 font-medium ml-1 text-xs">
+-                                {isToday ? "Gestiona tus clientes en tiempo real." : `Viendo registros del d├¡a ${selectedDate}`}
+-                            </p>
+-                        </div>
+-                        <div className="text-right flex gap-4 items-center">
+-                            {isManagerial && (
+-                                <>
+-                                    <button
+-                                        onClick={() => setShowCloseModal(true)}
+-                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${isDayClosed
+-                                            ? 'bg-green-500/20 text-green-400 border-green-500/50 hover:bg-green-500/30'
+-                                            : 'bg-red-500/20 text-red-400 border-red-500/50 hover:bg-red-500/30'
+-                                            }`}
+-                                    >
+-                                        {isDayClosed ? 'D├¡a Cerrado (Ver)' : 'Cerrar D├¡a'}
+-                                    </button>
+-                                    <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="bg-slate-900 text-white border border-slate-800 rounded-lg px-2 py-1 font-mono text-xs focus:border-pink-500 outline-none" />
+-                                </>
+-                            )}
+-                            <p className="text-3xl font-mono font-bold text-slate-200 tracking-tighter">{currentTime.toLocaleTimeString()}</p>
+-                        </div>
+-                    </div>
+-
+-                    <div className="grid grid-cols-4 xl:grid-cols-5 gap-3 overflow-y-auto custom-scrollbar flex-1 content-start p-2 -mx-2">
+-                        {employees.filter(e => e.isBuyer).map(emp => {
+-                            const session = activeSessions.find(s => String(s.employeeId) === String(emp.id));
+-                            const isClientActive = !!clientSessions[emp.id];
+-                            const isSessionActive = !!session || isClientActive;
+-
+-                            return (
+-                                <div
+-                                    key={emp.id}
+-                                    onClick={() => {
+-                                        if (!isToday) return;
+-                                        if (isClientActive) { setActiveClientModal(emp.id); return; }
+-                                        if (!isSessionActive) { startSession(emp.id, `${emp.firstName} ${emp.lastName}`); return; }
+-                                        startClient(emp.id);
+-                                    }}
+-                                    className={`relative rounded-2xl p-2 flex flex-col gap-1 transition-all duration-300 border h-28 overflow-hidden group select-none cursor-pointer 
+-                                        ${isClientActive ? 'bg-amber-500 border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.4)] scale-[1.02] z-10' :
+-                                            isSessionActive ? 'bg-slate-800 border-pink-500/50 hover:border-pink-500' :
+-                                                'bg-slate-800/40 border-white/5 opacity-60 hover:opacity-100 hover:bg-slate-800'
+-                                        }`}
++                <div className="w-2/3 bg-[#1e293b]/60 backdrop-blur-xl rounded-[2.5rem] p-0 border border-white/5 flex flex-col shadow-2xl relative overflow-hidden">
++
++                    {/* AUTO-CLOSE SETTINGS BAR (Manager/Supervisor/Responsible) */}
++                    {canEditPanels && (
++                        <div className="bg-slate-900/80 backdrop-blur border-b border-white/5 px-6 py-2 flex items-center justify-between gap-4">
++                            <div className="flex items-center gap-2 text-slate-400">
++                                <Settings size={14} className="text-pink-500" />
++                                <span className="text-[10px] font-bold uppercase tracking-widest">Config Cierre Autom├ítico</span>
++                            </div>
++                            <div className="flex items-center gap-4">
++                                <div className="flex items-center gap-2">
++                                    <span className="text-[10px] uppercase font-bold text-slate-500">Mediod├¡a</span>
++                                    <input
++                                        type="time"
++                                        value={closingHours.midday}
++                                        onChange={e => setClosingHours({ ...closingHours, midday: e.target.value })}
++                                        className="bg-slate-800 border border-white/10 rounded px-2 py-0.5 text-xs text-white font-mono focus:border-pink-500 outline-none"
++                                    />
++                                </div>
++                                <div className="flex items-center gap-2">
++                                    <span className="text-[10px] uppercase font-bold text-slate-500">Noche</span>
++                                    <input
++                                        type="time"
++                                        value={closingHours.night}
++                                        onChange={e => setClosingHours({ ...closingHours, night: e.target.value })}
++                                        className="bg-slate-800 border border-white/10 rounded px-2 py-0.5 text-xs text-white font-mono focus:border-pink-500 outline-none"
++                                    />
++                                </div>
++                                <button
++                                    onClick={handleSaveClosingHours}
++                                    className="p-1.5 bg-pink-600 hover:bg-pink-500 text-white rounded-lg transition-colors flex items-center gap-1"
++                                    title="Guardar Configuraci├│n"
+                                 >
+-                                    {isSessionActive && !isClientActive && (isManagerial || emp.id === user?.id) && (
++                                    <Save size={12} />
++                                </button>
++                            </div>
++                        </div>
++                    )}
++
++                    <div className="p-6 flex flex-col h-full overflow-hidden">
++                        {/* ... (Team Grid Header & Content - unchanged) ... */}
++                        <div className="flex justify-between items-center mb-6 shrink-0">
++                            <div>
++                                <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
++                                    <ShoppingBag className="text-pink-500" size={24} />
++                                    Productividad & Kiosco
++                                </h1>
++                                <p className="text-slate-400 font-medium ml-1 text-xs">
++                                    {isToday ? "Gestiona tus clientes en tiempo real." : `Viendo registros del d├¡a ${selectedDate}`}
++                                </p>
++                            </div>
++                            <div className="text-right flex gap-4 items-center">
++                                {isManagerial && (
++                                    <>
+                                         <button
+-                                            onClick={(e) => { e.stopPropagation(); if (confirm('┬┐Terminar turno de ' + emp.alias + '?')) endSession(emp.id); }}
+-                                            className="absolute top-2 right-2 p-1.5 text-slate-400 hover:text-white bg-black/20 hover:bg-red-500 rounded-full z-20 transition-all backdrop-blur-sm"
++                                            onClick={() => setShowCloseModal(true)}
++                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${isDayClosed
++                                                ? 'bg-green-500/20 text-green-400 border-green-500/50 hover:bg-green-500/30'
++                                                : 'bg-red-500/20 text-red-400 border-red-500/50 hover:bg-red-500/30'
++                                                }`}
+                                         >
+-                                            <X size={14} />
++                                            {isDayClosed ? 'D├¡a Cerrado (Ver)' : 'Cerrar D├¡a'}
+                                         </button>
+-                                    )}
++                                        <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="bg-slate-900 text-white border border-slate-800 rounded-lg px-2 py-1 font-mono text-xs focus:border-pink-500 outline-none" />
++                                    </>
++                                )}
++                                <p className="text-3xl font-mono font-bold text-slate-200 tracking-tighter">{currentTime.toLocaleTimeString()}</p>
++                            </div>
++                        </div>
+ 
+-                                    {!isSessionActive ? (
+-                                        <div className="flex-1 flex flex-col items-center justify-center gap-2 group-hover:scale-105 transition-transform opacity-70 group-hover:opacity-100">
+-                                            <div className="w-10 h-10 rounded-xl bg-slate-700 border-2 border-slate-600 flex items-center justify-center text-sm font-bold text-slate-400 group-hover:border-pink-500 group-hover:text-pink-500 transition-colors">
+-                                                {emp.firstName.substring(0, 1)}
+-                                            </div>
+-                                            <p className="text-xl font-black text-slate-400 group-hover:text-white uppercase tracking-tight">{emp.alias || emp.firstName}</p>
+-                                        </div>
+-                                    ) : (
+-                                        <div className="flex-1 flex flex-col h-full w-full relative">
+-                                            <div className="flex items-center gap-2 mb-2 px-1 relative z-10">
+-                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold border shadow-lg ${isClientActive ? 'bg-black text-amber-500 border-black' : 'bg-pink-600 border-pink-500 text-white'}`}>
++                        <div className="grid grid-cols-4 xl:grid-cols-5 gap-3 overflow-y-auto custom-scrollbar flex-1 content-start p-2 -mx-2">
++                            {employees.filter(e => e.isBuyer).map(emp => {
++                                const session = activeSessions.find(s => String(s.employeeId) === String(emp.id));
++                                const isClientActive = !!clientSessions[emp.id];
++                                const isSessionActive = !!session || isClientActive;
++
++                                return (
++                                    <div
++                                        key={emp.id}
++                                        onClick={() => {
++                                            if (!isToday) return;
++                                            if (isClientActive) { setActiveClientModal(emp.id); return; }
++                                            if (!isSessionActive) { startSession(emp.id, `${emp.firstName} ${emp.lastName}`); return; }
++                                            startClient(emp.id);
++                                        }}
++                                        className={`relative rounded-2xl p-2 flex flex-col gap-1 transition-all duration-300 border h-28 overflow-hidden group select-none cursor-pointer 
++                                        ${isClientActive ? 'bg-amber-500 border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.4)] scale-[1.02] z-10' :
++                                                isSessionActive ? 'bg-slate-800 border-pink-500/50 hover:border-pink-500' :
++                                                    'bg-slate-800/40 border-white/5 opacity-60 hover:opacity-100 hover:bg-slate-800'
++                                            }`}
++                                    >
++                                        {isSessionActive && !isClientActive && (isManagerial || emp.id === user?.id) && (
++                                            <button
++                                                onClick={(e) => { e.stopPropagation(); if (confirm('┬┐Terminar turno de ' + emp.alias + '?')) endSession(emp.id); }}
++                                                className="absolute top-2 right-2 p-1.5 text-slate-400 hover:text-white bg-black/20 hover:bg-red-500 rounded-full z-20 transition-all backdrop-blur-sm"
++                                            >
++                                                <X size={14} />
++                                            </button>
++                                        )}
++
++                                        {!isSessionActive ? (
++                                            <div className="flex-1 flex flex-col items-center justify-center gap-2 group-hover:scale-105 transition-transform opacity-70 group-hover:opacity-100">
++                                                <div className="w-10 h-10 rounded-xl bg-slate-700 border-2 border-slate-600 flex items-center justify-center text-sm font-bold text-slate-400 group-hover:border-pink-500 group-hover:text-pink-500 transition-colors">
+                                                     {emp.firstName.substring(0, 1)}
+                                                 </div>
+-                                                <p className={`font-black text-lg truncate leading-none uppercase tracking-tight ${isClientActive ? 'text-black' : 'text-white'}`}>
+-                                                    {emp.alias || emp.firstName}
+-                                                </p>
++                                                <p className="text-xl font-black text-slate-400 group-hover:text-white uppercase tracking-tight">{emp.alias || emp.firstName}</p>
+                                             </div>
+-                                            <div className="flex-1 flex items-center justify-center">
+-                                                {isClientActive ? (
+-                                                    <div className="flex flex-col items-center animate-pulse">
+-                                                        <Clock size={32} className="text-black mb-1" />
+-                                                        <span className="font-black text-black text-sm uppercase tracking-widest">En Curso</span>
+-                                                    </div>
+-                                                ) : (
+-                                                    <div className="flex flex-col items-center opacity-50 group-hover:opacity-100 transition-opacity">
+-                                                        <UserPlus size={32} className="text-pink-500 mb-1" />
+-                                                        <span className="font-bold text-slate-400 text-xs uppercase tracking-widest group-hover:text-white transition-colors">Atender</span>
++                                        ) : (
++                                            <div className="flex-1 flex flex-col h-full w-full relative">
++                                                <div className="flex items-center gap-2 mb-2 px-1 relative z-10">
++                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold border shadow-lg ${isClientActive ? 'bg-black text-amber-500 border-black' : 'bg-pink-600 border-pink-500 text-white'}`}>
++                                                        {emp.firstName.substring(0, 1)}
+                                                     </div>
+-                                                )}
++                                                    <p className={`font-black text-lg truncate leading-none uppercase tracking-tight ${isClientActive ? 'text-black' : 'text-white'}`}>
++                                                        {emp.alias || emp.firstName}
++                                                    </p>
++                                                </div>
++                                                <div className="flex-1 flex items-center justify-center">
++                                                    {isClientActive ? (
++                                                        <div className="flex flex-col items-center animate-pulse">
++                                                            <Clock size={32} className="text-black mb-1" />
++                                                            <span className="font-black text-black text-sm uppercase tracking-widest">En Curso</span>
++                                                        </div>
++                                                    ) : (
++                                                        <div className="flex flex-col items-center opacity-50 group-hover:opacity-100 transition-opacity">
++                                                            <UserPlus size={32} className="text-pink-500 mb-1" />
++                                                            <span className="font-bold text-slate-400 text-xs uppercase tracking-widest group-hover:text-white transition-colors">Atender</span>
++                                                        </div>
++                                                    )}
++                                                </div>
+                                             </div>
+-                                        </div>
+-                                    )}
+-                                </div>
+-                            );
+-                        })}
++                                        )}
++                                    </div>
++                                );
++                            })}
++                        </div>
+                     </div>
+                 </div>
+ 
+@@ -553,143 +618,157 @@ const Productivity = () => {
+             {/* MODALS */}
+ 
+             {/* EDIT TIME MODAL */}
+-            {editingRecord && (
+-                <EditTimeModal
+-                    record={editingRecord}
+-                    onClose={() => setEditingRecord(null)}
+-                    onSave={(newSeconds) => {
+-                        if (editingRecord.empId) {
+-                            updateDailyGroups(editingRecord.empId, selectedDate, { clientSeconds: newSeconds });
+-                            setEditingRecord(null);
+-                        }
+-                    }}
+-                />
+-            )}
++            {
++                editingRecord && (
++                    <EditTimeModal
++                        record={editingRecord}
++                        onClose={() => setEditingRecord(null)}
++                        onSave={(newSeconds) => {
++                            if (editingRecord.empId) {
++                                updateDailyGroups(editingRecord.empId, selectedDate, { clientSeconds: newSeconds });
++                                setEditingRecord(null);
++                            }
++                        }}
++                    />
++                )
++            }
+ 
+             {/* EDIT SHIFT TIME MODAL */}
+-            {editingShiftTime && (
+-                <EditShiftTimeModal
+-                    employeeId={editingShiftTime.empId}
+-                    employeeName={editingShiftTime.employeeName}
+-                    currentSeconds={editingShiftTime.totalSeconds}
+-                    onClose={() => setEditingShiftTime(null)}
+-                    onSave={(newSeconds) => {
+-                        updateEmployeeShiftTime(editingShiftTime.empId, selectedDate, newSeconds);
+-                        setEditingShiftTime(null);
+-                    }}
+-                />
+-            )}
+-
+-            {showCloseModal && (
+-                <CloseDayModal
+-                    date={selectedDate}
+-                    onClose={() => setShowCloseModal(false)}
+-                    onConfirm={async (text) => {
+-                        await updateDayIncident(selectedDate, text);
+-                        await closeDay(selectedDate, { max_concurrent: maxConcurrent, observation: text });
+-                        setShowCloseModal(false);
+-                    }}
+-                    initialIncidentText={dayIncidents[selectedDate] || ''}
+-                    maxConcurrent={maxConcurrent}
+-                    isClosed={isDayClosed}
+-                    onReopen={async () => {
+-                        if (confirm('┬┐Est├ís seguro de reabrir este d├¡a?')) {
+-                            await reopenDay(selectedDate);
++            {
++                editingShiftTime && (
++                    <EditShiftTimeModal
++                        employeeId={editingShiftTime.empId}
++                        employeeName={editingShiftTime.employeeName}
++                        currentSeconds={editingShiftTime.totalSeconds}
++                        onClose={() => setEditingShiftTime(null)}
++                        onSave={(newSeconds) => {
++                            updateEmployeeShiftTime(editingShiftTime.empId, selectedDate, newSeconds);
++                            setEditingShiftTime(null);
++                        }}
++                    />
++                )
++            }
++
++            {
++                showCloseModal && (
++                    <CloseDayModal
++                        date={selectedDate}
++                        onClose={() => setShowCloseModal(false)}
++                        onConfirm={async (text) => {
++                            await updateDayIncident(selectedDate, text);
++                            await closeDay(selectedDate, { max_concurrent: maxConcurrent, observation: text });
+                             setShowCloseModal(false);
+-                        }
+-                    }}
+-                />
+-            )}
++                        }}
++                        initialIncidentText={dayIncidents[selectedDate] || ''}
++                        maxConcurrent={maxConcurrent}
++                        isClosed={isDayClosed}
++                        onReopen={async () => {
++                            if (confirm('┬┐Est├ís seguro de reabrir este d├¡a?')) {
++                                await reopenDay(selectedDate);
++                                setShowCloseModal(false);
++                            }
++                        }}
++                    />
++                )
++            }
+ 
+             {/* EDIT STATS MODAL */}
+-            {editingStats && (
+-                <EditStatsModal
+-                    empId={editingStats.empId}
+-                    date={editingStats.date}
+-                    currentStats={editingStats.currentStats}
+-                    onClose={() => setEditingStats(null)}
+-                    onSave={(newStats) => {
+-                        updateDailyGroups(editingStats.empId, editingStats.date, newStats);
+-                        setEditingStats(null);
+-                    }}
+-                />
+-            )}
++            {
++                editingStats && (
++                    <EditStatsModal
++                        empId={editingStats.empId}
++                        date={editingStats.date}
++                        currentStats={editingStats.currentStats}
++                        onClose={() => setEditingStats(null)}
++                        onSave={(newStats) => {
++                            updateDailyGroups(editingStats.empId, editingStats.date, newStats);
++                            setEditingStats(null);
++                        }}
++                    />
++                )
++            }
+ 
+             {/* NO DEAL DETAIL MODAL */}
+-            {noDealDetail && (
+-                <NoDealModal
+-                    onClose={() => setNoDealDetail(null)}
+-                    employeeId={noDealDetail.empId}
+-                    reasonRaw={noDealDetail.reason}
+-                    onSave={async (details) => {
+-                        await addNoDealDetail({
+-                            ...details,
+-                            date: noDealDetail.date,
+-                            employee_id: noDealDetail.empId,
+-                            reason: noDealDetail.reason
+-                        });
+-                        setNoDealDetail(null);
+-                    }}
+-                />
+-            )}
++            {
++                noDealDetail && (
++                    <NoDealModal
++                        onClose={() => setNoDealDetail(null)}
++                        employeeId={noDealDetail.empId}
++                        reasonRaw={noDealDetail.reason}
++                        onSave={async (details) => {
++                            await addNoDealDetail({
++                                ...details,
++                                date: noDealDetail.date,
++                                employee_id: noDealDetail.empId,
++                                reason: noDealDetail.reason
++                            });
++                            setNoDealDetail(null);
++                        }}
++                    />
++                )
++            }
+ 
+             {/* CLIENT INTERACTION MODAL */}
+-            {activeClientModal && (
+-                <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur flex justify-center items-center p-4 animate-in fade-in duration-200">
+-                    <div className="bg-[#1e293b] w-full max-w-lg rounded-3xl p-8 border border-white/10 shadow-2xl relative">
+-                        {/* Timer Header */}
+-                        <div className="text-center mb-8">
+-                            <p className="text-amber-500 font-bold uppercase tracking-widest text-xs mb-2 animate-pulse">Atendiendo Cliente...</p>
+-                            <ClientTimer startTime={clientSessions[activeClientModal]} />
+-                        </div>
++            {
++                activeClientModal && (
++                    <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur flex justify-center items-center p-4 animate-in fade-in duration-200">
++                        <div className="bg-[#1e293b] w-full max-w-lg rounded-3xl p-8 border border-white/10 shadow-2xl relative">
++                            {/* Timer Header */}
++                            <div className="text-center mb-8">
++                                <p className="text-amber-500 font-bold uppercase tracking-widest text-xs mb-2 animate-pulse">Atendiendo Cliente...</p>
++                                <ClientTimer startTime={clientSessions[activeClientModal]} />
++                            </div>
+ 
+-                        {/* Actions */}
+-                        <div className="grid grid-cols-2 gap-4">
+-                            <button onClick={() => endClient(activeClientModal, 'standard')} className="bg-slate-700 hover:bg-green-600 text-white p-4 rounded-xl font-bold transition-all flex flex-col items-center gap-2 group">
+-                                <Check size={24} className="group-hover:scale-125 transition-transform" />
+-                                <span>Compra General</span>
+-                            </button>
+-                            <button onClick={() => endClient(activeClientModal, 'jewelry')} className="bg-slate-700 hover:bg-amber-500 hover:text-black text-white p-4 rounded-xl font-bold transition-all flex flex-col items-center gap-2 group">
+-                                <Watch size={24} className="group-hover:scale-125 transition-transform" />
+-                                <span>Compra Joyer├¡a</span>
+-                            </button>
+-                            <button onClick={() => endClient(activeClientModal, 'recoverable')} className="bg-slate-700 hover:bg-blue-600 text-white p-4 rounded-xl font-bold transition-all flex flex-col items-center gap-2 group">
+-                                <RefreshCw size={24} className="group-hover:scale-125 transition-transform" />
+-                                <span>Recuperable</span>
+-                            </button>
+-                            <button onClick={() => setActiveClientModal(activeClientModal + '_REJECT')} className="bg-slate-700 hover:bg-red-600 text-white p-4 rounded-xl font-bold transition-all flex flex-col items-center gap-2 group">
+-                                <X size={24} className="group-hover:scale-125 transition-transform" />
+-                                <span>No Trato / Rechazo</span>
+-                            </button>
+-                        </div>
++                            {/* Actions */}
++                            <div className="grid grid-cols-2 gap-4">
++                                <button onClick={() => endClient(activeClientModal, 'standard')} className="bg-slate-700 hover:bg-green-600 text-white p-4 rounded-xl font-bold transition-all flex flex-col items-center gap-2 group">
++                                    <Check size={24} className="group-hover:scale-125 transition-transform" />
++                                    <span>Compra General</span>
++                                </button>
++                                <button onClick={() => endClient(activeClientModal, 'jewelry')} className="bg-slate-700 hover:bg-amber-500 hover:text-black text-white p-4 rounded-xl font-bold transition-all flex flex-col items-center gap-2 group">
++                                    <Watch size={24} className="group-hover:scale-125 transition-transform" />
++                                    <span>Compra Joyer├¡a</span>
++                                </button>
++                                <button onClick={() => endClient(activeClientModal, 'recoverable')} className="bg-slate-700 hover:bg-blue-600 text-white p-4 rounded-xl font-bold transition-all flex flex-col items-center gap-2 group">
++                                    <RefreshCw size={24} className="group-hover:scale-125 transition-transform" />
++                                    <span>Recuperable</span>
++                                </button>
++                                <button onClick={() => setActiveClientModal(activeClientModal + '_REJECT')} className="bg-slate-700 hover:bg-red-600 text-white p-4 rounded-xl font-bold transition-all flex flex-col items-center gap-2 group">
++                                    <X size={24} className="group-hover:scale-125 transition-transform" />
++                                    <span>No Trato / Rechazo</span>
++                                </button>
++                            </div>
+ 
+-                        <div className="mt-8 pt-4 border-t border-white/5 text-center">
+-                            <button onClick={() => setActiveClientModal(null)} className="text-xs text-slate-500 hover:text-white underline">Ocultar (Seguir Crono)</button>
++                            <div className="mt-8 pt-4 border-t border-white/5 text-center">
++                                <button onClick={() => setActiveClientModal(null)} className="text-xs text-slate-500 hover:text-white underline">Ocultar (Seguir Crono)</button>
++                            </div>
+                         </div>
+                     </div>
+-                </div>
+-            )}
++                )
++            }
+ 
+             {/* REJECTION REASON MODAL */}
+-            {activeClientModal && typeof activeClientModal === 'string' && activeClientModal.includes('_REJECT') && (
+-                <div className="absolute inset-0 z-[60] bg-black/90 flex justify-center items-center p-4">
+-                    <div className="bg-[#1e293b] w-full max-w-md rounded-3xl p-6 border border-red-500/30 shadow-2xl">
+-                        <h3 className="text-xl font-bold text-white mb-6 text-center">Motivo del Rechazo</h3>
+-                        <div className="flex flex-col gap-3">
+-                            {REJECTION_REASONS.map(reason => (
+-                                <button
+-                                    key={reason}
+-                                    onClick={() => endClient(parseInt(activeClientModal), 'noDeal', reason)}
+-                                    className="p-3 bg-slate-800 hover:bg-red-500/20 hover:text-red-400 border border-white/5 rounded-xl text-left text-sm font-medium transition-colors"
+-                                >
+-                                    {reason}
+-                                </button>
+-                            ))}
++            {
++                activeClientModal && typeof activeClientModal === 'string' && activeClientModal.includes('_REJECT') && (
++                    <div className="absolute inset-0 z-[60] bg-black/90 flex justify-center items-center p-4">
++                        <div className="bg-[#1e293b] w-full max-w-md rounded-3xl p-6 border border-red-500/30 shadow-2xl">
++                            <h3 className="text-xl font-bold text-white mb-6 text-center">Motivo del Rechazo</h3>
++                            <div className="flex flex-col gap-3">
++                                {REJECTION_REASONS.map(reason => (
++                                    <button
++                                        key={reason}
++                                        onClick={() => endClient(parseInt(activeClientModal), 'noDeal', reason)}
++                                        className="p-3 bg-slate-800 hover:bg-red-500/20 hover:text-red-400 border border-white/5 rounded-xl text-left text-sm font-medium transition-colors"
++                                    >
++                                        {reason}
++                                    </button>
++                                ))}
++                            </div>
++                            <button onClick={() => setActiveClientModal(null)} className="mt-4 w-full py-3 text-slate-500 hover:text-white text-sm">Cancelar / Cerrar</button>
+                         </div>
+-                        <button onClick={() => setActiveClientModal(null)} className="mt-4 w-full py-3 text-slate-500 hover:text-white text-sm">Cancelar / Cerrar</button>
+                     </div>
+-                </div>
+-            )}
++                )
++            }
+ 
+             {/* VISUAL LOCATIONS MODAL */}
+             <VisualLocationsModal
+@@ -721,7 +800,7 @@ const Productivity = () => {
+                 </div>
+             </div>
+ 
+-        </div>
++        </div >
+     );
+ };
+ 

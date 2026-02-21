@@ -1,0 +1,60 @@
+﻿commit fc4a6ba73d93ba4bac3d8afb0e06a66b8225cd9e
+Author: Juanma <tu_email@ejemplo.com>
+Date:   Fri Feb 20 07:13:48 2026 +0100
+
+    feat: Update Productivity components and utilities
+
+diff --git a/src/context/ProductivityContext.jsx b/src/context/ProductivityContext.jsx
+index d3ffc3e..24e5486 100644
+--- a/src/context/ProductivityContext.jsx
++++ b/src/context/ProductivityContext.jsx
+@@ -248,27 +248,20 @@ export const ProductivityProvider = ({ children }) => {
+     const updateDailyGroups = async (employeeId, date, updates) => {
+         const key = `${employeeId}-${date}`;
+ 
+-        let newState = {};
+-        setDailyGroups(prev => {
+-            const current = prev[key];
+-            const safeCurrent = typeof current === 'number'
+-                ? { standard: current, jewelry: 0, recoverable: 0 }
+-                : (current || { standard: 0, jewelry: 0, recoverable: 0 });
+-
+-            const safeUpdates = typeof updates === 'number'
+-                ? { standard: updates }
+-                : updates;
+-
+-            newState = { ...safeCurrent, ...safeUpdates };
+-            return { ...prev, [key]: newState };
+-        });
++        // 1. Calculate newState safely using current scope state (or default)
++        const current = dailyGroups[key] || { standard: 0, jewelry: 0, recoverable: 0, noDeal: 0, clientSeconds: 0 };
++        const newState = { ...current, ...updates };
++
++        // 2. Optimistic Update
++        setDailyGroups(prev => ({ ...prev, [key]: newState }));
+ 
+         try {
+-            await fetch('/api/daily-groups', {
++            const res = await fetch('/api/daily-groups', {
+                 method: 'POST',
+                 headers: getHeaders(),
+                 body: JSON.stringify({ key, data: newState })
+             });
++            if (res.ok) return await res.json();
+         } catch (err) {
+             console.error("Error updating groups", err);
+         }
+@@ -515,11 +508,12 @@ export const ProductivityProvider = ({ children }) => {
+             updateGoldPrice,
+             logTransaction: async (employeeId, startTime, endTime, type, details) => {
+                 try {
+-                    await fetch('/api/transaction-logs', {
++                    const res = await fetch('/api/transaction-logs', {
+                         method: 'POST',
+                         headers: getHeaders(),
+                         body: JSON.stringify({ employeeId, startTime, endTime, type, details })
+                     });
++                    if (res.ok) return await res.json();
+                 } catch (err) { console.error('Error logging transaction:', err); }
+             }
+         }}>

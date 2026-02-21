@@ -1,0 +1,272 @@
+﻿diff --git a/src/pages/Productivity.jsx b/src/pages/Productivity.jsx
+index dcf0ee7..eb33ef3 100644
+--- a/src/pages/Productivity.jsx
++++ b/src/pages/Productivity.jsx
+@@ -14,6 +14,8 @@ import NoDealModal from '../components/Productivity/NoDealModal';
+ import VisualLocationsModal from '../components/Productivity/VisualLocationsModal';
+ import ProductivityTimeline from '../components/Productivity/ProductivityTimeline';
+ import AnomalyPanel from '../components/Productivity/AnomalyPanel';
++import GamifiedCard from '../components/Productivity/GamifiedCard';
++import KioskoModal from '../components/Productivity/KioskoModal';
+ 
+ 
+ // REJECTION_REASONS removed as per request to simplify flow
+@@ -29,7 +31,7 @@ const Productivity = () => {
+         goldPrice, updateGoldPrice, updateEmployeeShiftTime, logTransaction, transactionLogs // Added transactionLogs
+     } = useProductivity();
+ 
+-    const { employees } = useTeam();
++    const { employees, updateEmployee } = useTeam();
+     const { user } = useAuth();
+     const { currentStore } = useStore();
+ 
+@@ -45,10 +47,12 @@ const Productivity = () => {
+     // Location Categories
+     const LOCATION_CATEGORIES = ['LETRAS', 'VOL├ÜMENES', 'PATINETES', 'ALMACEN / PARED', 'RESERVA'];
+     const [activeLocationCategory, setActiveLocationCategory] = useState(null); // null means closed
++    const [visualLocationsModalOpen, setVisualLocationsModalOpen] = useState(false);
++    const [storeMap, setStoreMap] = useState(null);
+ 
+-    // Live Client State (Derived from Persistent Active Sessions)
+-    const activeClientModalState = useState(null);
+-    const [activeClientModal, setActiveClientModal] = activeClientModalState;
++    // Live Client State
++    const [activeClientModal, setActiveClientModal] = useState(null); // ID of employee
++    const [rewardModalEmployeeId, setRewardModalEmployeeId] = useState(null); // Just ID, look up fresh object
+     const [shopActiveSeconds, setShopActiveSeconds] = useState(0);
+     const [maxConcurrent, setMaxConcurrent] = useState(0);
+ 
+@@ -295,10 +299,38 @@ const Productivity = () => {
+             updates[type] = (currentData[type] || 0) + 1;
+         }
+ 
+-        await updateDailyGroups(empId, selectedDate, updates);
++        const groupRes = await updateDailyGroups(empId, selectedDate, updates);
+ 
+         // Log accurate transaction for stats
+-        logTransaction(empId, new Date(start).toISOString(), new Date().toISOString(), type, { reason });
++        const txRes = await logTransaction(empId, new Date(start).toISOString(), new Date().toISOString(), type, { reason });
++
++        // Gamification: Update XP Local State
++        const emp = employees.find(e => e.id === empId);
++        if (emp) {
++            let g = { ...(emp.gamification || {}) };
++            let changed = false;
++
++            // 1. Transaction Response (Absolute Values from Backend)
++            if (txRes && txRes.success && txRes.xp !== undefined) {
++                g.xp = txRes.xp;
++                g.level = txRes.level;
++                g.coins = txRes.coins;
++                if (txRes.reward) g.pendingRewards = (parseInt(g.pendingRewards) || 0) + 1;
++                changed = true;
++            }
++            // 2. Group Update Response (Delta) - if tx didn't have gamification data (e.g. correction)
++            else if (groupRes && groupRes.xpDelta) {
++                g.xp = Math.max(0, (g.xp || 0) + groupRes.xpDelta);
++                g.level = Math.floor(Math.sqrt(g.xp / 100)) + 1;
++                // Coins if available in groupRes? Backend doesn't return coinsDelta yet in daily-groups but we should.
++                // But Transaction is main source for sales. Groups update is for corrections.
++                changed = true;
++            }
++
++            if (changed) {
++                updateEmployee(empId, { gamification: g });
++            }
++        }
+ 
+         await toggleClientSession(empId, false); // End in DB
+         setActiveClientModal(null);
+@@ -309,6 +341,29 @@ const Productivity = () => {
+     // ... (Keep existing helpers like calculateShopActiveTime, etc. simplified for brevity if logic unchanged)
+     // I will inline the simple ones needed for display.
+ 
++    const handleResetGamification = async (empId) => {
++        if (!confirm("┬┐EST├üS SEGURO? Esto reiniciar├í por completo el nivel, experiencia y objetos del empleado. Esta acci├│n no se puede deshacer.")) return;
++
++        try {
++            const storeId = currentStore || 'store_1';
++            const res = await fetch(`/api/employees/${empId}/reset-gamification`, {
++                method: 'POST',
++                headers: { 'x-store-id': storeId }
++            });
++
++            if (res.ok) {
++                const data = await res.json();
++                updateEmployee(empId, { gamification: data.employee.gamification });
++                alert("Perfil reseteado correctamente.");
++            } else {
++                alert("Error al resetear perfil.");
++            }
++        } catch (e) {
++            console.error(e);
++            alert("Error de conexi├│n.");
++        }
++    };
++
+     return (
+         <div className="flex flex-col h-full overflow-hidden relative gap-4">
+ 
+@@ -433,7 +488,7 @@ const Productivity = () => {
+                             </div>
+                         </div>
+ 
+-                        <div className="grid grid-cols-4 xl:grid-cols-5 gap-3 overflow-y-auto custom-scrollbar flex-1 content-start p-2 -mx-2">
++                        <div className={`${viewMode === 'timeline' ? 'flex flex-col' : 'grid grid-cols-4 xl:grid-cols-5'} gap-3 overflow-y-auto custom-scrollbar flex-1 content-start p-2 -mx-2`}>
+                             {viewMode === 'timeline' ? (
+                                 <ProductivityTimeline
+                                     selectedDate={selectedDate}
+@@ -447,66 +502,32 @@ const Productivity = () => {
+                                     const session = activeSessions.find(s => String(s.employeeId) === String(emp.id));
+                                     const isClientActive = !!clientSessions[emp.id];
+                                     const isSessionActive = !!session || isClientActive;
++                                    const stats = getGroupCounts(emp.id, selectedDate);
+ 
+                                     return (
+-                                        <div
++                                        <GamifiedCard
+                                             key={emp.id}
++                                            emp={emp}
++                                            session={session}
++                                            isClientActive={isClientActive}
++                                            stats={stats}
+                                             onClick={() => {
+                                                 if (!isToday) return;
+                                                 if (isClientActive) { setActiveClientModal(emp.id); return; }
+                                                 if (!isSessionActive) { startSession(emp.id, `${emp.firstName} ${emp.lastName}`); return; }
+                                                 startClient(emp.id);
+                                             }}
+-                                            className={`relative rounded-2xl p-2 flex flex-col gap-1 transition-all duration-300 border h-28 overflow-hidden group select-none cursor-pointer 
+-                                        ${isClientActive ? 'bg-amber-500 border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.4)] scale-[1.02] z-10' :
+-                                                    isSessionActive ? 'bg-slate-800 border-pink-500/50 hover:border-pink-500' :
+-                                                        'bg-slate-800/40 border-white/5 opacity-60 hover:opacity-100 hover:bg-slate-800'
+-                                                }`}
+-                                        >
+-                                            {isSessionActive && !isClientActive && (isManagerial || emp.id === user?.id || user?.role === ROLES.KIOSK) && (
+-                                                <button
+-                                                    onClick={(e) => { e.stopPropagation(); if (confirm('┬┐Terminar turno de ' + emp.alias + '?')) endSession(emp.id); }}
+-                                                    className="absolute top-2 right-2 p-1.5 text-slate-400 hover:text-white bg-black/20 hover:bg-red-500 rounded-full z-20 transition-all backdrop-blur-sm"
+-                                                >
+-                                                    <X size={14} />
+-                                                </button>
+-                                            )}
+-
+-                                            {!isSessionActive ? (
+-                                                <div className="flex-1 flex flex-col items-center justify-center gap-2 group-hover:scale-105 transition-transform opacity-70 group-hover:opacity-100">
+-                                                    <div className="w-10 h-10 rounded-xl bg-slate-700 border-2 border-slate-600 flex items-center justify-center text-sm font-bold text-slate-400 group-hover:border-pink-500 group-hover:text-pink-500 transition-colors">
+-                                                        {emp.firstName.substring(0, 1)}
+-                                                    </div>
+-                                                    <p className="text-xl font-black text-slate-400 group-hover:text-white uppercase tracking-tight">{emp.alias || emp.firstName}</p>
+-                                                </div>
+-                                            ) : (
+-                                                <div className="flex-1 flex flex-col h-full w-full relative">
+-                                                    <div className="flex items-center gap-2 mb-2 px-1 relative z-10">
+-                                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold border shadow-lg ${isClientActive ? 'bg-black text-amber-500 border-black' : 'bg-pink-600 border-pink-500 text-white'}`}>
+-                                                            {emp.firstName.substring(0, 1)}
+-                                                        </div>
+-                                                        <p className={`font-black text-lg truncate leading-none uppercase tracking-tight ${isClientActive ? 'text-black' : 'text-white'}`}>
+-                                                            {emp.alias || emp.firstName}
+-                                                        </p>
+-                                                    </div>
+-                                                    <div className="flex-1 flex items-center justify-center">
+-                                                        {isClientActive ? (
+-                                                            <div className="flex flex-col items-center animate-pulse">
+-                                                                <Clock size={32} className="text-black mb-1" />
+-                                                                <span className="font-black text-black text-sm uppercase tracking-widest">En Curso</span>
+-                                                            </div>
+-                                                        ) : (
+-                                                            <div className="flex flex-col items-center opacity-50 group-hover:opacity-100 transition-opacity">
+-                                                                <UserPlus size={32} className="text-pink-500 mb-1" />
+-                                                                <span className="font-bold text-slate-400 text-xs uppercase tracking-widest group-hover:text-white transition-colors">Atender</span>
+-                                                            </div>
+-                                                        )}
+-                                                    </div>
+-                                                </div>
+-                                            )}
+-                                        </div>
++                                            onEndSession={(id) => {
++                                                if (confirm(`┬┐Terminar turno de ${emp.alias || emp.firstName}?`)) endSession(id);
++                                            }}
++                                            onOpenRewards={(id) => setRewardModalEmployeeId(id)}
++                                            onResetGamification={handleResetGamification}
++                                            isManagerial={isManagerial}
++                                            user={user}
++                                        />
+                                     );
+-                                }))}
++                                })
++                            )}
+                         </div>
+                     </div>
+                 </div>
+@@ -600,12 +621,15 @@ const Productivity = () => {
+ 
+             {/* BOTTOM SECTION: DETAILED TABLE */}
+             <div className="flex-[1] bg-[#1e293b]/60 backdrop-blur-xl rounded-[2.5rem] border border-white/5 p-6 min-h-0 shadow-xl flex flex-col">
+-                <AnomalyPanel
+-                    dailyStats={dailyStats}
+-                    transactionLogs={transactionLogs}
+-                    employees={employees}
+-                    selectedDate={selectedDate}
+-                />
++                {isManagerial && (
++                    <AnomalyPanel
++                        dailyStats={dailyStats}
++                        transactionLogs={transactionLogs}
++                        employees={employees}
++                        selectedDate={selectedDate}
++                        isManagerial={isManagerial}
++                    />
++                )}
+ 
+                 <div className="overflow-y-auto custom-scrollbar flex-1 mt-4">
+                     <table className="w-full text-left border-collapse">
+@@ -634,8 +658,13 @@ const Productivity = () => {
+                             </tr>
+                         </thead>
+                         <tbody className="text-sm divide-y divide-white/5">
+-                            {Object.keys(dailyStats).map(empId => {
++                            {Object.keys(dailyStats).sort((a, b) => {
++                                const nA = employees.find(e => e.id == a)?.firstName || '';
++                                const nB = employees.find(e => e.id == b)?.firstName || '';
++                                return nA.localeCompare(nB);
++                            }).map(empId => {
+                                 const stat = dailyStats[empId];
++
+                                 const data = getGroupCounts(empId, selectedDate);
+                                 const hitRate = data.totalInteractions > 0 ? ((data.totalSold / data.totalInteractions) * 100).toFixed(0) : 0;
+                                 const avgTime = data.totalInteractions > 0 ? (data.clientSeconds / data.totalInteractions).toFixed(0) : 0;
+@@ -899,13 +928,27 @@ const Productivity = () => {
+             }
+ 
+ 
+-
+             {/* VISUAL LOCATIONS MODAL */}
+-            <VisualLocationsModal
+-                isOpen={!!activeLocationCategory}
+-                onClose={() => setActiveLocationCategory(null)}
+-                category={activeLocationCategory}
+-            />
++            {visualLocationsModalOpen && (
++                <VisualLocationsModal
++                    isOpen={visualLocationsModalOpen}
++                    onClose={() => setVisualLocationsModalOpen(false)}
++                    category={activeLocationCategory} // Keep category prop if still used for filtering
++                    storeMap={storeMap} // Assuming storeMap exists in scope or context if needed, or fetch inside
++                />
++            )}
++
++            {/* KIOSKO / REWARD SHOP MODAL */}
++            {rewardModalEmployeeId && (
++                <KioskoModal
++                    isOpen={!!rewardModalEmployeeId}
++                    onClose={() => setRewardModalEmployeeId(null)}
++                    employee={employees.find(e => e.id === rewardModalEmployeeId)}
++                    updateEmployee={updateEmployee}
++                    isManagerial={isManagerial}
++                    user={user}
++                />
++            )}
+ 
+             {/* LOCATION BUTTONS DOCK (Footer) */}
+             <div className="w-full flex justify-end shrink-0">

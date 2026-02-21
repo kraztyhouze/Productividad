@@ -194,7 +194,7 @@ const GamifiedCard = ({
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             style={!isClientActive ? customStyle : {}}
-            className={`relative rounded-2xl p-2 flex flex-col gap-1 transition-all duration-300 border h-32 overflow-hidden group select-none cursor-pointer 
+            className={`relative rounded-3xl p-3 flex flex-col gap-2 transition-all duration-300 border h-36 overflow-hidden group select-none cursor-pointer 
                 ${isClientActive ? 'bg-amber-500 border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.6)] z-20' :
                     isSessionActive ? `bg-slate-800 ${customBorder ? '' : rank.border} ${customBorder?.glow ? '' : rank.shadow}` :
                         `${rank.bg} ${customBorder ? '' : rank.border} opacity-80 hover:opacity-100 hover:bg-slate-800`
@@ -207,7 +207,7 @@ const GamifiedCard = ({
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
                     onClick={(e) => { e.stopPropagation(); onResetGamification(emp.id); }}
-                    className="absolute top-2 left-2 p-1.5 text-slate-500 hover:text-red-500 bg-black/10 hover:bg-black/30 rounded-full z-30 transition-all backdrop-blur-sm opacity-0 group-hover:opacity-100"
+                    className="absolute top-3 left-3 p-1.5 text-slate-500 hover:text-red-500 bg-black/10 hover:bg-black/30 rounded-full z-30 transition-all backdrop-blur-sm opacity-0 group-hover:opacity-100"
                     title="RESETEAR PERFIL COMPLETAMENTE"
                 >
                     <Trash2 size={12} />
@@ -233,40 +233,42 @@ const GamifiedCard = ({
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={(e) => { e.stopPropagation(); if (onOpenRewards) onOpenRewards(emp.id); }}
-                className={`absolute bottom-2 left-2 z-40 p-1.5 rounded-full cursor-pointer shadow-lg border-2 border-white transition-colors flex items-center justify-center
-                    ${pendingRewards > 0 ? 'bg-yellow-400 text-black hover:bg-yellow-300' : 'bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white'}
+                className={`absolute bottom-3 left-3 z-40 p-2 rounded-full cursor-pointer shadow-xl border-2 border-white/20 transition-all flex items-center justify-center backdrop-blur-sm
+                    ${pendingRewards > 0 ? 'bg-gradient-to-r from-yellow-400 to-amber-500 border-yellow-200 text-black shadow-amber-500/50' : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white hover:border-white/40'}
                 `}
                 title={pendingRewards > 0 ? "¡Premios Pendientes!" : "Kiosko & Perfil"}
             >
                 {pendingRewards > 0 ? (
-                    <Gift size={16} className="animate-bounce" />
+                    <Gift size={18} className="animate-bounce" />
                 ) : (
-                    <ShoppingBag size={14} />
+                    <ShoppingBag size={16} />
                 )}
             </motion.div>
 
             {/* HEADER */}
             <div className="flex items-center gap-3 relative z-10">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black border-2 transition-colors relative shrink-0
-                    ${isClientActive ? 'bg-black text-amber-500 border-black' :
-                        isSessionActive ? 'bg-slate-700 text-white ' + rank.border :
-                            'bg-slate-800 text-slate-400 border-slate-600 group-hover:border-white'
+                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-black border-2 transition-colors relative shrink-0 shadow-inner
+                    ${isClientActive ? 'bg-black text-amber-500 border-black shadow-amber-500/50' :
+                        isSessionActive ? 'bg-slate-800 text-white ' + rank.border + ' shadow-black/50' :
+                            'bg-slate-800/80 text-slate-400 border-slate-600 group-hover:border-white'
                     }
                 `}>
                     {emp.gamification?.avatarUrl ? (
-                        <img src={emp.gamification.avatarUrl} alt="" className="w-full h-full object-cover rounded-lg" />
+                        <div className="w-full h-full p-0.5 relative overflow-hidden rounded-[14px]">
+                            <img src={emp.gamification.avatarUrl} alt="" className="w-full h-full object-cover rounded-xl" />
+                        </div>
                     ) : (
                         emp.alias?.[0] || emp.firstName?.[0]
                     )}
 
                     {/* Level Badge */}
-                    <div className="absolute -bottom-2 -right-2 bg-slate-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-slate-700 flex items-center gap-0.5 shadow-md">
+                    <div className="absolute -bottom-2 -right-2 bg-slate-900 text-white text-[10px] font-bold px-2 py-0.5 rounded-full border border-slate-700 flex items-center gap-1 shadow-lg z-10">
                         {rank.icon} <span>{level}</span>
                     </div>
                 </div>
 
-                <div className="flex-1 min-w-0">
-                    <p className={`text-lg font-black truncate leading-none uppercase tracking-tight 
+                <div className="flex-1 min-w-0 flex flex-col justify-center mt-1">
+                    <p className={`text-xl font-black truncate leading-tight uppercase tracking-tight 
                         ${isClientActive ? 'text-black' :
                             isSessionActive ? 'text-white' : 'text-slate-400 group-hover:text-white'}
                     `}>
@@ -285,22 +287,22 @@ const GamifiedCard = ({
             </div>
 
             {/* BODY */}
-            <div className="flex-1 flex items-center justify-center relative z-10">
+            <div className="flex-1 flex items-center justify-center relative z-10 -mt-2">
                 {isSessionActive ? (
                     isClientActive ? (
                         <div className="flex flex-col items-center animate-pulse">
-                            <Clock size={28} className="text-black mb-0.5" />
-                            <span className="font-black text-black text-xs uppercase tracking-widest">En Curso</span>
+                            <Clock size={32} className="text-black mb-1 drop-shadow-md" />
+                            <span className="font-black text-black text-sm uppercase tracking-widest">En Curso</span>
                         </div>
                     ) : (
-                        <div className="flex flex-col items-center opacity-70 group-hover:opacity-100 transition-opacity">
-                            <UserPlus size={28} className={`text-pink-500 mb-0.5 ${isOnFire ? 'animate-bounce' : ''}`} />
-                            <span className="font-bold text-slate-300 text-[10px] uppercase tracking-widest group-hover:text-white">Atender</span>
+                        <div className="flex flex-col items-center opacity-80 group-hover:opacity-100 transition-opacity">
+                            <UserPlus size={32} className={`text-pink-500 mb-1 drop-shadow-lg ${isOnFire ? 'animate-bounce' : ''}`} />
+                            <span className="font-extrabold text-slate-300 text-[11px] uppercase tracking-widest group-hover:text-white">Atender Cliente</span>
                         </div>
                     )
                 ) : (
                     <div className="flex flex-col items-center opacity-40 group-hover:opacity-100 transition-opacity scale-90 group-hover:scale-100 duration-300">
-                        <span className="font-extrabold text-slate-400 text-xs uppercase border-2 border-slate-500 px-2 py-1 rounded-lg group-hover:border-white group-hover:text-white">
+                        <span className="font-extrabold text-slate-400 text-sm uppercase px-3 py-1.5 rounded-xl border-2 border-slate-500 group-hover:border-white group-hover:text-white group-hover:shadow-[0_0_15px_rgba(255,255,255,0.2)]">
                             Iniciar Turno
                         </span>
                     </div>
@@ -313,31 +315,31 @@ const GamifiedCard = ({
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
                     onClick={(e) => { e.stopPropagation(); onEndSession(emp.id); }}
-                    className="absolute top-2 right-2 p-1.5 text-slate-400 hover:text-white bg-black/20 hover:bg-red-500 rounded-full z-20 transition-all backdrop-blur-sm"
+                    className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-white bg-black/20 hover:bg-red-500 rounded-full z-20 transition-all backdrop-blur-sm"
                 >
                     <motion.div animate={{ rotate: 0 }} whileHover={{ rotate: 90 }}>
-                        <X size={14} />
+                        <X size={16} />
                     </motion.div>
                 </motion.button>
             )}
 
             {/* ON FIRE ICON */}
             {isOnFire && (
-                <div className="absolute top-2 right-8 z-20" title={`On Fire! ${gph.toFixed(1)}/h`}>
-                    <Flame size={16} className="text-orange-500 fill-orange-500 animate-pulse" />
+                <div className="absolute top-3 right-10 z-20" title={`On Fire! ${gph.toFixed(1)}/h`}>
+                    <Flame size={20} className="text-orange-500 fill-orange-500 animate-pulse drop-shadow-lg" />
                 </div>
             )}
 
             {/* MEDALS ROW */}
             {emp.gamification?.medals && emp.gamification.medals.length > 0 && (
-                <div className="absolute bottom-1.5 right-2 z-20 flex items-center gap-0.5">
+                <div className="absolute bottom-2.5 right-3 z-20 flex items-center gap-1">
                     {emp.gamification.medals.slice(0, 4).map((medal, i) => (
                         <div key={medal.id || i} className="w-5 h-5 rounded-full bg-amber-500/20 border border-amber-500/40 overflow-hidden flex items-center justify-center" title={medal.title}>
                             <img src={medal.icon} alt="" className="w-4 h-4" />
                         </div>
                     ))}
                     {emp.gamification.medals.length > 4 && (
-                        <span className="text-[8px] text-amber-400 font-bold ml-0.5">+{emp.gamification.medals.length - 4}</span>
+                        <span className="text-[10px] text-amber-400 font-bold ml-0.5">+{emp.gamification.medals.length - 4}</span>
                     )}
                 </div>
             )}

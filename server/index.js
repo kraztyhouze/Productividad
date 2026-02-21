@@ -1553,6 +1553,62 @@ app.put('/api/daily-records/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// --- Market Link Aggregator (Instant) ---
+app.get('/api/market/search', (req, res) => {
+    const { q } = req.query;
+    if (!q) return res.status(400).json({ error: 'Query required' });
+
+    console.log(`[Aggregator] Generating links for: ${q}`);
+    const encodedQ = encodeURIComponent(q);
+
+    const results = [
+        {
+            id: 'amazon', store: 'Amazon', storeCode: 'AM', color: 'amber',
+            price: 'Ver Nuevo', condition: 'Nuevo (Ref. Techo)',
+            url: `https://www.amazon.es/s?k=${encodedQ}`,
+            context: 'Referencia PVP Nuevo',
+            found: true
+        },
+        {
+            id: 'ebay_sold', store: 'eBay (Vendidos)', storeCode: 'EB', color: 'blue',
+            price: 'Ver Vendidos', condition: 'Realmente Vendidos',
+            url: `https://www.ebay.es/sch/i.html?_nkw=${encodedQ}&LH_Sold=1&LH_Complete=1&LH_ItemCondition=3000`,
+            context: 'Precio Real Mercado',
+            found: true
+        },
+        {
+            id: 'wallapop', store: 'Wallapop', storeCode: 'W', color: 'teal',
+            price: 'Ver Calle', condition: 'Segunda Mano',
+            url: `https://es.wallapop.com/app/search?keywords=${encodedQ}`,
+            context: 'Competencia Directa',
+            found: true
+        },
+        {
+            id: 'backmarket', store: 'Back Market', storeCode: 'BM', color: 'slate',
+            price: 'Ver Reacond.', condition: 'Reacondicionado',
+            url: `https://www.backmarket.es/es-es/search?q=${encodedQ}`,
+            context: 'Ref. Reacondicionado',
+            found: true
+        },
+        {
+            id: 'cex', store: 'CeX', storeCode: 'CeX', color: 'red',
+            price: 'Ver Web', condition: 'Usado',
+            url: `https://es.webuy.com/search?stext=${encodedQ}`,
+            context: 'Precio Venta Tienda',
+            found: true
+        },
+        {
+            id: 'cash', store: 'Cash Converters', storeCode: 'CC', color: 'green',
+            price: 'Ver Web', condition: 'Usado',
+            url: `https://www.cashconverters.es/es/es/search/?q=${encodedQ}`,
+            context: 'Precio Venta Tienda',
+            found: true
+        }
+    ];
+
+    res.json(results);
+});
+
 // Serve static files from the React app
 app.use(express.static(path.join(__dirname, '../dist')));
 

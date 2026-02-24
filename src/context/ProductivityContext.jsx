@@ -137,11 +137,28 @@ export const ProductivityProvider = ({ children }) => {
     // --- EFFECT: POLLING ---
     useEffect(() => {
         if (!currentStore) return;
+
         const interval = setInterval(() => {
-            fetchData();
-            fetchInternalGold();
-        }, 5000);
-        return () => clearInterval(interval);
+            // Only poll if tab is active to save egress
+            if (document.visibilityState === 'visible') {
+                fetchData();
+                fetchInternalGold();
+            }
+        }, 30000); // Increased from 5s to 30s for bandwidth optimization
+
+        // Also fetch immediately when tab becomes visible again
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                fetchData();
+                fetchInternalGold();
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, [currentStore]);
 
     // --- ACTIONS ---

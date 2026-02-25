@@ -1,4 +1,5 @@
 import 'dotenv/config';
+process.env.NODE_ENV = 'production';
 import express from 'express';
 
 import cors from 'cors';

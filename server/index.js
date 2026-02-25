@@ -1619,5 +1619,9 @@ app.get(/.*/, (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`==========================================`);
+    console.log(`🚀 TikTak 2.1 PRODUCTION SERVER STARTING`);
+    console.log(`✅ Port: ${PORT}`);
+    console.log(`✅ Environment: ${process.env.NODE_ENV || 'production'}`);
+    console.log(`==========================================`);
 });

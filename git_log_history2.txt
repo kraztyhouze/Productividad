@@ -1,0 +1,115 @@
+﻿cc843c7 Fix: Optimize egress and polling for Supabase
+517ffcd fix(market): restore /api/market/search and style(productivity): enhance GamifiedCard UI
+07bcdd5 fix: Employee Data Deletion and Shift Time Updates
+47d8055 fix: normalize dailyGroups keys to prevent employee data mix-ups
+1e95ea9 feat: Add gamification profile reset functionality
+c252989 fix(server): Use RegEx for wildcard route (Express 5 compat)
+1ef8c75 fix: Serve static files from React build (fix white screen)
+fc4a6ba feat: Update Productivity components and utilities
+cf0c7c1 feat(Productivity): Add Timeline View and Anomaly Detection Panel
+d455d45 fix: Restore full app functionality - original contexts, formatDate TDZ fix, Top Mes shows groups+productivity
+18c57af fix: Resolve white screen crash - formatDate TDZ error, missing imports, and robust context providers
+b9a6816 Configure proper RLS policies for security + data access, verify DB schema, and fix store ID handling
+adfe53b Fix dashboard historical stats display, robust data aggregation, and enable RLS security
+42c1ba3 Cleanup: Remove test_api.js script from repo
+2ed9f7a Fix: Correcci├│n carga de datos Dashboard (Total Mes y Datos Ayer)
+89fbc0d Fix potential NaN in dashboard stats and add debug logs
+c986f3c Add hourly stats and comparison chart to dashboard
+d8bf75c Fix dashboard stats, comparison box, and concurrency tracking
+663ac4e feat: Add glossary to Performance Report UI and Excel export
+4b79716 feat: Add professional Excel export to Performance Report
+a771c06 feat: Add collapsible price categories, employee fraud detection metrics, and simplified Kiosk role
+38301ce Fix: PriceList editing issues and added Initial Data loader
+ea5c940 Feat: Frontend for Market Prices (PVP CONSOLAS Y TMX)
+8bc02e1 Feat: Backend support for Market Prices (PVP CONSOLAS Y TMX)
+93daf8a Feat: Complete AirPods Authenticity Guide (Added AirPods 4, 1, 2)
+f19caf8 Fix: Removed phantom 'Inspecci├│n Visual' entries from Watch PDF checklist (Fixes 'FALLO' issue)
+83c1f0a Feat: Added AirPods Weight Guide to Market Authenticity Checks
+1643f30 Fix: Backend endpoints for store settings (closing hours & announcement) persistence
+b8438a7 Feat: Expanded Market Guides with Authenticity Checks (AirPods) and more Account Removal guides (Xiaomi, Huawei, etc). Refactored Guides UI.
+09e553e Fix: Corrected JSX structure in Market.jsx, closing Product Mode block properly.
+3d692cb Fix: Removed premature component closure in Market.jsx causing build failure.
+41d8688 Market: Added Watch Report with Timegrapher data & Brand/Model inputs. Added Account Removal Guides.
+2dfecaf Dashboard: Enhanced metrics with union time and concurrency. Productivity: Added marquee announcement and improved layout.
+3388861 feat: Enhance Reports and Dashboard
+5be3863 Add Excel export for Other No Deals report
+409edf8 Redesign No Deals Report UI
+639fabb Refactor: Security cleanup, code organization, initialized locations in db, updated credentials handling
+04856fa Enhance: Simplified No Deal flow by removing intermediate reason selection modal.
+5a0154d Fix: Synced DB sequences to resolve 500 Insert Error. Cleaned up server logs.
+b294c0d Fix: Normalize date handling to local time in Reports and Productivity to resolve 'missing today's records' bug.
+51ca17b Fix: Add x-store-id header to reports and productivity fetch requests
+4e00fbc feat: fix auto-close hours persistence and improve excel export
+2048bed fix: add missing DELETE endpoint for daily-groups
+694ec0b feat: enhance no-purchase report with tabs and export
+a61cdab fix: resolve html entities in NoDealModal.jsx
+dea26bf feat: enhance no-purchase tracking (Joyer├¡a/Otros) and implement auto-close session feature
+74f27fe Restricci├│n de edici├│n de tiempos a Gerente y Supervisor - Agregado rol Supervisor - Nueva funcionalidad para editar tiempo de turno - Restricciones de permisos en edici├│n de tiempos de turno y compras
+2f70506 Trigger Render deployment - Migraci├│n Supabase completa
+59fe535 A├▒adir resumen de deployment completado
+a3dc51d Migraci├│n a Supabase - Actualizar configuraci├│n de base de datos
+9042410 Fix: Zone assignment in location creation form - always use active category
+899db8c Feat: Multi-category Visual Locations system with smart sorting and real-time sync
+6286931 Fix: Locations persistence, delete endpoint, and real-time polling
+e6a5db6 Feat: Add Visual Locations Management Module (CRUD + Bulk Create)
+1e295d7 Feat: Add Timegrapher Help Modal to Watch Inspection
+e27ae0b Feat: Update Market with advanced Watch Inspection and refactor Gold Price context
+808635f Add detailed Watches inspection checklist to Market
+1d380fe Fix gold price sync between Productivity and Market via Context
+472a364 Enhance Market Gold Quote with active price sync & simplify categories
+2ecf134 Perf: Optimize Gold Scraper - Move to background job with caching to prevent timeouts
+94afe87 Fix: Enable PG Keep-Alive and error handling to prevent writeAfterFIN crashes
+ae65379 perf: Optimize productivity data syncing with unified endpoint
+9ffe715 feat: Add download shortcut endpoint and UI link
+3fb7768 feat: Add remote monitoring UI to LaptopDiagnostics
+c70d64c feat: Sync Needs/Overstock panels via DB and restrict permissions
+5b50787 fix(client): resolve ReferenceError by importing LaptopRemoteTest component
+4398dab feat: Add database backup endpoint and sidebar button for managers
+c6f0db8 fix(server): resolve Express 5 routing issue using regex for catch-all route
+e149a8d feat: Add remote laptop test, sync gold price via DB, and fix employee session stop button
+bd7340e feat: Major update - Security hardening (Bcrypt/Server-Auth), Mobile Diagnostics, and Multi-store fixes
+7632c56 Fix: Enhance scraper cloud compatibility with Puppeteer flags and longer timeouts
+259873c Refactor: Remove Firebase, migrate diagnostics to local API, optimize Gold Scraper and cleanup dependencies
+5f848b8 feat: optimize gold scraper, redesign price card, and fix session timer
+4995424 fix: improve mobile sensors and gps tests with manual triggers and fallbacks
+1741798 fix: mobile diagnostics hardware tests (mic, cam, gps) and add employee alias to pdf
+182ec09 fix: mobile diagnostics microphone recording and final step render issue
+b678cce feat: complete mobile diagnostics with local api and pdf report
+9582dbb feat: add real-time gold price scraper for productivity page
+4bd868c Implement detailed Dashboard with active sessions and Recharts
+9129504 Enhance Mobile Touch Test with swipe support
+cbc1cb2 Fix Productivity table showing orphaned group stats
+a8bfed5 Increase QR code size for easier mobile scanning
+ecc0eae Fix Reports crash and active session data mismatch
+49a4c97 Fix Productivity Page: UI robustness, API restoration, and Session Persistence
+d986e56 chore: trigger deployment
+1c347d1 feat(market): implementaci├│n avanzada de l├│gica de tasaci├│n con reglas de riesgo, stock y alta rotaci├│n
+3b6f1d3 Refactor Market Scanner to Link Aggregator and Add Horizontal Appraisal Survey
+b73cec1 Fix: Add database migrations for missing employee columns (avatar, order, alias)
+481aafd Update: Restore employee base from user provided list. Standardize credentials (initials/1234) and simplify roles to Gerente/Supervisor/Responsable/Empleado.
+788606b Fix: Comprehensive backend/frontend review. Add missing tables/APIs (tasks, roles, families), fix Employee mapping, upgrade Role management to DB-backed.
+56edbe1 Fix: Upgrade Docker Node version to 20 and refactor DB init for robustness
+77202f3 Feat: Market scanner with Puppeteer, new stores (eBay, GAME, Chrono24), and style fixes
+2ebba09 Feat: Add Market Scanner page and link redirect functionality
+a291d46 Feat: Apply Neon Silhouette design to Employee avatars
+31c424d Feat: Collapsible sidebar, Max concurrent stats, UI grid fixes
+cf9661e Feat: Add interactive Gold Price widget to Productivity dashboard
+4bd6660 UI: Refine Dark Matte Glass Theme across Team, Planning and Productivity modules
+d562fc5 Enhance Login UI: Match high-fidelity design with glowing glassmorphism and uncropped logo
+b15f344 Apply TikTak branding to all modules: Team (Rose), Planning (Pink), Reports (Fuchsia)
+5998938 Rebrand to TikTak: Update Login, Dashboard, Sidebar with new pink theme and typography
+1baba77 Refactor Team and Planning modules: Extract components and clean up state
+2165e45 Refactor Productivity: Extract components (InfoPanel, Modals) and cleanup state logic for compactness
+d8c7de4 Refactor Productivity layout: Add Need/Overstock sections and fix context bugs
+02babfc Fix: Sync active button state (int/str type mismatch) & Feat: Add delete employee day data functionality
+4824abd Fix async login handler in Login page
+6f23581 Update AuthContext to use API validation for persistent users
+de25b6c Add debug logs for server startup
+fa7eb6c Migrate Employee management to API with persistent Postgres DB
+03dfba3 Use Regex for catch-all route to fully fix Express 5 issue
+572a9c2 Fix Express 5 wildcard route syntax error
+7d3eb26 Fix Dockerfile: use npm install and npm start
+ce913e7 Specify node engine version for Render
+aab51a8 Fix deployment: bind to 0.0.0.0, add health check and start script
+2dc0289 Migraci├│n a PostgreSQL para Railway
+64749fa Subida inicial

@@ -696,7 +696,7 @@ app.get('/api/sync/productivity', async (req, res) => {
             pool.query('SELECT date FROM closed_days WHERE store_id = $1', [storeId]),
             pool.query('SELECT date, text FROM day_incidents WHERE store_id = $1', [storeId]),
             pool.query('SELECT id, name, type, date FROM product_families WHERE store_id = $1 ORDER BY id DESC', [storeId]),
-            pool.query("SELECT * FROM transaction_logs WHERE store_id = $1 ORDER BY start_time DESC LIMIT 300", [storeId])
+            pool.query("SELECT id, store_id, employee_id, start_time, end_time, type, details FROM transaction_logs WHERE store_id = $1 ORDER BY start_time DESC LIMIT 100", [storeId])
         ]);
 
         const dailyGroupsMap = {};

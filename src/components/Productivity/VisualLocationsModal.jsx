@@ -27,7 +27,7 @@ const VisualLocationsModal = ({ isOpen, onClose, category }) => {
     useEffect(() => {
         if (isOpen) {
             fetchLocations(); // Initial load
-            const interval = setInterval(() => fetchLocations(true), 3000); // Poll silently
+            const interval = setInterval(() => fetchLocations(true), 30000); // Poll silently every 30 seconds
             return () => clearInterval(interval);
         }
     }, [isOpen]);

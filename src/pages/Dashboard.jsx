@@ -98,7 +98,7 @@ const Dashboard = () => {
         };
 
         fetchStats();
-        const interval = setInterval(fetchStats, 60000);
+        const interval = setInterval(fetchStats, 180000); // Polling reduced to every 3 mins to save egress
         return () => clearInterval(interval);
     }, [currentStore, selectedDate]);
 

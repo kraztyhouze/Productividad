@@ -1610,6 +1610,60 @@ app.get('/api/market/search', (req, res) => {
     res.json(results);
 });
 
+// --- AUTO-CLOSE SHIFTS CRON ---
+setInterval(async () => {
+    try {
+        const now = new Date();
+        const nowEsp = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Madrid' }));
+        const h = nowEsp.getHours().toString().padStart(2, '0');
+        const m = nowEsp.getMinutes().toString().padStart(2, '0');
+        const currentHHMM = `${h}:${m}`;
+
+        const settingsRes = await pool.query('SELECT store_id, midday_close, night_close FROM store_settings');
+
+        for (let setting of settingsRes.rows) {
+            // Check if current time matches either midday_close or night_close
+            if ((setting.midday_close && setting.midday_close === currentHHMM) ||
+                (setting.night_close && setting.night_close === currentHHMM)) {
+
+                const activeRes = await pool.query('SELECT * FROM active_sessions WHERE store_id = $1', [setting.store_id]);
+                if (activeRes.rows.length === 0) continue; // Already closed or no sessions
+
+                console.log(`[Auto-Close] Store ${setting.store_id} reached closing time: ${currentHHMM}. Closing ${activeRes.rows.length} sessions.`);
+
+                for (let session of activeRes.rows) {
+                    const start = new Date(session.start_time);
+                    const end = now;
+                    let durationSeconds = Math.max(0, (end - start) / 1000);
+                    if (isNaN(durationSeconds)) durationSeconds = 0;
+
+                    const dateStr = start.toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
+                    // Provide a semi-unique ID as frontend used Date.now()
+                    const recordId = Date.now() + Math.floor(Math.random() * 10000);
+
+                    // 1. Create Daily Record
+                    await pool.query(
+                        'INSERT INTO daily_records (id, employee_id, employee_name, start_time, end_time, duration_seconds, date, groups_count, store_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+                        [recordId, session.employee_id, session.employee_name, session.start_time, end.toISOString(), durationSeconds, dateStr, 0, setting.store_id]
+                    );
+
+                    // 2. Clear Active Session
+                    await pool.query('DELETE FROM active_sessions WHERE employee_id = $1 AND store_id = $2', [session.employee_id, setting.store_id]);
+
+                    // 3. Clear Active Client Shopping
+                    if (session.client_start_time) {
+                        await pool.query('INSERT INTO transaction_logs (store_id, employee_id, start_time, end_time, type, details) VALUES ($1, $2, $3, $4, $5, $6)',
+                            [setting.store_id, session.employee_id, session.client_start_time, end.toISOString(), 'shopping', JSON.stringify({ action: 'shift_end_auto_stop_backend' })]
+                        );
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        console.error("[Auto-Close Error]", err);
+    }
+}, 60000); // Check every 60 seconds
+
 // Serve static files from the React app
 app.use(express.static(path.join(__dirname, '../dist')));
 

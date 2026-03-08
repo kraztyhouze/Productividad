@@ -1610,6 +1610,58 @@ app.get('/api/market/search', (req, res) => {
     res.json(results);
 });
 
+// --- 7. Diagnostics API ---
+const diagnosticSessions = {}; // In-memory store for remote test sessions
+
+app.post('/api/diagnostics/init', (req, res) => {
+    const { type } = req.body;
+    const sessionId = Date.now().toString(36).substr(-4) + Math.random().toString(36).substring(2, 6);
+    const url = type === 'mobile' ? `/mobile-test/${sessionId}` : `/laptop-test/${sessionId}`;
+    diagnosticSessions[sessionId] = { status: 'waiting', results: [], deviceInfo: null };
+    res.json({ sessionId, url });
+});
+
+app.get('/api/diagnostics/session/:sessionId', (req, res) => {
+    const { sessionId } = req.params;
+    const session = diagnosticSessions[sessionId];
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    res.json(session);
+});
+
+app.post('/api/diagnostics/update/:sessionId', (req, res) => {
+    const { sessionId } = req.params;
+    if (!diagnosticSessions[sessionId]) {
+        diagnosticSessions[sessionId] = { status: 'running', results: [], deviceInfo: null };
+    }
+    const session = diagnosticSessions[sessionId];
+    const { status, results, deviceInfo } = req.body;
+
+    if (status) session.status = status;
+    if (results) session.results = results;
+    if (deviceInfo) session.deviceInfo = deviceInfo;
+
+    res.json({ success: true });
+});
+
+app.post('/api/diagnostics/remote/:sessionId', (req, res) => {
+    const { sessionId } = req.params;
+    if (!diagnosticSessions[sessionId]) {
+        diagnosticSessions[sessionId] = { status: 'running', results: [], deviceInfo: null };
+    }
+    const session = diagnosticSessions[sessionId];
+    const { test, status, details } = req.body;
+
+    const existingIndex = session.results.findIndex(r => r.name === test);
+    const passed = status === 'PASS';
+    if (existingIndex !== -1) {
+        session.results[existingIndex] = { name: test, passed, details };
+    } else {
+        session.results.push({ name: test, passed, details });
+    }
+
+    res.json({ success: true });
+});
+
 // --- AUTO-CLOSE SHIFTS CRON ---
 setInterval(async () => {
     try {

@@ -1,6 +1,8 @@
 #!/bin/bash
 
-echo "🚀 PREPARANDO DEPLOYMENT A PRODUCCIÓN"
+# 🚀 SCRIPT DE DEPLOYMENT TOTAL PARA RENDER
+
+echo "🚀 PREPARANDO DEPLOYMENT A RENDER"
 echo "======================================"
 echo ""
 
@@ -19,51 +21,42 @@ echo "2️⃣ Verificando archivos a subir..."
 git status --short
 
 echo ""
-echo "3️⃣ Archivos que NO se subirán (protegidos):"
-echo "   - .env (credenciales)"
-echo "   - backup-railway/ (datos locales)"
-echo "   - .env.railway.backup (backup)"
-echo ""
-
-read -p "¿Continuar con el commit? (s/n): " -n 1 -r
-echo ""
-
-if [[ ! $REPLY =~ ^[Ss]$ ]]; then
-    echo "❌ Deployment cancelado"
-    exit 1
+read -p "✍️  Introduce un mensaje para este parche (o deja vacío para 'Actualización'): " commitMessage
+if [ -z "$commitMessage" ]; then
+    commitMessage="Actualización"
 fi
 
 echo ""
-echo "4️⃣ Añadiendo cambios..."
+echo "3️⃣ Añadiendo cambios..."
 git add .
+git commit -m "$commitMessage"
 
 echo ""
-echo "5️⃣ Creando commit..."
-git commit -m "Migración a Supabase
+echo "4️⃣ Sincronizando ramas y subiendo a la nube..."
 
-- Actualizar configuración de base de datos
-- Cambiar de Railway a Supabase (Transaction Pooler IPv4)
-- Scripts de migración y diagnóstico añadidos
-- Documentación de migración actualizada"
+# Push a master
+echo "-> Guardando tu código en 'master'..."
+git push origin master
 
-echo ""
-echo "6️⃣ Haciendo push..."
-git push origin main || git push origin master
+# Sincronizar render
+echo "-> Enviando el código a la web (rama 'render')..."
+git checkout render
+git merge master
+git push origin render
+
+# Sincronizar main
+echo "-> Guardando copia de seguridad (rama 'main')..."
+git checkout main
+git merge master
+git push origin main
+
+# Volver a master
+echo "-> Devolviéndote a tu rama de trabajo..."
+git checkout master
 
 echo ""
 echo "======================================"
-echo "✅ DEPLOYMENT COMPLETADO"
+echo "✅ DEPLOYMENT A RENDER COMPLETADO"
 echo "======================================"
+echo "✅ Render y tu entorno de trabajo (master) ahora están 100% sincronizados."
 echo ""
-echo "⚠️  IMPORTANTE: Actualiza las variables de entorno en Railway:"
-echo ""
-echo "1. Ve a: https://railway.app"
-echo "2. Abre tu proyecto TikTak"
-echo "3. Ve a Variables"
-echo "4. Actualiza DATABASE_URL con:"
-echo ""
-echo "   postgresql://postgres.qbvrrjafxwidnjsdzqjs:0qSKEQY2beYeNYdL@aws-1-eu-west-1.pooler.supabase.com:6543/postgres"
-echo ""
-echo "5. Guarda y espera el redeploy automático"
-echo ""
-echo "======================================"

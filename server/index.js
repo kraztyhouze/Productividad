@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import puppeteer from 'puppeteer';
 import bcrypt from 'bcryptjs'; // Security
+import rateLimit from 'express-rate-limit'; // Rate limiting
 import { initDb, pool } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -17,7 +18,24 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+// Security: Constrain CORS to allowed origins
+const allowedOrigins = [
+    'http://localhost:5173',
+    'https://tiktak-manager.vercel.app',
+    'https://tiktak-manager.onrender.com'
+];
+app.use(cors({
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) === -1) {
+            var msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+            return callback(new Error(msg), false);
+        }
+        return callback(null, true);
+    }
+}));
+
 app.use(express.json());
 
 // --- GAMIFICATION CONSTANTS (used across multiple endpoints) ---
@@ -226,8 +244,17 @@ app.delete('/api/market-prices/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Rate Limiting for Login
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 20, // Limit each IP to 20 requests per `window` (here, per 15 minutes)
+    message: { success: false, message: 'Demasiados intentos de inicio de sesión, por favor inténtalo más tarde.' },
+    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+});
+
 // 0. Auth (Login) - Secure Server-Side Check
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', loginLimiter, async (req, res) => {
     const { username, password } = req.body;
     const storeId = req.headers['x-store-id'] || 'store_1';
 

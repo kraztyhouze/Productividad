@@ -11,37 +11,57 @@ function logError(err, route) {
 }
 
 // Helper to calculate next task date
-function getNextOccurrence(currentDateStr, periodicity, recurring_days, recurring_month_day) {
+function getNextOccurrence(currentDateStr, task) {
     try {
+        const { 
+            periodicity, 
+            recurring_days, 
+            recurring_month_day, 
+            recurring_interval = 1, 
+            recurring_type = 'simple',
+            recurring_end_date 
+        } = task;
+
         let next = new Date(currentDateStr);
         if (isNaN(next.getTime())) next = new Date();
         
+        const interval = Number(recurring_interval) || 1;
+
         if (periodicity === 'Diario') {
-            next.setDate(next.getDate() + 1);
+            next.setDate(next.getDate() + interval);
         } else if (periodicity === 'Semanal') {
             const dayMap = { 'D': 0, 'L': 1, 'M': 2, 'X': 3, 'J': 4, 'V': 5, 'S': 6 };
             const selectedDays = (Array.isArray(recurring_days) ? recurring_days : []).map(d => dayMap[d]).filter(d => d !== undefined).sort((a,b) => a - b);
             
             if (selectedDays.length === 0) {
-                next.setDate(next.getDate() + 7);
+                next.setDate(next.getDate() + (7 * interval));
             } else {
                 let currentDay = next.getDay();
                 let nextDay = selectedDays.find(d => d > currentDay);
                 if (nextDay === undefined) {
                     nextDay = selectedDays[0];
-                    next.setDate(next.getDate() + (7 - currentDay + nextDay));
+                    next.setDate(next.getDate() + (7 * interval - currentDay + nextDay));
                 } else {
                     next.setDate(next.getDate() + (nextDay - currentDay));
                 }
             }
         } else if (periodicity === 'Mensual') {
-            const day = Number(recurring_month_day) || 1;
-            next.setMonth(next.getMonth() + 1);
-            next.setDate(day);
+            next.setMonth(next.getMonth() + interval);
+            if (recurring_type === 'on_day' && recurring_month_day) {
+                next.setDate(Number(recurring_month_day));
+            }
+        } else if (periodicity === 'Anual') {
+            next.setFullYear(next.getFullYear() + interval);
+        } else {
+            return null;
         }
-        return next.toISOString().split('T')[0];
+
+        const nextDateStr = next.toISOString().split('T')[0];
+        if (recurring_end_date && nextDateStr > recurring_end_date) return null;
+        
+        return nextDateStr;
     } catch (e) {
-        return currentDateStr;
+        return null;
     }
 }
 
@@ -59,19 +79,23 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
     const { 
         title, date, priority, status, assigned_to, description, 
-        recurring, periodicity, recurring_days, recurring_month_day 
+        recurring, periodicity, recurring_days, recurring_month_day,
+        recurring_interval, recurring_end_date, recurring_type
     } = req.body;
     const storeId = req.headers['x-store-id'] || 'store_1';
     try {
         const result = await pool.query(
             `INSERT INTO tasks (
                 title, date, priority, status, assigned_to, description, 
-                recurring, periodicity, recurring_days, recurring_month_day, store_id
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+                recurring, periodicity, recurring_days, recurring_month_day, 
+                recurring_interval, recurring_end_date, recurring_type, store_id
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
             [
                 title, date || new Date().toISOString().split('T')[0], priority || 'Media', status || 'Pendiente', assigned_to || '', description || '', 
                 !!recurring, periodicity || 'Manual', 
-                JSON.stringify(recurring_days || []), recurring_month_day || null, storeId
+                JSON.stringify(recurring_days || []), recurring_month_day || null,
+                recurring_interval || 1, recurring_end_date || null, recurring_type || 'simple',
+                storeId
             ]
         );
         res.json(result.rows[0]);
@@ -85,7 +109,8 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const { 
         title, date, priority, status, assigned_to, description, 
-        recurring, periodicity, recurring_days, recurring_month_day 
+        recurring, periodicity, recurring_days, recurring_month_day,
+        recurring_interval, recurring_end_date, recurring_type
     } = req.body;
     const storeId = req.headers['x-store-id'] || 'store_1';
     
@@ -96,27 +121,31 @@ router.put('/:id', async (req, res) => {
         const result = await pool.query(
             `UPDATE tasks SET 
                 title=$1, date=$2, priority=$3, status=$4, assigned_to=$5, description=$6, 
-                recurring=$7, periodicity=$8, recurring_days=$9, recurring_month_day=$10 
-            WHERE id=$11 RETURNING *`,
+                recurring=$7, periodicity=$8, recurring_days=$9, recurring_month_day=$10,
+                recurring_interval=$11, recurring_end_date=$12, recurring_type=$13
+            WHERE id=$14 RETURNING *`,
             [
                 title, date, priority, status, assigned_to || '', description || '', 
                 !!recurring, periodicity, JSON.stringify(recurring_days || []), 
-                recurring_month_day, id
+                recurring_month_day, recurring_interval || 1, recurring_end_date || null, 
+                recurring_type || 'simple', id
             ]
         );
 
         if (status === 'Hecha' && currentTask?.status !== 'Hecha' && recurring) {
-            const nextDateStr = getNextOccurrence(date, periodicity, recurring_days, recurring_month_day);
-            if (periodicity !== 'Manual') {
+            const nextDateStr = getNextOccurrence(date, req.body);
+            if (nextDateStr) {
                 await pool.query(
                     `INSERT INTO tasks (
                         title, date, priority, status, assigned_to, description, 
-                        recurring, periodicity, recurring_days, recurring_month_day, store_id
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+                        recurring, periodicity, recurring_days, recurring_month_day, 
+                        recurring_interval, recurring_end_date, recurring_type, store_id
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
                     [
                         title, nextDateStr, priority, 'Pendiente', assigned_to || '', description || '', 
                         true, periodicity, JSON.stringify(recurring_days || []), 
-                        recurring_month_day, storeId
+                        recurring_month_day, recurring_interval || 1, recurring_end_date || null, 
+                        recurring_type || 'simple', storeId
                     ]
                 );
             }

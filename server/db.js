@@ -136,6 +136,9 @@ export const initDb = async () => {
         const alters = [
             "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recurring_days JSONB DEFAULT '[]';",
             "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recurring_month_day INTEGER;",
+            "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recurring_interval INTEGER DEFAULT 1;",
+            "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recurring_end_date TEXT;",
+            "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recurring_type TEXT DEFAULT 'simple';",
             "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS periodicity TEXT DEFAULT 'Manual';",
             "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;",
             "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assigned_to TEXT;",

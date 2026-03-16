@@ -162,6 +162,18 @@ const Gerencia = () => {
         { id: 'cash', label: 'Fondos', icon: Calculator }
     ];
 
+    const handleDeleteTask = async (id) => {
+        if (!confirm('¿Seguro que quieres eliminar esta tarea?')) return;
+        const res = await fetch(`/api/tasks/${id}`, { 
+            method: 'DELETE', 
+            headers: { 'x-store-id': currentStore } 
+        });
+        if (res.ok) { 
+            setModal({ type: null, data: null }); 
+            loadData(); 
+        }
+    };
+
     return (
         <div className="p-6 md:p-10 space-y-10 max-w-[1600px] mx-auto animate-in fade-in duration-500">
             <div className="bg-white/80 backdrop-blur-md p-2 rounded-[40px] shadow-sm border border-[#E2E8F0] flex gap-2 w-fit sticky top-4 z-40 mx-auto md:mx-0">
@@ -180,7 +192,12 @@ const Gerencia = () => {
             </div>
 
             <GlobalModal isOpen={modal.type === 'task'} onClose={() => setModal({ type: null, data: null })} title={modal.data ? 'Editar Tarea' : 'Nueva Tarea'}>
-                <TaskForm initialData={modal.data} onSave={handleSaveTask} onCancel={() => setModal({ type: null, data: null })} />
+                <TaskForm 
+                    initialData={modal.data} 
+                    onSave={handleSaveTask} 
+                    onCancel={() => setModal({ type: null, data: null })} 
+                    onDelete={handleDeleteTask}
+                />
             </GlobalModal>
 
             <GlobalModal isOpen={modal.type === 'partner'} onClose={() => setModal({ type: null, data: null })} title="Nuevo Joyero">
@@ -274,33 +291,235 @@ const GerenciaDashboard = ({ tasks, partners, movements, cashHistory }) => {
 const TasksView = ({ tasks, onEdit, onAdd, loadData, currentStore }) => {
     const safeTasks = Array.isArray(tasks) ? tasks : [];
     const [month, setMonth] = useState(new Date());
+    const [selectedTask, setSelectedTask] = useState(null);
+    const [view, setView] = useState('calendar'); // 'calendar' or 'list'
+
     const startDate = startOfWeek(startOfMonth(month), { weekStartsOn: 1 });
     const endDate = endOfWeek(endOfMonth(month), { weekStartsOn: 1 });
     const days = eachDayOfInterval({ start: startDate, end: endDate });
 
+    const toggleStatus = async (task) => {
+        const newStatus = task.status === 'Hecha' ? 'Pendiente' : 'Hecha';
+        await fetch(`/api/tasks/${task.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore },
+            body: JSON.stringify({ ...task, status: newStatus })
+        });
+        loadData();
+        if (selectedTask?.id === task.id) {
+            setSelectedTask({ ...task, status: newStatus });
+        }
+    };
+
     const deleteTask = async (id) => {
-        if (!confirm('¿Eliminar?')) return;
+        if (!confirm('¿Seguro que quieres eliminar esta tarea?')) return;
         await fetch(`/api/tasks/${id}`, { method: 'DELETE', headers: { 'x-store-id': currentStore } });
+        setSelectedTask(null);
         loadData();
     };
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="flex justify-between items-center"><h2 className="text-2xl font-black text-[#1A365D] tracking-tighter">Agenda & Planificación</h2><button onClick={onAdd} className="bg-[#FF8C9D] text-white px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-xl shadow-coral-100"><Plus size={18} className="inline mr-2"/> Nueva Tarea</button></div>
-            <div className="bg-white rounded-[40px] border border-[#E2E8F0] shadow-sm overflow-hidden text-sm">
-                <div className="p-6 flex justify-between items-center border-b"><h3 className="text-lg font-black text-[#1A365D] uppercase">{format(month, 'MMMM yyyy', { locale: es })}</h3><div className="flex gap-2"><button onClick={() => setMonth(subMonths(month, 1))} className="p-2 hover:bg-slate-50 rounded-xl text-slate-400"><ChevronLeft/></button><button onClick={() => setMonth(addMonths(month, 1))} className="p-2 hover:bg-slate-50 rounded-xl text-slate-400"><ChevronRight/></button></div></div>
-                <div className="grid grid-cols-7 bg-[#F4F7FA] border-b">{['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(d => <div key={d} className="p-4 text-center text-[10px] font-black text-[#A0AEC0] uppercase tracking-widest">{d}</div>)}</div>
-                <div className="grid grid-cols-7">
-                    {days.map((day, i) => {
-                        const dayTasks = safeTasks.filter(t => isSameDay(parseISO(t.date), day));
-                        return (
-                            <div key={i} className={`min-h-[120px] p-3 border-r border-b hover:bg-slate-50 transition-colors ${!isSameMonth(day, month) ? 'opacity-20 bg-slate-50' : ''}`}>
-                                <div className={`text-xs font-black mb-2 ${isSameDay(day, new Date()) ? 'text-[#FF8C9D] w-6 h-6 bg-coral-50 rounded-md flex items-center justify-center' : 'text-slate-400'}`}>{format(day, 'd')}</div>
-                                <div className="space-y-1">{dayTasks.map(t => <div key={t.id} onClick={() => onEdit(t)} className={`text-[9px] px-2 py-1 rounded-lg font-bold truncate cursor-pointer uppercase ${t.status === 'Hecha' ? 'bg-green-100 text-green-700' : 'bg-coral-50 text-[#FF8C9D]'}`}>{t.title}</div>)}</div>
-                            </div>
-                        );
-                    })}
+        <div className="flex flex-col lg:flex-row gap-8 animate-in fade-in duration-500">
+            {/* Main Content: Calendar/List */}
+            <div className="flex-1 space-y-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <h2 className="text-3xl font-black text-[#1A365D] tracking-tighter uppercase tabular-nums">
+                            Agenda <span className="text-[#FF8C9D]">TikTak</span>
+                        </h2>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Planificación y seguimiento de tareas</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <div className="bg-white p-1 rounded-2xl border border-slate-100 flex gap-1 shadow-sm">
+                            <button 
+                                onClick={() => setView('calendar')}
+                                className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${view === 'calendar' ? 'bg-[#1A365D] text-white' : 'text-slate-400 hover:bg-slate-50'}`}
+                            >
+                                Calendario
+                            </button>
+                            <button 
+                                onClick={() => setView('list')}
+                                className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${view === 'list' ? 'bg-[#1A365D] text-white' : 'text-slate-400 hover:bg-slate-50'}`}
+                            >
+                                Lista
+                            </button>
+                        </div>
+                        <button 
+                            onClick={onAdd} 
+                            className="bg-[#FF8C9D] text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-coral-100 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2"
+                        >
+                            <Plus size={16} /> Nueva Tarea
+                        </button>
+                    </div>
                 </div>
+
+                {view === 'calendar' ? (
+                    <div className="bg-white rounded-[40px] border border-[#E2E8F0] shadow-sm overflow-hidden text-sm">
+                        <div className="p-8 flex justify-between items-center bg-white border-b border-[#F4F7FA]">
+                            <div className="flex items-center gap-4">
+                                <h3 className="text-xl font-black text-[#1A365D] uppercase tracking-tighter">
+                                    {format(month, 'MMMM yyyy', { locale: es })}
+                                </h3>
+                                <button 
+                                    onClick={() => setMonth(new Date())}
+                                    className="text-[9px] font-black text-[#FF8C9D] uppercase tracking-widest px-3 py-1 bg-coral-50 rounded-lg hover:bg-coral-100 transition-colors"
+                                >
+                                    Hoy
+                                </button>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={() => setMonth(subMonths(month, 1))} className="w-10 h-10 flex items-center justify-center hover:bg-slate-50 rounded-2xl text-slate-400 border border-slate-100 transition-all"><ChevronLeft size={20}/></button>
+                                <button onClick={() => setMonth(addMonths(month, 1))} className="w-10 h-10 flex items-center justify-center hover:bg-slate-50 rounded-2xl text-slate-400 border border-slate-100 transition-all"><ChevronRight size={20}/></button>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-7 bg-[#F8F9FB] border-b border-[#E2E8F0]">
+                            {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(d => (
+                                <div key={d} className="p-4 text-center text-[9px] font-black text-[#A0AEC0] uppercase tracking-widest">{d}</div>
+                            ))}
+                        </div>
+                        <div className="grid grid-cols-7 bg-slate-50/20">
+                            {days.map((day, i) => {
+                                const dayTasks = safeTasks.filter(t => isSameDay(parseISO(t.date), day));
+                                const isCurrentMonth = isSameMonth(day, month);
+                                const isTodayDay = isToday(day);
+
+                                return (
+                                    <div 
+                                        key={i} 
+                                        className={`min-h-[140px] p-3 border-r border-b border-[#E2E8F0] transition-all relative ${!isCurrentMonth ? 'opacity-10' : 'hover:bg-white'} ${isTodayDay ? 'bg-[#FF8C9D]/5' : ''}`}
+                                    >
+                                        <div className={`text-[10px] font-black mb-3 flex items-center justify-center w-7 h-7 rounded-lg transition-all ${isTodayDay ? 'bg-[#FF8C9D] text-white shadow-lg shadow-coral-100' : 'text-slate-300'}`}>
+                                            {format(day, 'd')}
+                                        </div>
+                                        <div className="space-y-1.5 overflow-y-auto max-h-[90px] custom-scrollbar pr-1">
+                                            {dayTasks.map(t => (
+                                                <button 
+                                                    key={t.id} 
+                                                    onClick={() => setSelectedTask(t)} 
+                                                    className={`w-full text-left text-[8px] px-2.5 py-1.5 rounded-xl font-black truncate uppercase transition-all active:scale-95 flex items-center gap-1.5 ${
+                                                        t.status === 'Hecha' 
+                                                        ? 'bg-green-50 text-green-500 border border-green-100' 
+                                                        : t.priority === 'Alta'
+                                                        ? 'bg-red-50 text-red-500 border border-red-100'
+                                                        : 'bg-blue-50 text-[#1A365D] border border-blue-100 shadow-sm'
+                                                    }`}
+                                                >
+                                                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${t.status === 'Hecha' ? 'bg-green-500' : t.priority === 'Alta' ? 'bg-red-500' : 'bg-[#1A365D]'}`} />
+                                                    {t.title}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        {safeTasks.length === 0 ? (
+                            <div className="bg-white p-20 rounded-[40px] border border-dashed border-slate-200 text-center">
+                                <p className="text-slate-400 font-bold text-sm">No hay tareas programadas.</p>
+                            </div>
+                        ) : (
+                            safeTasks.sort((a, b) => a.date.localeCompare(b.date)).map(t => (
+                                <div 
+                                    key={t.id} 
+                                    onClick={() => setSelectedTask(t)}
+                                    className="bg-white p-6 rounded-[32px] border border-[#E2E8F0] shadow-sm hover:shadow-md transition-all cursor-pointer flex items-center gap-6 group"
+                                >
+                                    <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center shrink-0 ${isToday(parseISO(t.date)) ? 'bg-[#FF8C9D] text-white shadow-xl shadow-coral-100' : 'bg-[#F4F7FA] text-slate-400'}`}>
+                                        <span className="text-xs font-black uppercase leading-none">{format(parseISO(t.date), 'MMM', { locale: es })}</span>
+                                        <span className="text-xl font-black leading-tight">{format(parseISO(t.date), 'd')}</span>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className={`text-[8px] font-black px-2 py-0.5 rounded-md uppercase ${t.priority === 'Alta' ? 'bg-red-100 text-red-500' : 'bg-blue-100 text-[#1A365D]'}`}>{t.priority}</span>
+                                            {t.recurring && <span className="text-[8px] font-black px-2 py-0.5 rounded-md bg-coral-50 text-[#FF8C9D] flex items-center gap-1 uppercase"><Clock size={8}/> Periódica</span>}
+                                        </div>
+                                        <h4 className="text-sm font-black text-[#1A365D] uppercase truncate">{t.title}</h4>
+                                        <p className="text-[10px] text-slate-400 font-bold truncate mt-1">{t.description || 'Sin descripción'}</p>
+                                    </div>
+                                    <div className="shrink-0 flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); toggleStatus(t); }}
+                                            className={`p-3 rounded-2xl transition-all ${t.status === 'Hecha' ? 'bg-green-100 text-green-600' : 'bg-slate-50 text-slate-300 hover:bg-green-50 hover:text-green-500'}`}
+                                        >
+                                            <CheckCircle2 size={20} />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* Side Panel: Task Details */}
+            <div className={`w-full lg:w-96 shrink-0 transition-all ${selectedTask ? 'translate-x-0 opacity-100' : 'translate-x-10 opacity-0 pointer-events-none hidden lg:block'}`}>
+                {selectedTask ? (
+                    <div className="bg-[#1A365D] text-white p-8 rounded-[40px] shadow-2xl space-y-8 sticky top-32 border border-blue-800">
+                        <div className="flex justify-between items-start">
+                             <div className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest ${selectedTask.status === 'Hecha' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-coral-500/20 text-[#FF8C9D] border border-coral-500/30'}`}>
+                                {selectedTask.status}
+                             </div>
+                             <button onClick={() => setSelectedTask(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/50"><X size={20}/></button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <h3 className="text-2xl font-black tracking-tight leading-tight uppercase">{selectedTask.title}</h3>
+                            <div className="flex flex-wrap gap-3">
+                                <div className="flex items-center gap-2 text-[10px] font-bold text-blue-200 bg-white/5 px-3 py-2 rounded-xl">
+                                    <CalendarIcon size={14} className="text-[#FF8C9D]" /> {format(parseISO(selectedTask.date), "EEEE, d 'de' MMMM", { locale: es })}
+                                </div>
+                                {selectedTask.recurring && (
+                                    <div className="flex items-center gap-2 text-[10px] font-bold text-blue-200 bg-white/5 px-3 py-2 rounded-xl">
+                                        <Clock size={14} className="text-[#FF8C9D]" /> {selectedTask.periodicity} (Cada {selectedTask.recurring_interval})
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="space-y-4 border-t border-white/10 pt-8">
+                            <label className="text-[10px] font-black text-blue-300 uppercase tracking-widest block">Instrucciones</label>
+                            <div className="bg-white/5 p-6 rounded-[32px] min-h-[150px] text-xs font-bold leading-relaxed text-blue-100 whitespace-pre-wrap">
+                                {selectedTask.description || <span className="italic opacity-30 tracking-normal">Sin instrucciones detalladas...</span>}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 pt-6">
+                            <button 
+                                onClick={() => toggleStatus(selectedTask)}
+                                className={`flex-1 py-4 rounded-2xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2 ${
+                                    selectedTask.status === 'Hecha' 
+                                    ? 'bg-blue-800 text-blue-300' 
+                                    : 'bg-[#FF8C9D] text-white shadow-lg shadow-coral-500/20'
+                                }`}
+                            >
+                                <Check size={16} /> {selectedTask.status === 'Hecha' ? 'COMPLETADA' : 'MARCAR HECHA'}
+                            </button>
+                            <button 
+                                onClick={() => onEdit(selectedTask)}
+                                className="flex-1 py-4 bg-white/10 hover:bg-white/20 text-white rounded-2xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2"
+                            >
+                                <Edit3 size={16} /> EDITAR
+                            </button>
+                            <button 
+                                onClick={() => deleteTask(selectedTask.id)}
+                                className="col-span-2 py-4 text-red-400 font-black text-[10px] uppercase hover:text-red-300 transition-colors"
+                            >
+                                ELIMINAR TAREA
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="h-full bg-slate-50 rounded-[40px] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center p-12 text-center">
+                        <div className="w-16 h-16 bg-white rounded-3xl shadow-sm flex items-center justify-center mb-6 text-slate-300">
+                            <CalendarIcon size={32} />
+                        </div>
+                        <h4 className="text-sm font-black text-[#1A365D] uppercase tracking-tighter">Detalles de Tarea</h4>
+                        <p className="text-[10px] text-slate-400 font-bold mt-2">Selecciona una tarea del calendario para ver sus instrucciones y gestionarla.</p>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -377,19 +596,219 @@ const CashView = ({ history, onSave, user }) => {
 
 // --- FORMS ---
 
-const TaskForm = ({ initialData, onSave, onCancel }) => {
-    const [data, setData] = useState(initialData || { title: '', date: format(new Date(), 'yyyy-MM-dd'), priority: 'Media', periodicity: 'Diario', recurring: true, assigned_to: '', description: '' });
+const TaskForm = ({ initialData, onSave, onCancel, onDelete }) => {
+    const [data, setData] = useState(initialData || { 
+        title: '', 
+        date: format(new Date(), 'yyyy-MM-dd'), 
+        priority: 'Media', 
+        periodicity: 'Manual', 
+        recurring: false, 
+        assigned_to: '', 
+        description: '',
+        recurring_interval: 1,
+        recurring_type: 'simple',
+        recurring_days: [],
+        recurring_end_date: ''
+    });
+
+    const isEdit = !!initialData?.id;
+
+    const days = [
+        { key: 'L', label: 'L' },
+        { key: 'M', label: 'M' },
+        { key: 'X', label: 'X' },
+        { key: 'J', label: 'J' },
+        { key: 'V', label: 'V' },
+        { key: 'S', label: 'S' },
+        { key: 'D', label: 'D' }
+    ];
+
+    const toggleDay = (day) => {
+        const current = Array.isArray(data.recurring_days) ? data.recurring_days : [];
+        if (current.includes(day)) {
+            setData({ ...data, recurring_days: current.filter(d => d !== day) });
+        } else {
+            setData({ ...data, recurring_days: [...current, day] });
+        }
+    };
+
     return (
-        <form onSubmit={(e) => { e.preventDefault(); onSave(data); }} className="space-y-6">
-            <div className="grid grid-cols-1 gap-6">
-                <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Descripción Tarea</label><input type="text" required className="w-full bg-[#F4F7FA] border-none rounded-2xl p-4 font-bold" value={data.title} onChange={e => setData({...data, title: e.target.value})}/></div>
-                <div className="grid grid-cols-2 gap-4">
-                    <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Fecha</label><input type="date" required className="w-full bg-[#F4F7FA] border-none rounded-2xl p-4 font-bold" value={data.date} onChange={e => setData({...data, date: e.target.value})}/></div>
-                    <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Prioridad</label><select className="w-full bg-[#F4F7FA] border-none rounded-2xl p-4 font-bold" value={data.priority} onChange={e => setData({...data, priority: e.target.value})}><option>Baja</option><option>Media</option><option>Alta</option></select></div>
+        <form onSubmit={(e) => { e.preventDefault(); onSave(data); }} className="space-y-8">
+            <div className="space-y-6">
+                {/* Basic Info */}
+                <div className="grid grid-cols-1 gap-6">
+                    <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-2 tracking-widest">Título de la Tarea</label>
+                        <input 
+                            type="text" 
+                            required 
+                            placeholder="Ej: Revisar inventario de vitrinas"
+                            className="w-full bg-[#F4F7FA] border-2 border-transparent focus:border-[#FF8C9D] focus:bg-white transition-all rounded-2xl p-4 font-bold text-[#1A365D]" 
+                            value={data.title} 
+                            onChange={e => setData({...data, title: e.target.value})}
+                        />
+                    </div>
+                    
+                    <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-2 tracking-widest">Instrucciones Detalladas</label>
+                        <textarea 
+                            rows={4}
+                            placeholder="Describe paso a paso lo que debe hacerse..."
+                            className="w-full bg-[#F4F7FA] border-2 border-transparent focus:border-[#FF8C9D] focus:bg-white transition-all rounded-2xl p-4 font-bold text-[#1A365D] resize-none" 
+                            value={data.description} 
+                            onChange={e => setData({...data, description: e.target.value})}
+                        />
+                    </div>
                 </div>
-                <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Frecuencia</label><select className="w-full bg-[#F4F7FA] border-none rounded-2xl p-4 font-bold" value={data.periodicity} onChange={e => setData({...data, periodicity: e.target.value})}><option>Manual</option><option>Diario</option><option>Semanal</option><option>Mensual</option></select></div>
+
+                <div className="grid grid-cols-2 gap-6">
+                    <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-2 tracking-widest">Fecha de Inicio</label>
+                        <div className="relative">
+                            <CalendarIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <input 
+                                type="date" 
+                                required 
+                                className="w-full bg-[#F4F7FA] border-none rounded-2xl p-4 pl-12 font-bold text-[#1A365D]" 
+                                value={data.date} 
+                                onChange={e => setData({...data, date: e.target.value})}
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-2 tracking-widest">Prioridad</label>
+                        <select 
+                            className="w-full bg-[#F4F7FA] border-none rounded-2xl p-4 font-bold text-[#1A365D] appearance-none cursor-pointer" 
+                            value={data.priority} 
+                            onChange={e => setData({...data, priority: e.target.value})}
+                        >
+                            <option value="Baja">Baja</option>
+                            <option value="Media">Media (Normal)</option>
+                            <option value="Alta">Alta (Urgente)</option>
+                        </select>
+                    </div>
+                </div>
+
+                {/* Recurrence Section */}
+                <div className="bg-[#F8F9FB] p-6 rounded-[32px] border border-slate-100 space-y-6">
+                    <div className="flex items-center justify-between">
+                        <h4 className="text-[11px] font-black text-[#1A365D] uppercase tracking-widest flex items-center gap-2">
+                             Periodicidad <Clock size={14} className="text-[#FF8C9D]" />
+                        </h4>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input 
+                                type="checkbox" 
+                                className="w-5 h-5 rounded-lg border-slate-300 text-[#FF8C9D] focus:ring-[#FF8C9D]/20"
+                                checked={data.recurring} 
+                                onChange={e => setData({ ...data, recurring: e.target.checked, periodicity: e.target.checked ? 'Diario' : 'Manual' })} 
+                            />
+                            <span className="text-[10px] font-black text-[#A0AEC0] uppercase">Tarea Periódica</span>
+                        </label>
+                    </div>
+
+                    {data.recurring && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Repetir cada...</label>
+                                    <select 
+                                        className="w-full bg-white border-none rounded-xl p-3 font-bold text-[#1A365D]" 
+                                        value={data.periodicity} 
+                                        onChange={e => setData({...data, periodicity: e.target.value})}
+                                    >
+                                        <option value="Diario">Días</option>
+                                        <option value="Semanal">Semanas</option>
+                                        <option value="Mensual">Meses</option>
+                                        <option value="Anual">Años</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Intervalo</label>
+                                    <input 
+                                        type="number" 
+                                        min="1"
+                                        className="w-full bg-white border-none rounded-xl p-3 font-bold text-[#1A365D]" 
+                                        value={data.recurring_interval} 
+                                        onChange={e => setData({...data, recurring_interval: e.target.value})}
+                                    />
+                                </div>
+                            </div>
+
+                            {data.periodicity === 'Semanal' && (
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase block mb-3 text-center">Días de la semana</label>
+                                    <div className="flex justify-between gap-1">
+                                        {days.map(d => {
+                                            const active = Array.isArray(data.recurring_days) && data.recurring_days.includes(d.key);
+                                            return (
+                                                <button 
+                                                    key={d.key}
+                                                    type="button"
+                                                    onClick={() => toggleDay(d.key)}
+                                                    className={`w-10 h-10 rounded-xl font-black text-xs transition-all ${active ? 'bg-[#FF8C9D] text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-100'}`}
+                                                >
+                                                    {d.label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {data.periodicity === 'Mensual' && (
+                                <div className="space-y-4">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Día del mes</label>
+                                    <input 
+                                        type="number" 
+                                        min="1" max="31"
+                                        placeholder="Ej: 15"
+                                        className="w-full bg-white border-none rounded-xl p-3 font-bold text-[#1A365D]" 
+                                        value={data.recurring_month_day || ''} 
+                                        onChange={e => setData({...data, recurring_month_day: e.target.value, recurring_type: 'on_day'})}
+                                    />
+                                </div>
+                            )}
+
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Finalizar repetición (Opcional)</label>
+                                <input 
+                                    type="date" 
+                                    className="w-full bg-white border-none rounded-xl p-3 font-bold text-[#1A365D]" 
+                                    value={data.recurring_end_date || ''} 
+                                    onChange={e => setData({...data, recurring_end_date: e.target.value})}
+                                />
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
-            <div className="flex gap-4 pt-4"><button type="button" onClick={onCancel} className="flex-1 py-4 font-black text-[10px] text-slate-400">CANCELAR</button><button type="submit" className="flex-1 py-4 bg-[#1A365D] text-white rounded-2xl font-black text-[10px]">CONFIRMAR</button></div>
+
+            <div className="flex flex-col gap-3 shrink-0 pt-4">
+                <button 
+                    type="submit" 
+                    className="w-full py-5 bg-[#1A365D] text-white rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl shadow-[#1A365D]/20 hover:scale-[1.01] transition-all"
+                >
+                    {isEdit ? 'GUARDAR CAMBIOS' : 'CREAR TAREA'}
+                </button>
+                <div className="flex gap-3">
+                    {isEdit && (
+                        <button 
+                            type="button" 
+                            onClick={() => onDelete(data.id)}
+                            className="flex-1 py-4 bg-red-50 text-red-400 rounded-2xl font-black text-[10px] uppercase hover:bg-red-100 transition-colors"
+                        >
+                            ELIMINAR
+                        </button>
+                    )}
+                    <button 
+                        type="button" 
+                        onClick={onCancel} 
+                        className="flex-1 py-4 bg-slate-50 text-slate-400 rounded-2xl font-black text-[10px] uppercase hover:bg-slate-100 transition-colors"
+                    >
+                        CANCELAR
+                    </button>
+                </div>
+            </div>
         </form>
     );
 };

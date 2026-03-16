@@ -22,6 +22,7 @@ import marketPricesRouter from './routes/market-prices.js';
 import dashboardRouter from './routes/dashboard.js';
 import operationalRouter from './routes/operational.js';
 import gerenciaRouter from './routes/gerencia.js';
+import taskBatteriesRouter from './routes/task-batteries.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -140,6 +141,7 @@ app.use('/api/market-prices', marketPricesRouter);   // /api/market-prices/*
 app.use('/api/dashboard', dashboardRouter);          // /api/dashboard
 app.use('/api', operationalRouter);                  // /api/day-incidents, /api/no-deals, /api/locations, /api/market/search, /api/diagnostics/*, /api/security/*
 app.use('/api/gerencia', gerenciaRouter);
+app.use('/api/task-batteries', taskBatteriesRouter);
 
 // ─── Auto-Close Shifts Cron (every 60s) ───────────────────────────────────────
 setInterval(async () => {

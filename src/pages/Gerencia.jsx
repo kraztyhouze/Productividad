@@ -25,7 +25,9 @@ import {
     ArrowUpRight,
     Users,
     CheckCircle2,
-    X
+    Layers,
+    X,
+    Info
 } from 'lucide-react';
 import { 
     format, 
@@ -72,6 +74,7 @@ const Gerencia = () => {
     const [partners, setPartners] = useState([]);
     const [movements, setMovements] = useState([]);
     const [cashHistory, setCashHistory] = useState([]);
+    const [batteries, setBatteries] = useState([]);
     const [loading, setLoading] = useState(false);
 
     const [modal, setModal] = useState({ type: null, data: null });
@@ -80,11 +83,12 @@ const Gerencia = () => {
         setLoading(true);
         try {
             const h = { 'x-store-id': currentStore };
-            const [tRes, pRes, mRes, cRes] = await Promise.all([
+            const [tRes, pRes, mRes, cRes, bRes] = await Promise.all([
                 fetch('/api/tasks', { headers: h }),
                 fetch('/api/gerencia/goldsmith/partners', { headers: h }),
                 fetch('/api/gerencia/goldsmith/movements', { headers: h }),
-                fetch('/api/gerencia/cash-control', { headers: h })
+                fetch('/api/gerencia/cash-control', { headers: h }),
+                fetch('/api/task-batteries', { headers: h })
             ]);
             
             // Defensive parsing to prevent React crashes if API fails
@@ -92,6 +96,7 @@ const Gerencia = () => {
             if (pRes.ok) setPartners(await pRes.json());
             if (mRes.ok) setMovements(await mRes.json());
             if (cRes.ok) setCashHistory(await cRes.json());
+            if (bRes.ok) setBatteries(await bRes.json());
             
         } catch (e) { 
             console.error("Error loading Gerencia data:", e);
@@ -175,6 +180,35 @@ const Gerencia = () => {
         if (res.ok) loadData();
     };
 
+    const handleSaveBattery = async (bData) => {
+        const method = bData.id ? 'PUT' : 'POST';
+        const url = bData.id ? `/api/task-batteries/${bData.id}` : '/api/task-batteries';
+        const res = await fetch(url, {
+            method, headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore },
+            body: JSON.stringify(bData)
+        });
+        if (res.ok) { setModal({ type: null, data: null }); loadData(); }
+    };
+
+    const handleDeleteBattery = async (id) => {
+        if (!confirm('¿Seguro quieres eliminar esta batería y todas sus tareas?')) return;
+        const res = await fetch(`/api/task-batteries/${id}`, { 
+            method: 'DELETE', headers: { 'x-store-id': currentStore } 
+        });
+        if (res.ok) loadData();
+    };
+
+    const handleToggleBatteryItem = async (itemId, isDone, completedBy) => {
+        const res = await fetch(`/api/task-batteries/items/${itemId}`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore },
+            body: JSON.stringify({ is_done: isDone, completed_by: completedBy })
+        });
+        if (res.ok) {
+            setModal({ type: null, data: null });
+            loadData();
+        }
+    };
+
     const tabs = [
         { id: 'summary', label: 'Resumen', icon: BarChart3 },
         { id: 'tasks', label: 'Agenda', icon: CalendarIcon },
@@ -206,7 +240,19 @@ const Gerencia = () => {
 
             <div className="min-h-[70vh]">
                 {activeTab === 'summary' && <GerenciaDashboard tasks={tasks} partners={partners} movements={movements} cashHistory={cashHistory} />}
-                {activeTab === 'tasks' && <TasksView tasks={tasks} onEdit={(t) => setModal({ type: 'task', data: t })} onAdd={() => setModal({ type: 'task', data: null })} loadData={loadData} currentStore={currentStore} />}
+                {activeTab === 'tasks' && (
+                    <TasksView 
+                        tasks={tasks} 
+                        batteries={batteries}
+                        onEdit={(t) => setModal({ type: 'task', data: t })} 
+                        onAdd={() => setModal({ type: 'task', data: null })} 
+                        onAddBattery={() => setModal({ type: 'battery', data: null })}
+                        onCheckBattery={(item) => setModal({ type: 'battery_item_check', data: item })}
+                        onDeleteBattery={handleDeleteBattery}
+                        loadData={loadData} 
+                        currentStore={currentStore} 
+                    />
+                )}
                 {activeTab === 'jewelry' && <JewelryView partners={partners} movements={movements} onAddPartner={() => setModal({ type: 'partner', data: null })} onEditPartner={(p) => setModal({ type: 'partner', data: p })} onDeletePartner={handleDeletePartner} onAddMovement={(type) => setModal({ type: 'movement', data: type })} onDeleteMovement={handleDeleteMovement} onRefine={(m) => setModal({ type: 'refine', data: m })} />}
                 {activeTab === 'cash' && <CashView history={Array.isArray(cashHistory) ? cashHistory : []} onSave={handleSaveCash} user={user} />}
             </div>
@@ -230,6 +276,14 @@ const Gerencia = () => {
 
             <GlobalModal isOpen={modal.type === 'refine'} onClose={() => setModal({ type: null, data: null })} title="Cerrar Lote / Afinaje">
                 <RefineForm movement={modal.data} onSave={handleUpdateSmelt} onCancel={() => setModal({ type: null, data: null })} />
+            </GlobalModal>
+
+            <GlobalModal isOpen={modal.type === 'battery'} onClose={() => setModal({ type: null, data: null })} title="Nueva Batería de Tareas">
+                <BatteryForm onSave={handleSaveBattery} onCancel={() => setModal({ type: null, data: null })} />
+            </GlobalModal>
+
+            <GlobalModal isOpen={modal.type === 'battery_item_check'} onClose={() => setModal({ type: null, data: null })} title="Confirmar Tarea Realizada">
+                <BatteryItemCheckForm item={modal.data} onConfirm={handleToggleBatteryItem} onCancel={() => setModal({ type: null, data: null })} />
             </GlobalModal>
         </div>
     );
@@ -308,7 +362,7 @@ const GerenciaDashboard = ({ tasks, partners, movements, cashHistory }) => {
     );
 };
 
-const TasksView = ({ tasks, onEdit, onAdd, loadData, currentStore }) => {
+const TasksView = ({ tasks, batteries, onEdit, onAdd, onAddBattery, onCheckBattery, onDeleteBattery, loadData, currentStore }) => {
     const safeTasks = Array.isArray(tasks) ? tasks : [];
     const [month, setMonth] = useState(new Date());
     const [selectedTask, setSelectedTask] = useState(null);
@@ -425,7 +479,7 @@ const TasksView = ({ tasks, onEdit, onAdd, loadData, currentStore }) => {
     };
 
     return (
-        <div className="flex flex-col lg:flex-row gap-8 animate-in fade-in duration-500">
+        <div className="flex flex-col xl:flex-row gap-8 animate-in fade-in duration-500">
             {/* Main Content: Calendar/List */}
             <div className="flex-1 space-y-6">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -450,16 +504,24 @@ const TasksView = ({ tasks, onEdit, onAdd, loadData, currentStore }) => {
                                 Lista
                             </button>
                         </div>
-                        <button 
-                            onClick={onAdd} 
-                            className="bg-[#FF8C9D] text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-coral-100 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2"
-                        >
-                            <Plus size={16} /> Nueva Tarea
-                        </button>
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={onAddBattery} 
+                                className="bg-[#1A365D] text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-blue-900/10 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2"
+                            >
+                                <Plus size={16} /> BATERÍA
+                            </button>
+                            <button 
+                                onClick={onAdd} 
+                                className="bg-[#FF8C9D] text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-coral-100 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2"
+                            >
+                                <Plus size={16} /> TAREA
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                {view === 'calendar' ? (
+                {view === 'calendar' && (
                     <div className="bg-white rounded-[40px] border border-[#E2E8F0] shadow-sm overflow-hidden text-sm">
                         <div className="p-8 flex justify-between items-center bg-white border-b border-[#F4F7FA]">
                             <div className="flex items-center gap-4">
@@ -522,7 +584,9 @@ const TasksView = ({ tasks, onEdit, onAdd, loadData, currentStore }) => {
                             })}
                         </div>
                     </div>
-                ) : (
+                )}
+
+                {view === 'list' && (
                     <div className="space-y-4">
                         {allTasks.length === 0 ? (
                             <div className="bg-white p-20 rounded-[40px] border border-dashed border-slate-200 text-center">
@@ -562,78 +626,60 @@ const TasksView = ({ tasks, onEdit, onAdd, loadData, currentStore }) => {
                 )}
             </div>
 
-            {/* Side Panel: Task Details */}
-            <div className={`w-full lg:w-96 shrink-0 transition-all ${selectedTask ? 'translate-x-0 opacity-100' : 'translate-x-10 opacity-0 pointer-events-none hidden lg:block'}`}>
-                {selectedTask ? (
-                    <div className="bg-[#1A365D] text-white p-8 rounded-[40px] shadow-2xl space-y-8 sticky top-32 border border-blue-800">
+            {/* Side Panel: Task Details & Batteries */}
+            <div className="w-full xl:w-[450px] shrink-0 space-y-8">
+                {selectedTask && (
+                    <div className="bg-[#1A365D] text-white p-8 rounded-[40px] shadow-2xl space-y-6 border border-blue-800 animate-in slide-in-from-right duration-300">
                         <div className="flex justify-between items-start">
-                             <div className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest ${selectedTask.status === 'Hecha' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-coral-500/20 text-[#FF8C9D] border border-coral-500/30'}`}>
+                             <div className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest ${selectedTask.status === 'Hecha' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-[#FF8C9D]/20 text-[#FF8C9D] border border-[#FF8C9D]/30'}`}>
                                 {selectedTask.isVirtual ? 'Programada' : selectedTask.status}
                              </div>
                              <button onClick={() => setSelectedTask(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/50"><X size={20}/></button>
                         </div>
-
                         <div className="space-y-4">
-                            <h3 className="text-2xl font-black tracking-tight leading-tight uppercase">{selectedTask.title}</h3>
-                            <div className="flex flex-wrap gap-3">
-                                <div className="flex items-center gap-2 text-[10px] font-bold text-blue-200 bg-white/5 px-3 py-2 rounded-xl">
+                            <h3 className="text-xl font-black uppercase tracking-tighter leading-tight">{selectedTask.title}</h3>
+                            <div className="flex flex-wrap gap-2">
+                                <div className="flex items-center gap-2 text-[10px] font-bold text-blue-200 bg-white/5 px-3 py-2 rounded-xl w-fit">
                                     <CalendarIcon size={14} className="text-[#FF8C9D]" /> {format(parseISO(selectedTask.date), "EEEE, d 'de' MMMM", { locale: es })}
                                 </div>
                                 {selectedTask.recurring && (
-                                    <div className="flex items-center gap-2 text-[10px] font-bold text-blue-200 bg-white/5 px-3 py-2 rounded-xl">
-                                        <Clock size={14} className="text-[#FF8C9D]" /> {selectedTask.periodicity} (Cada {selectedTask.recurring_interval})
+                                    <div className="flex items-center gap-2 text-[10px] font-bold text-blue-200 bg-white/5 px-3 py-2 rounded-xl w-fit">
+                                        <Clock size={14} className="text-[#FF8C9D]" /> {selectedTask.periodicity}
                                     </div>
                                 )}
                             </div>
                         </div>
-
-                        <div className="space-y-4 border-t border-white/10 pt-8">
+                        <div className="space-y-4 border-t border-white/10 pt-6">
                             <label className="text-[10px] font-black text-blue-300 uppercase tracking-widest block">Instrucciones</label>
-                            <div className="bg-white/5 p-6 rounded-[32px] min-h-[150px] text-xs font-bold leading-relaxed text-blue-100 whitespace-pre-wrap">
-                                {selectedTask.description || <span className="italic opacity-30 tracking-normal">Sin instrucciones detalladas...</span>}
+                            <div className="bg-white/5 p-6 rounded-[32px] min-h-[80px] text-xs font-bold leading-relaxed text-blue-100 whitespace-pre-wrap">
+                                {selectedTask.description || <span className="italic opacity-30">Sin instrucciones especiales...</span>}
                             </div>
                         </div>
-
-                        <div className="grid grid-cols-2 gap-3 pt-6">
-                            <button 
-                                onClick={() => toggleStatus(selectedTask)}
-                                className={`flex-1 py-4 rounded-2xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2 ${
-                                    selectedTask.status === 'Hecha' 
-                                    ? 'bg-blue-800 text-blue-300' 
-                                    : 'bg-[#FF8C9D] text-white shadow-lg shadow-coral-500/20'
-                                }`}
-                            >
-                                <Check size={16} /> {selectedTask.isVirtual ? 'CONFIRMAR Y COMPLETAR' : selectedTask.status === 'Hecha' ? 'COMPLETADA' : 'MARCAR HECHA'}
+                        <div className="grid grid-cols-2 gap-3 pt-4">
+                            <button onClick={() => toggleStatus(selectedTask)} className={`py-4 rounded-2xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2 ${selectedTask.status === 'Hecha' ? 'bg-green-500 text-white shadow-lg shadow-green-500/20' : 'bg-white text-[#1A365D]'}`}>
+                                <Check size={16}/> {selectedTask.status === 'Hecha' ? 'COMPLETADA' : 'COMPLETAR'}
                             </button>
-                            <button 
-                                onClick={() => {
-                                    if(selectedTask.isVirtual) {
-                                        alert('Para editar esta tarea futura, primero complétala o edita la tarea actual de la serie.');
-                                        return;
-                                    }
-                                    onEdit(selectedTask);
-                                }}
-                                className={`flex-1 py-4 bg-white/10 hover:bg-white/20 text-white rounded-2xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2 ${selectedTask.isVirtual ? 'opacity-30' : ''}`}
-                            >
-                                <Edit3 size={16} /> EDITAR
-                            </button>
-                            <button 
-                                onClick={() => deleteTask(selectedTask.id)}
-                                className="col-span-2 py-4 text-red-400 font-black text-[10px] uppercase hover:text-red-300 transition-colors"
-                            >
-                                ELIMINAR TAREA
-                            </button>
+                            <button onClick={() => { if(!selectedTask.isVirtual) { onEdit(selectedTask); setSelectedTask(null); } else { alert('Edita la tarea principal de la serie.'); } }} className={`py-4 bg-white/10 text-white rounded-2xl font-black text-[10px] uppercase ${selectedTask.isVirtual ? 'opacity-30' : ''}`}>EDITAR</button>
                         </div>
-                    </div>
-                ) : (
-                    <div className="h-full bg-slate-50 rounded-[40px] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center p-12 text-center">
-                        <div className="w-16 h-16 bg-white rounded-3xl shadow-sm flex items-center justify-center mb-6 text-slate-300">
-                            <CalendarIcon size={32} />
-                        </div>
-                        <h4 className="text-sm font-black text-[#1A365D] uppercase tracking-tighter">Detalles de Tarea</h4>
-                        <p className="text-[10px] text-slate-400 font-bold mt-2">Selecciona una tarea del calendario para ver sus instrucciones y gestionarla.</p>
                     </div>
                 )}
+
+                <div className="bg-white/40 backdrop-blur-sm p-8 rounded-[40px] border border-white shadow-sm space-y-6">
+                    <div className="flex items-center justify-between">
+                        <h4 className="text-[10px] font-black text-[#1A365D] uppercase tracking-[0.3em]">Baterías Activas</h4>
+                        <Layers size={16} className="text-[#FF8C9D] animate-pulse" />
+                    </div>
+                    
+                    <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                        <BatteriesView 
+                            batteries={batteries} 
+                            hideHeader 
+                            isCompact 
+                            onCheck={onCheckBattery} 
+                            onDelete={onDeleteBattery} 
+                        />
+                    </div>
+                </div>
             </div>
         </div>
     );
@@ -1210,6 +1256,238 @@ const RefineForm = ({ movement, onSave, onCancel }) => {
             <div><label className="text-[10px] font-black text-slate-400 block mb-1 uppercase">Afinaje Resultante (%)</label><input type="number" step="0.1" required className="w-full bg-slate-50 rounded-2xl p-4 text-center font-black" value={ref} onChange={e => setRef(e.target.value)}/></div>
             <div><label className="text-[10px] font-black text-slate-400 block mb-1 uppercase">Importe Final (€)</label><input type="number" step="0.01" required className="w-full bg-slate-50 rounded-2xl p-4 text-center font-black text-green-600" value={rec} onChange={e => setRec(e.target.value)}/></div>
             <button type="submit" className="w-full py-5 bg-[#FF8C9D] text-white rounded-3xl font-black text-xs uppercase shadow-xl hover:scale-[1.02] transition-all">FINALIZAR Y ARCHIVAR</button>
+        </form>
+    );
+};
+
+
+const BatteriesView = ({ batteries, onAdd, onCheck, onDelete, hideHeader }) => {
+    const safeBatteries = Array.isArray(batteries) ? batteries : [];
+
+    return (
+        <div className="space-y-8 animate-in fade-in duration-500">
+            {!hideHeader && (
+                <div className="flex justify-between items-center bg-white/40 backdrop-blur-md p-6 rounded-[40px] border border-white">
+                    <div>
+                        <h2 className="text-3xl font-black text-[#1A365D] tracking-tighter uppercase tabular-nums">
+                            Baterías de <span className="text-[#FF8C9D]">Tareas</span>
+                        </h2>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Gestión de objetivos por periodos</p>
+                    </div>
+                    <button 
+                        onClick={onAdd} 
+                        className="bg-[#1A365D] text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-blue-900/10 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2"
+                    >
+                        <Plus size={16} /> NUEVA BATERÍA
+                    </button>
+                </div>
+            )}
+
+            <div className={isCompact ? "space-y-4" : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"}>
+                {safeBatteries.length === 0 ? (
+                    <div className="col-span-full py-10 bg-white/50 backdrop-blur-sm rounded-[40px] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center opacity-60">
+                        <Layers size={32} className="mb-4 text-slate-300" />
+                        <p className="font-black text-[10px] uppercase tracking-widest text-[#1A365D]">No hay baterías activas</p>
+                    </div>
+                ) : (
+                    safeBatteries.map(b => {
+                        const total = b.items?.length || 0;
+                        const done = (b.items || []).filter(i => i.is_done).length;
+                        const progress = total > 0 ? (done / total) * 100 : 0;
+                        
+                        return (
+                            <div key={b.id} className={`bg-white rounded-[32px] border border-[#E2E8F0] shadow-sm hover:shadow-xl transition-all overflow-hidden flex flex-col group ${isCompact ? 'p-6' : ''}`}>
+                                {!isCompact ? (
+                                    <>
+                                        <div className="p-8 border-b border-[#F4F7FA]">
+                                            <div className="flex justify-between items-start mb-6">
+                                                <div className="bg-blue-50 text-[#1A365D] p-3 rounded-2xl"><Layers size={20}/></div>
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => onDelete(b.id)} className="p-2 text-slate-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={16}/></button>
+                                                </div>
+                                            </div>
+                                            <h3 className="text-xl font-black text-[#1A365D] uppercase tracking-tighter mb-2">{b.title}</h3>
+                                            <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                                <div className="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-full">
+                                                    <CalendarIcon size={12} className="text-[#FF8C9D]"/>
+                                                    {format(parseISO(b.start_date), 'dd/MM')} — {format(parseISO(b.end_date), 'dd/MM')}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="p-8 space-y-4 flex-1 bg-slate-50/30">
+                                            <div className="flex justify-between items-end mb-2">
+                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Progreso ({done}/{total})</span>
+                                                <span className={`text-xs font-black ${progress === 100 ? 'text-green-500' : 'text-[#1A365D]'}`}>
+                                                    {progress.toFixed(0)}%
+                                                </span>
+                                            </div>
+                                            <div className="h-3 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                                                <div className={`h-full transition-all duration-1000 ${progress === 100 ? 'bg-green-500' : 'bg-gradient-to-r from-blue-400 to-[#1A365D]'}`} style={{ width: `${progress}%` }} />
+                                            </div>
+                                            
+                                            <div className="pt-6 space-y-3">
+                                                {(b.items || []).map(item => (
+                                                    <div key={item.id} className="flex items-center justify-between p-4 bg-white rounded-2xl group/item shadow-sm border border-transparent hover:border-blue-100 transition-all">
+                                                        <div className="flex items-center gap-4 overflow-hidden">
+                                                            <button 
+                                                                onClick={() => onCheck(item)}
+                                                                className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all shrink-0 ${item.is_done ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-slate-200 text-transparent hover:border-blue-400'}`}
+                                                            >
+                                                                <Check size={14} strokeWidth={4}/>
+                                                            </button>
+                                                            <div className="min-w-0">
+                                                                <p className={`text-xs font-bold uppercase truncate transition-all ${item.is_done ? 'text-slate-300 line-through' : 'text-[#1A365D]'}`}>{item.description}</p>
+                                                                {item.is_done && (
+                                                                    <div className="flex items-center gap-2 mt-1">
+                                                                        <span className="text-[8px] font-black text-green-500 bg-green-50 px-2 py-0.5 rounded-md flex items-center gap-1 uppercase">
+                                                                            <CheckCircle2 size={8}/> {item.completed_by}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-start">
+                                            <h3 className="text-xs font-black text-[#1A365D] uppercase tracking-tighter truncate pr-4">{b.title}</h3>
+                                            <span className="text-[9px] font-black text-[#FF8C9D] bg-coral-50 px-2 py-0.5 rounded-lg whitespace-nowrap">{progress.toFixed(0)}%</span>
+                                        </div>
+                                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                            <div className="h-full bg-[#1A365D] transition-all duration-700" style={{ width: `${progress}%` }} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            {(b.items || []).map(item => (
+                                                <button 
+                                                    key={item.id} 
+                                                    onClick={() => onCheck(item)}
+                                                    className="w-full flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl transition-all group/it"
+                                                >
+                                                    <div className={`w-4 h-4 rounded-md border-2 flex items-center justify-center shrink-0 ${item.is_done ? 'bg-green-500 border-green-500 text-white' : 'border-slate-200'}`}>
+                                                        {item.is_done && <Check size={10} strokeWidth={4}/>}
+                                                    </div>
+                                                    <span className={`text-[10px] font-bold uppercase truncate ${item.is_done ? 'text-slate-300 line-through' : 'text-slate-600'}`}>{item.description}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })
+                )}
+            </div>
+        </div>
+    );
+};
+
+const BatteryForm = ({ onSave, onCancel }) => {
+    const [title, setTitle] = useState('');
+    const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+    const [endDate, setEndDate] = useState(format(addMonths(new Date(), 1), 'yyyy-MM-dd'));
+    const [items, setItems] = useState(['', '', '']);
+
+    const handleItemChange = (idx, val) => {
+        const ni = [...items];
+        ni[idx] = val;
+        setItems(ni);
+    };
+
+    const addItem = () => setItems([...items, '']);
+    const removeItem = (idx) => setItems(items.filter((_, i) => i !== idx));
+
+    return (
+        <form onSubmit={(e) => { 
+            e.preventDefault(); 
+            const filteredItems = items.filter(i => i.trim() !== '');
+            if (filteredItems.length === 0) return alert('Debes añadir al menos una tarea.');
+            onSave({ title, start_date: startDate, end_date: endDate, items: filteredItems });
+        }} className="space-y-8">
+            <div className="grid grid-cols-1 gap-6">
+                <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase block mb-3 pl-1 tracking-widest">Nombre de la Batería</label>
+                    <input type="text" required placeholder="Ej: Mantenimiento Mensual Mar-Abr" className="w-full bg-slate-50 border-none rounded-2xl p-5 font-black text-[#1A365D] shadow-inner" value={title} onChange={e => setTitle(e.target.value)}/>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-3 pl-1 tracking-widest">Fecha Inicio</label>
+                        <input type="date" required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-black text-[#1A365D] shadow-inner" value={startDate} onChange={e => setStartDate(e.target.value)}/>
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-3 pl-1 tracking-widest">Fecha Fin</label>
+                        <input type="date" required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-black text-[#1A365D] shadow-inner" value={endDate} onChange={e => setEndDate(e.target.value)}/>
+                    </div>
+                </div>
+                <div className="space-y-4 pt-4">
+                    <div className="flex justify-between items-center px-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest">Lista de Tareas ({items.filter(i => i.trim()).length})</label>
+                        <button type="button" onClick={addItem} className="text-[9px] font-black text-[#FF8C9D] bg-coral-50 hover:bg-coral-100 px-4 py-2 rounded-xl transition-all uppercase tracking-widest">+ AÑADIR FILA</button>
+                    </div>
+                    <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+                        {items.map((item, idx) => (
+                            <div key={idx} className="flex gap-3 group">
+                                <div className="bg-slate-50 flex-1 flex items-center rounded-2xl overflow-hidden focus-within:ring-2 focus-within:ring-[#1A365D]/10 transition-all">
+                                    <span className="pl-5 text-[10px] font-black text-slate-300">{idx + 1}.</span>
+                                    <input 
+                                        type="text" 
+                                        placeholder={`Tarea a realizar...`}
+                                        className="w-full bg-transparent border-none p-5 font-bold text-xs outline-none" 
+                                        value={item} 
+                                        onChange={e => handleItemChange(idx, e.target.value)}
+                                    />
+                                </div>
+                                {items.length > 1 && (
+                                    <button type="button" onClick={() => removeItem(idx)} className="text-slate-300 hover:text-red-400 p-2 transition-colors"><Trash2 size={18}/></button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+            <div className="flex gap-4 pt-4 shrink-0">
+                <button type="button" onClick={onCancel} className="flex-1 py-5 font-black text-[10px] text-slate-400 uppercase tracking-widest">CANCELAR</button>
+                <button type="submit" className="flex-1 py-5 bg-[#1A365D] text-white rounded-[32px] font-black text-[10px] uppercase tracking-widest shadow-xl shadow-blue-900/10 hover:scale-[1.01] transition-all">CREAR BATERÍA</button>
+            </div>
+        </form>
+    );
+};
+
+const BatteryItemCheckForm = ({ item, onConfirm, onCancel }) => {
+    const [name, setName] = useState('');
+
+    return (
+        <form onSubmit={(e) => { e.preventDefault(); onConfirm(item.id, !item.is_done, name); }} className="space-y-8">
+            <div className="bg-slate-50 p-8 rounded-[40px] text-center border-2 border-dashed border-slate-200">
+                <p className="text-[10px] font-black text-[#A0AEC0] uppercase tracking-widest mb-3">Estás marcando como realizada:</p>
+                <h4 className="text-xl font-black text-[#1A365D] uppercase tracking-tighter leading-tight bg-white p-6 rounded-3xl shadow-sm border border-[#E2E8F0]">{item.description}</h4>
+            </div>
+
+            <div className="space-y-4">
+                <label className="text-[10px] font-black text-slate-400 uppercase block text-center tracking-[0.3em]">¿Quién firma esta tarea?</label>
+                <input 
+                    type="text" 
+                    required 
+                    autoFocus
+                    placeholder="Escribe tu nombre..."
+                    className="w-full bg-white border-2 border-slate-100 focus:border-green-500 rounded-3xl p-6 text-center font-black text-[#1A365D] text-2xl outline-none transition-all shadow-xl shadow-slate-100" 
+                    value={name} 
+                    onChange={e => setName(e.target.value)}
+                />
+            </div>
+
+            <div className="flex flex-col gap-4 pt-4">
+                <button type="submit" className="w-full py-6 bg-green-500 text-white rounded-3xl font-black text-[11px] uppercase tracking-widest shadow-2xl shadow-green-500/20 hover:scale-[1.01] active:scale-95 transition-all flex items-center justify-center gap-3">
+                    <CheckCircle2 size={18}/> CONFIRMAR FINALIZACIÓN
+                </button>
+                <button type="button" onClick={onCancel} className="w-full py-2 text-slate-300 font-black text-[9px] uppercase tracking-[0.2em] hover:text-slate-400 transition-colors">
+                    ME HE EQUIVOCADO, CANCELAR
+                </button>
+            </div>
         </form>
     );
 };

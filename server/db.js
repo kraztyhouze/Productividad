@@ -134,6 +134,29 @@ export const initDb = async () => {
             );
         `);
 
+        // Task Batteries (New)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS task_batteries (
+                id SERIAL PRIMARY KEY,
+                title TEXT NOT NULL,
+                start_date TEXT NOT NULL,
+                end_date TEXT NOT NULL,
+                store_id TEXT DEFAULT 'store_1',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS battery_items (
+                id SERIAL PRIMARY KEY,
+                battery_id INTEGER REFERENCES task_batteries(id) ON DELETE CASCADE,
+                description TEXT NOT NULL,
+                is_done BOOLEAN DEFAULT FALSE,
+                completed_by TEXT,
+                completed_at TIMESTAMP
+            );
+        `);
+
         // Migrations / Alters (Safe to run multiple times)
         const alters = [
             "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recurring_days JSONB DEFAULT '[]';",

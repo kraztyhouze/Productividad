@@ -178,7 +178,13 @@ export const initDb = async () => {
             "ALTER TABLE goldsmith_movements ADD COLUMN IF NOT EXISTS is_debt_adjustment BOOLEAN DEFAULT FALSE;",
             "ALTER TABLE cash_control_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;",
             "ALTER TABLE goldsmith_partners ADD COLUMN IF NOT EXISTS phone TEXT;",
-            "ALTER TABLE goldsmith_partners ADD COLUMN IF NOT EXISTS email TEXT;"
+            "ALTER TABLE goldsmith_partners ADD COLUMN IF NOT EXISTS email TEXT;",
+            "ALTER TABLE employees ADD COLUMN IF NOT EXISTS can_count_cash BOOLEAN DEFAULT FALSE;",
+            "ALTER TABLE cash_control_logs ADD COLUMN IF NOT EXISTS expected_total NUMERIC DEFAULT 0;",
+            "ALTER TABLE cash_control_logs ADD COLUMN IF NOT EXISTS responsible_1 TEXT;",
+            "ALTER TABLE cash_control_logs ADD COLUMN IF NOT EXISTS responsible_2 TEXT;",
+            "ALTER TABLE goldsmith_partners ADD COLUMN IF NOT EXISTS debt_type TEXT DEFAULT '18k';",
+            "ALTER TABLE goldsmith_partners ADD COLUMN IF NOT EXISTS debt_formula TEXT;"
         ];
         for (const sql of alters) {
             try { await client.query(sql); } catch (e) { /* ignore already exists */ }

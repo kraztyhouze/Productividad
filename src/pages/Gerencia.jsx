@@ -792,8 +792,13 @@ const JewelryView = ({ partners, movements, onAddPartner, onEditPartner, onDelet
                                                 </div>
                                             </div>
                                             <div className="flex justify-between items-center mt-3 pt-3 border-t border-dashed border-slate-200">
-                                                <span className="text-[8px] font-black text-slate-300 uppercase">Saldo Pendiente</span>
-                                                <span className={`text-[10px] font-black ${Number(p.debt_grams) > 0 ? 'text-[#FF8C9D]' : 'text-green-500'}`}>{p.debt_grams}g</span>
+                                                <div className="flex flex-col">
+                                                    <span className="text-[8px] font-black text-slate-300 uppercase tracking-tighter">Deuda en {p.debt_type || '18k'}</span>
+                                                    {p.debt_formula && p.debt_formula !== 'x' && (
+                                                        <span className="text-[7px] font-bold text-blue-400 uppercase">Fórmula: {p.debt_formula}</span>
+                                                    )}
+                                                </div>
+                                                <span className={`text-[12px] font-black ${Number(p.debt_grams) > 0 ? 'text-[#FF8C9D]' : 'text-green-500'}`}>{Number(p.debt_grams).toFixed(2)}g</span>
                                             </div>
                                         </div>
                                     ))
@@ -984,9 +989,8 @@ const CashView = ({ history, onSave, employees, user }) => {
     const safeEmployees = Array.isArray(employees) ? employees : [];
     const [localDate, setLocalDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     
-    // Auth roles for counting
-    const authRoles = [ROLES.MANAGER, ROLES.SUPERVISOR, ROLES.RESPONSIBLE];
-    const countingStaff = safeEmployees.filter(e => authRoles.includes(e.role));
+    // Auth roles for counting - Filtered by canCountCash permission
+    const countingStaff = safeEmployees.filter(e => e.canCountCash);
 
     const [data, setData] = useState({
         expected_total: 0,
@@ -1399,14 +1403,29 @@ const PartnerForm = ({ initialData, onSave, onCancel }) => {
     const [info, setInfo] = useState(initialData?.contact_info || '');
     const [phone, setPhone] = useState(initialData?.phone || '');
     const [email, setEmail] = useState(initialData?.email || '');
+    const [debtType, setDebtType] = useState(initialData?.debt_type || '18k');
+    const [debtFormula, setDebtFormula] = useState(initialData?.debt_formula || 'x');
 
     return (
-        <form onSubmit={(e) => { e.preventDefault(); onSave({ id: initialData?.id, name, contact_info: info, phone, email }); }} className="space-y-6">
+        <form onSubmit={(e) => { e.preventDefault(); onSave({ id: initialData?.id, name, contact_info: info, phone, email, debt_type: debtType, debt_formula: debtFormula }); }} className="space-y-6">
             <div className="grid grid-cols-1 gap-6">
-                <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Nombre Comercial / Profesional</label><input type="text" required className="w-full bg-slate-50 border-none rounded-2xl p-4 font-black text-[#1A365D]" value={name} onChange={e => setName(e.target.value)}/></div>
+                <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Nombre Comercial / Profesional</label><input type="text" required className="w-full bg-slate-50 border-none rounded-2xl p-4 font-black text-[#1A365D]" value={name} onChange={setName ? (e => setName(e.target.value)) : undefined} /></div>
                 <div className="grid grid-cols-2 gap-4">
                     <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Teléfono</label><input type="tel" className="w-full bg-slate-50 border-none rounded-2xl p-4 font-black" value={phone} onChange={e => setPhone(e.target.value)}/></div>
                     <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Email</label><input type="email" className="w-full bg-slate-50 border-none rounded-2xl p-4 font-black" value={email} onChange={e => setEmail(e.target.value)}/></div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 bg-blue-50/30 p-4 rounded-3xl border border-blue-50">
+                    <div>
+                        <label className="text-[10px] font-black text-blue-400 uppercase block mb-2">Tipo de Deuda Base</label>
+                        <select className="w-full bg-white border-none rounded-xl p-3 font-black text-xs" value={debtType} onChange={e => setDebtType(e.target.value)}>
+                            <option value="18k">Oro 18k</option>
+                            <option value="24k">Oro 24k</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-black text-blue-400 uppercase block mb-2 pl-1">Fórmula de Cálculo (x = gr)</label>
+                        <input type="text" className="w-full bg-white border-none rounded-xl p-3 font-black text-xs" placeholder="Ej: x * 0.95" value={debtFormula} onChange={e => setDebtFormula(e.target.value)} />
+                    </div>
                 </div>
                 <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Notas / Dirección / Información Extra</label><textarea className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold resize-none" rows={3} value={info} onChange={e => setInfo(e.target.value)}/></div>
             </div>
@@ -1421,18 +1440,39 @@ const PartnerForm = ({ initialData, onSave, onCancel }) => {
 const MovementForm = ({ type: movType, partners, onSave, onCancel }) => {
     const safePartners = Array.isArray(partners) ? partners : [];
     const [lines, setLines] = useState([{ karat: '18k', type: 'Oro', weight: '', cost_gr: '' }]);
-    const [data, setData] = useState({ partner_id: '', date: format(new Date(), 'yyyy-MM-dd'), debt_added: 0, is_debt_adjustment: false, total_cost: 0 });
+    const [data, setData] = useState({ 
+        partner_id: '', 
+        date: format(new Date(), 'yyyy-MM-dd'), 
+        debt_added: 0, 
+        is_debt_adjustment: false, 
+        total_cost: 0,
+        debt_impact_override: '' // User can manually override what's added/subtracted
+    });
+    
+    const partner = safePartners.find(p => p.id.toString() === data.partner_id.toString());
     const totalW = lines.reduce((a, l) => a + Number(l.weight || 0), 0);
     
-    // In 'Fundición', we might want a total cost instead of per-line cost
+    // Logic for formula
+    const calculateImpact = (val) => {
+        if (!partner || !partner.debt_formula || !val) return val;
+        try {
+            // Very simple parser for safety
+            const f = partner.debt_formula.toLowerCase().replace(/x/g, val.toString());
+            // Only allow numbers and basic operators if possible, but eval is easier for user-provided math
+            return eval(f);
+        } catch (e) { return val; }
+    };
+
+    const debtImpact = data.debt_impact_override ? Number(data.debt_impact_override) : calculateImpact(totalW);
     const totalC = movType === 'Fundición' ? Number(data.total_cost || 0) : lines.reduce((a, l) => a + (Number(l.weight || 0) * Number(l.cost_gr || 0)), 0);
 
     return (
-        <form onSubmit={(e) => { e.preventDefault(); onSave({...data, type: movType, weight: totalW, cost: totalC, karats_data: lines, status: movType === 'Fundición' ? 'Pendiente' : 'Completado'}); }} className="space-y-6">
+        <form onSubmit={(e) => { e.preventDefault(); onSave({...data, type: movType, weight: totalW, cost: totalC, karats_data: lines, status: movType === 'Fundición' ? 'Pendiente' : 'Completado', debt_added: movType === 'Recepción' ? debtImpact : 0, weight: movType === 'Envío' && data.is_debt_adjustment ? debtImpact : totalW }); }} className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
                 <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Joyero</label><select required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold" value={data.partner_id} onChange={e => setData({...data, partner_id: e.target.value})}><option value="">Socio...</option>{safePartners.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
                 <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Fecha</label><input type="date" required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold" value={data.date} onChange={e => setData({...data, date: e.target.value})}/></div>
             </div>
+            
             <div className="bg-slate-50 p-6 rounded-3xl space-y-4">
                 <div className="flex justify-between items-center"><h4 className="text-[10px] font-black text-slate-400 uppercase">Detalle Pesos</h4><button type="button" onClick={() => setLines([...lines, { karat: '18k', type: 'Oro', weight: '', cost_gr: '' }])} className="text-[#FF8C9D] font-black text-[10px]">+ AÑADIR FILA</button></div>
                 {lines.map((l, i) => (
@@ -1442,7 +1482,7 @@ const MovementForm = ({ type: movType, partners, onSave, onCancel }) => {
                             {l.type === 'Oro' ? (<><option>24k</option><option>18k</option><option>14k</option><option>9k</option></>) : (<><option>999</option><option>925</option></>)}
                         </select>
                         <input type="number" step="0.01" required className="flex-1 bg-white rounded-lg p-2 text-xs font-bold" placeholder="Gramos" value={l.weight} onChange={e => { const nl = [...lines]; nl[i].weight = e.target.value; setLines(nl); }}/>
-                        {movType !== 'Recepción' && movType !== 'Fundición' && (
+                        {movType !== 'Recepción' && movType !== 'Fundición' && movType !== 'Envío' && (
                             <input type="number" step="0.01" required className="flex-1 bg-white rounded-lg p-2 text-xs font-bold" placeholder="€/g" value={l.cost_gr} onChange={e => { const nl = [...lines]; nl[i].cost_gr = e.target.value; setLines(nl); }}/>
                         )}
                         {lines.length > 1 && <button type="button" onClick={() => setLines(lines.filter((_, idx) => idx !== i))} className="text-red-300 px-2"><Trash2 size={14}/></button>}
@@ -1458,12 +1498,45 @@ const MovementForm = ({ type: movType, partners, onSave, onCancel }) => {
             )}
 
             <div className="pt-2 flex justify-between font-black text-[10px] uppercase px-2 text-slate-400">
-                <span>Total Peso: {totalW.toFixed(2)}g</span>
-                {movType !== 'Recepción' && movType !== 'Fundición' && <span className="text-coral-400">Total Coste estim: {totalC.toFixed(2)}€</span>}
+                <span>Total Peso Real: {totalW.toFixed(2)}g</span>
+                {movType !== 'Recepción' && movType !== 'Fundición' && movType !== 'Envío' && <span className="text-coral-400">Total Coste estim: {totalC.toFixed(2)}€</span>}
             </div>
 
-            {movType === 'Recepción' && <div><label className="text-[10px] font-black text-amber-500 uppercase block mb-1">Gramos pendientes de pago (Ledger)</label><input type="number" step="0.01" className="w-full border-2 border-amber-100 bg-amber-50 rounded-xl p-3 font-black" value={data.debt_added} onChange={e => setData({...data, debt_added: e.target.value})}/></div>}
-            {movType === 'Envío' && <div className="flex items-center gap-2 font-bold text-xs uppercase"><input type="checkbox" className="w-4 h-4" checked={data.is_debt_adjustment} onChange={e => setData({...data, is_debt_adjustment: e.target.checked})}/> Descontar del Ledger del Socio</div>}
+            {movType === 'Recepción' && (
+                <div className="bg-amber-50 p-6 rounded-3xl space-y-4 border border-amber-100">
+                    <div className="flex justify-between items-center text-amber-600 font-black text-[10px] uppercase">
+                        <span>Impacto en Deuda (Auto-calculado)</span>
+                        <span>Fórmula: {partner?.debt_formula || 'Sin fórmula'}</span>
+                    </div>
+                    <div className="flex gap-4 items-end">
+                        <div className="flex-1">
+                            <label className="text-[9px] font-black text-amber-400 uppercase block mb-1">Gramos a añadir al Ledger</label>
+                            <input type="number" step="0.01" className="w-full bg-white border-none rounded-xl p-3 font-black text-amber-900" placeholder={debtImpact.toFixed(2)} value={data.debt_impact_override} onChange={e => setData({...data, debt_impact_override: e.target.value})}/>
+                        </div>
+                        <div className="bg-white px-4 py-3 rounded-xl border border-amber-200 text-xs font-black text-amber-600">
+                             Result: {debtImpact.toFixed(2)} gr ({partner?.debt_type || '18k'})
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {movType === 'Envío' && (
+                <div className="space-y-4">
+                    <div className="flex items-center gap-2 font-bold text-xs uppercase px-2"><input type="checkbox" className="w-4 h-4" checked={data.is_debt_adjustment} onChange={e => setData({...data, is_debt_adjustment: e.target.checked})}/> Descontar del Ledger del Socio</div>
+                    {data.is_debt_adjustment && (
+                        <div className="bg-blue-50/50 p-6 rounded-3xl border border-blue-100 flex gap-4 items-end animate-in slide-in-from-top-2 duration-300">
+                             <div className="flex-1">
+                                <label className="text-[9px] font-black text-blue-400 uppercase block mb-1">Gramos a descontar (Confirmados por joyer)</label>
+                                <input type="number" step="0.01" className="w-full bg-white border-none rounded-xl p-3 font-black text-blue-900" placeholder={debtImpact.toFixed(2)} value={data.debt_impact_override} onChange={e => setData({...data, debt_impact_override: e.target.value})}/>
+                             </div>
+                             <div className="bg-white px-4 py-3 rounded-xl border border-blue-200 text-xs font-black text-blue-600">
+                                Descuento: {debtImpact.toFixed(2)} gr
+                             </div>
+                        </div>
+                    )}
+                </div>
+            )}
+            
             <button type="submit" className="w-full py-5 bg-[#1A365D] text-white rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl hover:scale-[1.01] transition-all">PROCESAR MOVIMIENTO</button>
         </form>
     );

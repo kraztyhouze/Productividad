@@ -30,6 +30,7 @@ const EmployeeModal = ({
                 setFormData({
                     ...editingEmployee,
                     isBuyer: editingEmployee.isBuyer !== undefined ? editingEmployee.isBuyer : false,
+                    canCountCash: editingEmployee.canCountCash !== undefined ? editingEmployee.canCountCash : false,
                     alias: editingEmployee.alias || ''
                 });
             } else {
@@ -37,7 +38,7 @@ const EmployeeModal = ({
                     firstName: '', lastName: '', alias: '', email: '', phone: '', address: '',
                     role: (roles.length > 0 ? roles[0].name : 'Empleado'), contractType: 'Indefinido', contractHours: 40,
                     username: '', password: '',
-                    isBuyer: false
+                    isBuyer: false, canCountCash: false
                 });
             }
         }
@@ -54,7 +55,8 @@ const EmployeeModal = ({
         const data = {
             ...formData,
             contractHours: Number(formData.contractHours),
-            isBuyer: formData.isBuyer
+            isBuyer: formData.isBuyer,
+            canCountCash: formData.canCountCash
         };
         onSave(data);
     };
@@ -112,10 +114,16 @@ const EmployeeModal = ({
                                         <input required={!editingEmployee} type="password" autoComplete="new-password" name="password" value={formData.password || ''} onChange={handleInputChange} className="w-full p-3 bg-white border border-[#E2E8F0] rounded-xl text-[#1A365D] text-sm outline-none focus:border-[#FF8C9D] transition-all" placeholder={editingEmployee ? "Sin cambios" : "••••••••"} />
                                     </div>
                                 </div>
-                                <label className="flex items-center gap-3 cursor-pointer p-4 bg-white border border-[#FF8C9D]/20 rounded-2xl hover:border-[#FF8C9D]/50 transition-all shadow-sm group">
-                                    <input type="checkbox" name="isBuyer" checked={formData.isBuyer === true} onChange={handleInputChange} className="accent-[#FF8C9D] w-5 h-5 rounded-md" />
-                                    <span className="text-sm font-bold text-[#1A365D] group-hover:text-[#FF8C9D] transition-colors">Autorizado para Compras</span>
-                                </label>
+                                <div className="space-y-3">
+                                    <label className="flex items-center gap-3 cursor-pointer p-4 bg-white border border-[#FF8C9D]/20 rounded-2xl hover:border-[#FF8C9D]/50 transition-all shadow-sm group">
+                                        <input type="checkbox" name="isBuyer" checked={formData.isBuyer === true} onChange={handleInputChange} className="accent-[#FF8C9D] w-5 h-5 rounded-md" />
+                                        <span className="text-sm font-bold text-[#1A365D] group-hover:text-[#FF8C9D] transition-colors">Autorizado para Compras</span>
+                                    </label>
+                                    <label className="flex items-center gap-3 cursor-pointer p-4 bg-white border border-blue-100 rounded-2xl hover:border-blue-300 transition-all shadow-sm group">
+                                        <input type="checkbox" name="canCountCash" checked={formData.canCountCash === true} onChange={handleInputChange} className="accent-blue-400 w-5 h-5 rounded-md" />
+                                        <span className="text-sm font-bold text-[#1A365D] group-hover:text-blue-500 transition-colors">Autorizado para Arqueo de Caja</span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
 

@@ -27,8 +27,8 @@ router.post('/goldsmith/partners', async (req, res) => {
     const storeId = req.headers['x-store-id'] || 'store_1';
     try {
         const result = await pool.query(
-            'INSERT INTO goldsmith_partners (name, contact_info, phone, email, store_id, debt_grams) VALUES ($1, $2, $3, $4, $5, 0) RETURNING *',
-            [name, contact_info, phone, email, storeId]
+            'INSERT INTO goldsmith_partners (name, contact_info, phone, email, store_id, debt_grams, debt_type, debt_formula) VALUES ($1, $2, $3, $4, $5, 0, $6, $7) RETURNING *',
+            [name, contact_info, phone, email, storeId, req.body.debt_type || '18k', req.body.debt_formula || '']
         );
         res.json(result.rows[0]);
     } catch (err) { 
@@ -42,8 +42,8 @@ router.put('/goldsmith/partners/:id', async (req, res) => {
     const { name, contact_info, phone, email } = req.body;
     try {
         const result = await pool.query(
-            'UPDATE goldsmith_partners SET name=$1, contact_info=$2, phone=$3, email=$4 WHERE id=$5 RETURNING *',
-            [name, contact_info, phone, email, id]
+            'UPDATE goldsmith_partners SET name=$1, contact_info=$2, phone=$3, email=$4, debt_type=$5, debt_formula=$6 WHERE id=$7 RETURNING *',
+            [name, contact_info, phone, email, req.body.debt_type, req.body.debt_formula, id]
         );
         res.json(result.rows[0]);
     } catch (err) {

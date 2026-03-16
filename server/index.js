@@ -32,8 +32,10 @@ const PORT = process.env.PORT || 3000;
 // ─── CORS ─────────────────────────────────────────────────────────────────────
 const allowedOrigins = [
     'http://localhost:5173',
+    'http://localhost:3000',
     'https://tiktak-manager.vercel.app',
-    'https://tiktak-manager.onrender.com'
+    'https://tiktak-manager.onrender.com',
+    'https://productividad.onrender.com'
 ];
 app.use(cors({
     origin: function (origin, callback) {

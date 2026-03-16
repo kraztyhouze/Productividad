@@ -102,8 +102,8 @@ router.post('/goldsmith/movements', async (req, res) => {
                 karats_data, status, is_debt_adjustment
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
             [
-                partner_id, type, weight || 0, cost || 0, date, storeId,
-                acquisition_cost || 0, refining_percentage || 0, received_amount || 0,
+                partner_id, type, weight || 0, (type === 'Fundición' ? cost : cost) || 0, date, storeId,
+                (type === 'Fundición' ? cost : acquisition_cost) || 0, refining_percentage || 0, received_amount || 0,
                 JSON.stringify(karats_data || []), status || 'Completado', !!is_debt_adjustment
             ]
         );
@@ -184,43 +184,69 @@ router.get('/cash-control', async (req, res) => {
 });
 
 router.post('/cash-control', async (req, res) => {
-    const { date, denominations, others, observations, total, is_closed, closed_at, closed_by } = req.body;
+    const { 
+        date, denominations, others, observations, total, 
+        is_closed, closed_at, closed_by, 
+        expected_total, responsible_1, responsible_2 
+    } = req.body;
     const storeId = req.headers['x-store-id'] || 'store_1';
     try {
         const check = await pool.query('SELECT id FROM cash_control_logs WHERE date = $1 AND store_id = $2 AND is_closed = false', [date, storeId]);
         
+        const query = check.rows.length > 0
+            ? `UPDATE cash_control_logs SET 
+                denominations=$1, others=$2, observations=$3, total=$4, is_closed=$5, 
+                closed_at=$6, closed_by=$7, expected_total=$8, responsible_1=$9, responsible_2=$10 
+                WHERE id=$11 RETURNING *`
+            : `INSERT INTO cash_control_logs (
+                denominations, others, observations, total, is_closed, 
+                closed_at, closed_by, expected_total, responsible_1, responsible_2, date, store_id
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`;
+
+        const params = [
+            JSON.stringify(denominations || {}), 
+            JSON.stringify(others || {}), 
+            observations || '', 
+            total || 0, 
+            !!is_closed, 
+            closed_at || null, 
+            closed_by || null,
+            expected_total || 0,
+            responsible_1 || null,
+            responsible_2 || null,
+            check.rows.length > 0 ? check.rows[0].id : date,
+            check.rows.length > 0 ? undefined : storeId
+        ];
+
+        // If insert, last param should be store_id. If update, last param should be id.
+        // Simplified query handling for clarity:
+        let result;
         if (check.rows.length > 0) {
-            const result = await pool.query(
-                'UPDATE cash_control_logs SET denominations=$1, others=$2, observations=$3, total=$4, is_closed=$5, closed_at=$6, closed_by=$7 WHERE id=$8 RETURNING *',
+            result = await pool.query(
+                `UPDATE cash_control_logs SET 
+                denominations=$1, others=$2, observations=$3, total=$4, is_closed=$5, 
+                closed_at=$6, closed_by=$7, expected_total=$8, responsible_1=$9, responsible_2=$10 
+                WHERE id=$11 RETURNING *`,
                 [
-                    JSON.stringify(denominations || {}), 
-                    JSON.stringify(others || {}), 
-                    observations || '', 
-                    total || 0, 
-                    !!is_closed, 
-                    closed_at || null, 
-                    closed_by || null, 
-                    check.rows[0].id
+                    JSON.stringify(denominations || {}), JSON.stringify(others || {}), 
+                    observations || '', total || 0, !!is_closed, closed_at || null, closed_by || null,
+                    expected_total || 0, responsible_1 || null, responsible_2 || null, check.rows[0].id
                 ]
             );
-            res.json(result.rows[0]);
         } else {
-            const result = await pool.query(
-                'INSERT INTO cash_control_logs (date, denominations, others, observations, total, is_closed, closed_at, closed_by, store_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+            result = await pool.query(
+                `INSERT INTO cash_control_logs (
+                date, denominations, others, observations, total, is_closed, 
+                closed_at, closed_by, expected_total, responsible_1, responsible_2, store_id
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
                 [
-                    date, 
-                    JSON.stringify(denominations || {}), 
-                    JSON.stringify(others || {}), 
-                    observations || '', 
-                    total || 0, 
-                    !!is_closed, 
-                    closed_at || null, 
-                    closed_by || null, 
-                    storeId
+                    date, JSON.stringify(denominations || {}), JSON.stringify(others || {}), 
+                    observations || '', total || 0, !!is_closed, closed_at || null, closed_by || null,
+                    expected_total || 0, responsible_1 || null, responsible_2 || null, storeId
                 ]
             );
-            res.json(result.rows[0]);
         }
+        res.json(result.rows[0]);
     } catch (err) { 
         logError(err, 'POST /cash-control');
         res.status(500).json({ error: err.message });

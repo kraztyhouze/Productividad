@@ -75,6 +75,7 @@ const Gerencia = () => {
     const [movements, setMovements] = useState([]);
     const [cashHistory, setCashHistory] = useState([]);
     const [batteries, setBatteries] = useState([]);
+    const [employees, setEmployees] = useState([]);
     const [loading, setLoading] = useState(false);
 
     const [modal, setModal] = useState({ type: null, data: null });
@@ -97,6 +98,9 @@ const Gerencia = () => {
             if (mRes.ok) setMovements(await mRes.json());
             if (cRes.ok) setCashHistory(await cRes.json());
             if (bRes.ok) setBatteries(await bRes.json());
+            
+            const eRes = await fetch('/api/employees', { headers: h });
+            if (eRes.ok) setEmployees(await eRes.json());
             
         } catch (e) { 
             console.error("Error loading Gerencia data:", e);
@@ -253,8 +257,8 @@ const Gerencia = () => {
                         currentStore={currentStore} 
                     />
                 )}
-                {activeTab === 'jewelry' && <JewelryView partners={partners} movements={movements} onAddPartner={() => setModal({ type: 'partner', data: null })} onEditPartner={(p) => setModal({ type: 'partner', data: p })} onDeletePartner={handleDeletePartner} onAddMovement={(type) => setModal({ type: 'movement', data: type })} onDeleteMovement={handleDeleteMovement} onRefine={(m) => setModal({ type: 'refine', data: m })} />}
-                {activeTab === 'cash' && <CashView history={Array.isArray(cashHistory) ? cashHistory : []} onSave={handleSaveCash} user={user} />}
+                {activeTab === 'jewelry' && <JewelryView partners={partners} movements={movements} onAddPartner={() => setModal({ type: null, data: null })} onEditPartner={(p) => setModal({ type: 'partner', data: p })} onDeletePartner={handleDeletePartner} onAddMovement={(type) => setModal({ type: 'movement', data: type })} onDeleteMovement={handleDeleteMovement} onRefine={(m) => setModal({ type: 'refine', data: m })} />}
+                {activeTab === 'cash' && <CashView history={Array.isArray(cashHistory) ? cashHistory : []} employees={employees} onSave={handleSaveCash} user={user} />}
             </div>
 
             <GlobalModal isOpen={modal.type === 'task'} onClose={() => setModal({ type: null, data: null })} title={modal.data ? 'Editar Tarea' : 'Nueva Tarea'}>
@@ -822,20 +826,43 @@ const JewelryView = ({ partners, movements, onAddPartner, onEditPartner, onDelet
 const JewelryReport = ({ movements, partners }) => {
     const [filterPartner, setFilterPartner] = useState('all');
     
-    const filteredMovements = movements.filter(m => 
-        filterPartner === 'all' || m.partner_id.toString() === filterPartner
-    );
+    const filteredMovements = useMemo(() => {
+        return movements.filter(m => 
+            filterPartner === 'all' || m.partner_id.toString() === filterPartner
+        ).sort((a,b) => b.date.localeCompare(a.date));
+    }, [movements, filterPartner]);
 
-    const stats = useMemo(() => {
-        const res = { totalWeight: 0, totalCost: 0, receivedVal: 0, smeltingCount: 0, shipmentsCount: 0 };
+    // Group by Month
+    const groupedByMonth = useMemo(() => {
+        const groups = {};
         filteredMovements.forEach(m => {
+            const monthKey = format(parseISO(m.date), 'MMMM yyyy', { locale: es });
+            if (!groups[monthKey]) groups[monthKey] = { movements: [], stats: { weight: 0, cost: 0, received: 0, benefit: 0 } };
+            groups[monthKey].movements.push(m);
+            
             if (m.type === 'Envío') {
-                res.totalWeight += Number(m.weight || 0);
-                res.shipmentsCount++;
-            } else if (m.type === 'Fundición') {
-                res.totalCost += Number(m.acquisition_cost || 0);
-                res.receivedVal += Number(m.received_amount || 0);
-                res.smeltingCount++;
+                groups[monthKey].stats.weight += Number(m.weight || 0);
+            } else if (m.type === 'Fundición' && m.status === 'Completado') {
+                const cost = Number(m.acquisition_cost || 0);
+                const received = Number(m.received_amount || 0);
+                groups[monthKey].stats.cost += cost;
+                groups[monthKey].stats.received += received;
+                groups[monthKey].stats.benefit += (received - cost);
+            }
+        });
+        return groups;
+    }, [filteredMovements]);
+
+    const totalStats = useMemo(() => {
+        const res = { totalWeight: 0, totalCost: 0, receivedVal: 0, benefit: 0 };
+        filteredMovements.forEach(m => {
+            if (m.type === 'Envío') res.totalWeight += Number(m.weight || 0);
+            else if (m.type === 'Fundición' && m.status === 'Completado') {
+                const cost = Number(m.acquisition_cost || 0);
+                const received = Number(m.received_amount || 0);
+                res.totalCost += cost;
+                res.receivedVal += received;
+                res.benefit += (received - cost);
             }
         });
         return res;
@@ -845,123 +872,299 @@ const JewelryReport = ({ movements, partners }) => {
         <div className="space-y-8 animate-in zoom-in duration-300">
             <div className="bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm flex flex-col md:flex-row justify-between items-center gap-6">
                 <div>
-                    <h3 className="text-xl font-black text-[#1A365D] tracking-tighter uppercase">Informe de Joyas</h3>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Análisis por socio y operativa</p>
+                    <h3 className="text-xl font-black text-[#1A365D] tracking-tighter uppercase">Informe Operativa Joyería</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Análisis de rentabilidad y movimientos</p>
                 </div>
-                <div className="flex items-center gap-3">
-                    <span className="text-[10px] font-black text-slate-400 uppercase">Filtrar por:</span>
-                    <select 
-                        className="bg-[#F4F7FA] border-none rounded-2xl p-3 pr-10 font-black text-[10px] uppercase text-[#1A365D]"
-                        value={filterPartner}
-                        onChange={(e) => setFilterPartner(e.target.value)}
-                    >
-                        <option value="all">Todos los Joyeros</option>
-                        {partners.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded-[32px] border border-[#E2E8F0] shadow-sm flex flex-col justify-between h-32">
-                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Peso Total Enviado</span>
-                    <p className="text-3xl font-black text-[#1A365D] tracking-tighter">{stats.totalWeight.toFixed(2)} gr</p>
-                </div>
-                <div className="bg-white p-6 rounded-[32px] border border-[#E2E8F0] shadow-sm flex flex-col justify-between h-32">
-                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Margen Generativo</span>
-                    <p className="text-3xl font-black text-green-500 tracking-tighter">{(stats.receivedVal - stats.totalCost).toFixed(2)} €</p>
-                </div>
-                <div className="bg-white p-6 rounded-[32px] border border-[#E2E8F0] shadow-sm flex flex-col justify-between h-32">
-                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Operaciones Totales</span>
-                    <p className="text-3xl font-black text-blue-500 tracking-tighter">{stats.shipmentsCount + stats.smeltingCount}</p>
+                <div className="flex items-center gap-4">
+                    <div className="flex flex-col items-end">
+                        <span className="text-[8px] font-black text-slate-300 uppercase mb-1">Joyero Seleccionado</span>
+                        <select 
+                            className="bg-[#F4F7FA] border-none rounded-2xl p-3 pr-10 font-black text-[10px] uppercase text-[#1A365D]"
+                            value={filterPartner}
+                            onChange={(e) => setFilterPartner(e.target.value)}
+                        >
+                            <option value="all">Todos los Socios</option>
+                            {partners.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                    </div>
                 </div>
             </div>
 
-            <div className="bg-white rounded-[40px] border border-[#E2E8F0] shadow-sm overflow-hidden">
-                <div className="p-8 border-b border-[#F4F7FA] flex justify-between items-center">
-                    <h4 className="text-xs font-black text-[#1A365D] uppercase tracking-widest">Desglose de Operaciones</h4>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="bg-[#1A365D] p-6 rounded-[32px] shadow-xl text-white">
+                    <span className="text-[8px] font-black text-blue-300 uppercase tracking-widest block mb-2">Peso Total Enviado</span>
+                    <p className="text-3xl font-black tracking-tighter">{totalStats.totalWeight.toFixed(2)}<span className="text-xs ml-1 opacity-50">gr</span></p>
                 </div>
-                <div className="p-4 overflow-x-auto">
-                    <table className="w-full text-left uppercase text-[9px] font-bold min-w-[600px]">
-                        <thead className="text-[#A0AEC0] border-b">
-                            <tr>
-                                <th className="p-4">Fecha</th>
-                                <th className="p-4">Tipo</th>
-                                <th className="p-4">Socio</th>
-                                <th className="p-4">Peso</th>
-                                <th className="p-4">Costo Adq.</th>
-                                <th className="p-4">Valor Rec.</th>
-                                <th className="p-4 text-right">Margen</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50">
-                            {filteredMovements.map(m => {
-                                const margin = Number(m.received_amount || 0) - Number(m.acquisition_cost || 0);
-                                return (
-                                    <tr key={m.id} className="hover:bg-slate-50">
-                                        <td className="p-4 font-black">{format(parseISO(m.date), 'dd/MM/yy')}</td>
-                                        <td className="p-4"><span className={`px-2 py-0.5 rounded-full ${m.type === 'Envío' ? 'bg-blue-50 text-blue-500' : 'bg-green-50 text-green-500'}`}>{m.type}</span></td>
-                                        <td className="p-4 text-slate-600">{m.partner_name}</td>
-                                        <td className="p-4 font-mono">{m.weight}g</td>
-                                        <td className="p-4 font-mono">{m.acquisition_cost || '-'} €</td>
-                                        <td className="p-4 font-mono">{m.received_amount || '-'} €</td>
-                                        <td className={`p-4 text-right font-black ${margin > 0 ? 'text-green-500' : margin < 0 ? 'text-red-400' : 'text-slate-300'}`}>
-                                            {m.type === 'Fundición' ? `${margin.toFixed(2)} €` : '-'}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                <div className="bg-white p-6 rounded-[32px] border border-[#E2E8F0] shadow-sm">
+                    <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest block mb-2">Coste Invertido</span>
+                    <p className="text-3xl font-black text-[#1A365D] tracking-tighter">{totalStats.totalCost.toFixed(2)}€</p>
+                </div>
+                <div className="bg-white p-6 rounded-[32px] border border-[#E2E8F0] shadow-sm">
+                    <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest block mb-2">Beneficio Neto</span>
+                    <p className="text-3xl font-black text-green-500 tracking-tighter">+{totalStats.benefit.toFixed(2)}€</p>
+                </div>
+                <div className="bg-green-50 p-6 rounded-[32px] border border-green-100 shadow-sm">
+                    <span className="text-[8px] font-black text-green-600/60 uppercase tracking-widest block mb-2">Rentabilidad (%)</span>
+                    <p className="text-3xl font-black text-green-600 tracking-tighter">
+                        {totalStats.totalCost > 0 ? ((totalStats.benefit / totalStats.totalCost) * 100).toFixed(1) : 0}%
+                    </p>
                 </div>
             </div>
+
+            {Object.keys(groupedByMonth).map(month => (
+                <div key={month} className="bg-white rounded-[40px] border border-[#E2E8F0] shadow-sm overflow-hidden">
+                    <div className="p-8 border-b border-[#F4F7FA] bg-slate-50/50 flex justify-between items-center">
+                        <div className="flex items-center gap-4">
+                            <h4 className="text-sm font-black text-[#1A365D] uppercase tracking-widest">{month}</h4>
+                            <div className="flex gap-2">
+                                <span className="text-[8px] font-black bg-white px-2 py-1 rounded-lg border border-slate-200 text-slate-400 uppercase">Beneficio mes: {groupedByMonth[month].stats.benefit.toFixed(2)}€</span>
+                                <span className="text-[8px] font-black bg-green-500 text-white px-2 py-1 rounded-lg uppercase">
+                                    {groupedByMonth[month].stats.cost > 0 ? ((groupedByMonth[month].stats.benefit / groupedByMonth[month].stats.cost) * 100).toFixed(1) : 0}%
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="p-4 overflow-x-auto">
+                        <table className="w-full text-left uppercase text-[9px] font-bold min-w-[600px]">
+                            <thead className="text-[#A0AEC0] border-b">
+                                <tr>
+                                    <th className="p-4">Fecha</th>
+                                    <th className="p-4">Tipo</th>
+                                    <th className="p-4">Socio</th>
+                                    <th className="p-4">Peso</th>
+                                    <th className="p-4">Costo Adq.</th>
+                                    <th className="p-4">Valor Final</th>
+                                    <th className="p-4">Beneficio</th>
+                                    <th className="p-4 text-right">Margen %</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                                {groupedByMonth[month].movements.map(m => {
+                                    const cost = Number(m.acquisition_cost || 0);
+                                    const received = Number(m.received_amount || 0);
+                                    const benefit = received - cost;
+                                    const marginPercent = cost > 0 ? (benefit / cost) * 100 : 0;
+                                    
+                                    return (
+                                        <tr key={m.id} className="hover:bg-slate-50 transition-colors">
+                                            <td className="p-4 font-black">{format(parseISO(m.date), 'dd/MM/yy')}</td>
+                                            <td className="p-4">
+                                                <span className={`px-2 py-1 rounded-lg text-[8px] font-black ${m.type === 'Envío' ? 'bg-blue-50 text-blue-500' : 'bg-green-50 text-green-500'}`}>
+                                                    {m.type}
+                                                </span>
+                                            </td>
+                                            <td className="p-4 text-slate-600">{m.partner_name}</td>
+                                            <td className="p-4 font-mono font-black">{m.weight}g</td>
+                                            <td className="p-4 font-mono text-slate-400">{cost > 0 ? `${cost.toFixed(2)}€` : '-'}</td>
+                                            <td className="p-4 font-mono font-black text-[#1A365D]">{received > 0 ? `${received.toFixed(2)}€` : '-'}</td>
+                                            <td className={`p-4 font-mono font-black ${benefit > 0 ? 'text-green-500' : 'text-slate-300'}`}>
+                                                {m.type === 'Fundición' && m.status === 'Completado' ? `+${benefit.toFixed(2)}€` : '-'}
+                                            </td>
+                                            <td className="p-4 text-right">
+                                                {m.type === 'Fundición' && m.status === 'Completado' ? (
+                                                    <span className={`px-2 py-1 rounded-lg text-[8px] font-black ${marginPercent > 0 ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400'}`}>
+                                                        {marginPercent.toFixed(1)}%
+                                                    </span>
+                                                ) : '-'}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            ))}
         </div>
     );
 };
 
-const CashView = ({ history, onSave, user }) => {
+const CashView = ({ history, onSave, employees, user }) => {
     const safeHistory = Array.isArray(history) ? history : [];
+    const safeEmployees = Array.isArray(employees) ? employees : [];
     const [localDate, setLocalDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-    const [counts, setCounts] = useState(() => { const o = {}; BILLS.concat(COINS).forEach(v => o[v] = 0); return o; });
-    const [others, setOthers] = useState({ vales: 0, tickets: 0, cheques: 0 });
-    const [obs, setObs] = useState('');
-    const [closed, setClosed] = useState(false);
+    
+    // Auth roles for counting
+    const authRoles = [ROLES.MANAGER, ROLES.SUPERVISOR, ROLES.RESPONSIBLE];
+    const countingStaff = safeEmployees.filter(e => authRoles.includes(e.role));
+
+    const [data, setData] = useState({
+        expected_total: 0,
+        real_total: 0,
+        observations: '',
+        responsible_1: '',
+        responsible_2: '',
+        is_closed: false
+    });
 
     useEffect(() => {
         const log = safeHistory.find(l => l.date === localDate);
-        if (log) { setCounts(log.denominations || counts); setOthers(log.others || others); setObs(log.observations || ''); setClosed(log.is_closed); }
-        else { const e = {}; BILLS.concat(COINS).forEach(v => e[v] = 0); setCounts(e); setOthers({ vales: 0, tickets: 0, cheques: 0 }); setObs(''); setClosed(false); }
-    }, [localDate, safeHistory]);
+        if (log) {
+            setData({
+                expected_total: log.expected_total || 0,
+                real_total: log.total || 0,
+                observations: log.observations || '',
+                responsible_1: log.responsible_1 || '',
+                responsible_2: log.responsible_2 || '',
+                is_closed: !!log.is_closed
+            });
+        } else {
+            setData({
+                expected_total: 0,
+                real_total: 0,
+                observations: '',
+                responsible_1: user.username || '',
+                responsible_2: '',
+                is_closed: false
+            });
+        }
+    }, [localDate, safeHistory, user]);
 
-    const total = useMemo(() => {
-        let t = 0; Object.entries(counts).forEach(([v, q]) => t += Number(v) * Number(q));
-        Object.values(others).forEach(v => t += Number(v)); return t;
-    }, [counts, others]);
+    const diff = Number(data.real_total || 0) - Number(data.expected_total || 0);
 
-    const saveAction = (isClosing) => {
-        onSave({ date: localDate, denominations: counts, others, observations: obs, total, is_closed: isClosing, closed_at: isClosing ? new Date().toISOString() : null, closed_by: isClosing ? user.username : null });
+    const handleSave = (isClosing) => {
+        if (!data.responsible_1) return alert('Debes seleccionar al menos un responsable.');
+        onSave({
+            ...data,
+            date: localDate,
+            total: data.real_total,
+            is_closed: isClosing,
+            closed_at: isClosing ? new Date().toISOString() : null,
+            closed_by: user.username
+        });
     };
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500 pb-10">
-            <div className="bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm flex flex-col md:flex-row justify-between items-end gap-6 text-sm">
-                <div className="space-y-3 w-full md:w-auto"><h2 className="text-2xl font-black text-[#1A365D] tracking-tighter">Arqueo de Fondos</h2><input type="date" className="w-full bg-[#F4F7FA] border-none rounded-2xl p-4 font-bold" value={localDate} onChange={e => setLocalDate(e.target.value)}/></div>
-                <div className="text-right w-full md:w-auto"><div className="flex flex-col items-end">{closed && <span className="bg-coral-100 text-[#FF8C9D] text-[8px] font-black p-1 rounded mb-2 px-2"><Lock size={8} className="inline mr-1"/> AUDITADO</span>}<p className="text-6xl font-black text-[#FF8C9D] tracking-tighter leading-none tabular-nums">{total.toLocaleString('es-ES')}€</p></div><p className="text-[10px] font-black text-[#A0AEC0] uppercase tracking-widest mt-1">Total Auditoría</p></div>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 text-sm">
-                <div className="bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm space-y-2">
-                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Calculadora de Billetes</h3>
-                    {BILLS.map(b => (
-                        <div key={b} className="flex items-center gap-4"><div className="w-16 h-10 bg-slate-50 rounded-xl flex items-center justify-center font-black">{b}€</div><input type="number" disabled={closed} className="flex-1 bg-slate-50 border-none rounded-xl p-2 text-center font-black" value={counts[b] || ''} onChange={e => setCounts({...counts, [b]: e.target.value})}/><div className="w-20 text-right font-black text-slate-300">{(b * (counts[b] || 0)).toLocaleString()}€</div></div>
-                    ))}
-                </div>
-                <div className="space-y-6">
-                    <div className="bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm space-y-4">
-                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Otros Documentos</h3>
-                        {Object.keys(others).map(k => (
-                            <div key={k} className="flex items-center gap-4"><div className="w-24 font-black uppercase text-[10px] text-slate-400">{k}</div><input type="number" step="0.01" disabled={closed} className="flex-1 bg-slate-50 border-none rounded-xl p-3 font-bold" value={others[k] || ''} onChange={e => setOthers({...others, [k]: e.target.value})}/></div>
-                        ))}
+            <div className="bg-white p-10 rounded-[40px] border border-[#E2E8F0] shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
+                <div className="space-y-4 w-full md:w-auto">
+                    <div>
+                        <h2 className="text-3xl font-black text-[#1A365D] tracking-tighter uppercase">Conteo de Caja</h2>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Registro diario de fondos y descuadres</p>
                     </div>
-                    <div className="flex gap-4">{!closed && <><button onClick={() => saveAction(false)} className="flex-1 bg-white border-2 border-slate-100 py-4 rounded-[28px] font-black text-[10px] uppercase">Borrador</button><button onClick={() => saveAction(true)} className="flex-1 bg-[#FF8C9D] text-white py-4 rounded-[28px] font-black text-[10px] uppercase shadow-lg shadow-coral-100">Cerrar Caja</button></>}</div>
+                    <input 
+                        type="date" 
+                        className="w-full bg-[#F4F7FA] border-none rounded-2xl p-4 font-black text-[#1A365D]" 
+                        value={localDate} 
+                        onChange={e => setLocalDate(e.target.value)}
+                    />
+                </div>
+
+                <div className="flex flex-col items-end gap-2 w-full md:w-auto">
+                    <div className="text-right">
+                        <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest block mb-1">Diferencia Final</span>
+                        <div className={`text-5xl font-black tabular-nums tracking-tighter ${diff === 0 ? 'text-slate-200' : diff > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                            {diff > 0 ? '+' : ''}{diff.toFixed(2)}€
+                        </div>
+                    </div>
+                    {diff !== 0 && (
+                        <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm ${diff > 0 ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
+                            {diff > 0 ? 'Sobra dinero' : 'Falta dinero'}
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="bg-white p-10 rounded-[40px] border border-[#E2E8F0] shadow-sm space-y-8">
+                    <h3 className="text-xs font-black text-[#1A365D] uppercase tracking-widest flex items-center gap-2">
+                         Resultados del Día <Calculator size={16} className="text-[#FF8C9D]"/>
+                    </h3>
+                    
+                    <div className="space-y-6">
+                        <div>
+                            <label className="text-[10px] font-black text-slate-400 uppercase block mb-3 pl-1">Total Teórico (Sistema) €</label>
+                            <input 
+                                type="number" 
+                                step="0.01"
+                                disabled={data.is_closed}
+                                className="w-full bg-[#F4F7FA] border-none rounded-2xl p-5 font-black text-2xl text-[#1A365D] focus:ring-2 focus:ring-blue-100 transition-all" 
+                                value={data.expected_total} 
+                                onChange={e => setData({...data, expected_total: e.target.value})}
+                            />
+                        </div>
+
+                        <div>
+                            <label className="text-[10px] font-black text-slate-400 uppercase block mb-3 pl-1 text-[#FF8C9D]">Total Real (Contado) €</label>
+                            <input 
+                                type="number" 
+                                step="0.01"
+                                disabled={data.is_closed}
+                                className="w-full bg-white border-4 border-[#FF8C9D]/10 focus:border-[#FF8C9D]/30 rounded-2xl p-5 font-black text-4xl text-[#1A365D] shadow-xl shadow-coral-100/10 transition-all"
+                                value={data.real_total} 
+                                onChange={e => setData({...data, real_total: e.target.value})}
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-6">
+                    <div className="bg-white p-10 rounded-[40px] border border-[#E2E8F0] shadow-sm space-y-6">
+                        <h3 className="text-xs font-black text-[#1A365D] uppercase tracking-widest">Responsables del Conteo</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-[9px] font-black text-slate-300 uppercase block mb-2">Responsable 1</label>
+                                <select 
+                                    disabled={data.is_closed}
+                                    className="w-full bg-[#F4F7FA] border-none rounded-2xl p-4 font-bold text-xs"
+                                    value={data.responsible_1}
+                                    onChange={e => setData({...data, responsible_1: e.target.value})}
+                                >
+                                    <option value="">Seleccionar...</option>
+                                    {countingStaff.map(e => <option key={e.id} value={e.nombre}>{e.nombre} ({e.role})</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-[9px] font-black text-slate-300 uppercase block mb-2">Responsable 2 (Opcional)</label>
+                                <select 
+                                    disabled={data.is_closed}
+                                    className="w-full bg-[#F4F7FA] border-none rounded-2xl p-4 font-bold text-xs"
+                                    value={data.responsible_2}
+                                    onChange={e => setData({...data, responsible_2: e.target.value})}
+                                >
+                                    <option value="">Ninguno</option>
+                                    {countingStaff.map(e => <option key={e.id} value={e.nombre}>{e.nombre} ({e.role})</option>)}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="pt-4">
+                            <label className="text-[10px] font-black text-slate-400 uppercase block mb-3">Anotaciones / Observaciones</label>
+                            <textarea 
+                                disabled={data.is_closed}
+                                rows={4}
+                                className="w-full bg-[#F4F7FA] border-none rounded-3xl p-5 font-bold text-xs resize-none placeholder:text-slate-300" 
+                                placeholder="Indica si ha habido algún problema, vales pendientes, o motivo del descuadre..."
+                                value={data.observations} 
+                                onChange={e => setData({...data, observations: e.target.value})}
+                            />
+                        </div>
+                    </div>
+
+                    {!data.is_closed ? (
+                        <div className="flex gap-4">
+                            <button 
+                                onClick={() => handleSave(false)} 
+                                className="flex-1 bg-white border-2 border-slate-100 py-5 rounded-[32px] font-black text-[11px] uppercase tracking-widest hover:bg-slate-50 transition-all"
+                            >
+                                Guardar Borrador
+                            </button>
+                            <button 
+                                onClick={() => handleSave(true)} 
+                                className="flex-1 bg-[#1A365D] text-white py-5 rounded-[32px] font-black text-[11px] uppercase tracking-widest shadow-xl shadow-blue-900/20 hover:scale-[1.02] active:scale-95 transition-all"
+                            >
+                                Cerrar y Firmar Caja
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="bg-coral-50 border-2 border-coral-100 p-8 rounded-[40px] flex items-center gap-6">
+                            <div className="bg-white p-4 rounded-3xl text-[#FF8C9D] shadow-sm"><Lock size={32}/></div>
+                            <div>
+                                <p className="text-[10px] font-black text-[#FF8C9D] uppercase tracking-[0.2em]">Caja Auditada y Cerrada</p>
+                                <p className="text-xs font-bold text-slate-500 mt-1">Este registro ya no puede ser modificado por seguridad.</p>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -1217,10 +1420,12 @@ const PartnerForm = ({ initialData, onSave, onCancel }) => {
 
 const MovementForm = ({ type: movType, partners, onSave, onCancel }) => {
     const safePartners = Array.isArray(partners) ? partners : [];
-    const [lines, setLines] = useState([{ karat: '18k', weight: '', cost_gr: '' }]);
-    const [data, setData] = useState({ partner_id: '', date: format(new Date(), 'yyyy-MM-dd'), debt_added: 0, is_debt_adjustment: false });
+    const [lines, setLines] = useState([{ karat: '18k', type: 'Oro', weight: '', cost_gr: '' }]);
+    const [data, setData] = useState({ partner_id: '', date: format(new Date(), 'yyyy-MM-dd'), debt_added: 0, is_debt_adjustment: false, total_cost: 0 });
     const totalW = lines.reduce((a, l) => a + Number(l.weight || 0), 0);
-    const totalC = lines.reduce((a, l) => a + (Number(l.weight || 0) * Number(l.cost_gr || 0)), 0);
+    
+    // In 'Fundición', we might want a total cost instead of per-line cost
+    const totalC = movType === 'Fundición' ? Number(data.total_cost || 0) : lines.reduce((a, l) => a + (Number(l.weight || 0) * Number(l.cost_gr || 0)), 0);
 
     return (
         <form onSubmit={(e) => { e.preventDefault(); onSave({...data, type: movType, weight: totalW, cost: totalC, karats_data: lines, status: movType === 'Fundición' ? 'Pendiente' : 'Completado'}); }} className="space-y-6">
@@ -1229,20 +1434,37 @@ const MovementForm = ({ type: movType, partners, onSave, onCancel }) => {
                 <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Fecha</label><input type="date" required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold" value={data.date} onChange={e => setData({...data, date: e.target.value})}/></div>
             </div>
             <div className="bg-slate-50 p-6 rounded-3xl space-y-4">
-                <div className="flex justify-between items-center"><h4 className="text-[10px] font-black text-slate-400 uppercase">Detalle Pesos</h4><button type="button" onClick={() => setLines([...lines, { karat: '18k', weight: '', cost_gr: '' }])} className="text-[#FF8C9D] font-black text-[10px]">+ AÑADIR FILA</button></div>
+                <div className="flex justify-between items-center"><h4 className="text-[10px] font-black text-slate-400 uppercase">Detalle Pesos</h4><button type="button" onClick={() => setLines([...lines, { karat: '18k', type: 'Oro', weight: '', cost_gr: '' }])} className="text-[#FF8C9D] font-black text-[10px]">+ AÑADIR FILA</button></div>
                 {lines.map((l, i) => (
-                    <div key={i} className="flex gap-2">
-                        <select className="bg-white rounded-lg p-2 text-xs font-bold" value={l.karat} onChange={e => { const nl = [...lines]; nl[i].karat = e.target.value; setLines(nl); }}><option>24k</option><option>18k</option><option>14k</option><option>9k</option></select>
-                        <input type="number" step="0.01" required className="flex-1 bg-white rounded-lg p-2 text-xs font-bold" placeholder="Gr" value={l.weight} onChange={e => { const nl = [...lines]; nl[i].weight = e.target.value; setLines(nl); }}/>
-                        <input type="number" step="0.01" required className="flex-1 bg-white rounded-lg p-2 text-xs font-bold" placeholder="€/g" value={l.cost_gr} onChange={e => { const nl = [...lines]; nl[i].cost_gr = e.target.value; setLines(nl); }}/>
+                    <div key={i} className="flex gap-2 items-center">
+                        <select className="bg-white rounded-lg p-2 text-[10px] font-black uppercase" value={l.type} onChange={e => { const nl = [...lines]; nl[i].type = e.target.value; setLines(nl); }}><option>Oro</option><option>Plata</option></select>
+                        <select className="bg-white rounded-lg p-2 text-[10px] font-black" value={l.karat} onChange={e => { const nl = [...lines]; nl[i].karat = e.target.value; setLines(nl); }}>
+                            {l.type === 'Oro' ? (<><option>24k</option><option>18k</option><option>14k</option><option>9k</option></>) : (<><option>999</option><option>925</option></>)}
+                        </select>
+                        <input type="number" step="0.01" required className="flex-1 bg-white rounded-lg p-2 text-xs font-bold" placeholder="Gramos" value={l.weight} onChange={e => { const nl = [...lines]; nl[i].weight = e.target.value; setLines(nl); }}/>
+                        {movType !== 'Recepción' && movType !== 'Fundición' && (
+                            <input type="number" step="0.01" required className="flex-1 bg-white rounded-lg p-2 text-xs font-bold" placeholder="€/g" value={l.cost_gr} onChange={e => { const nl = [...lines]; nl[i].cost_gr = e.target.value; setLines(nl); }}/>
+                        )}
                         {lines.length > 1 && <button type="button" onClick={() => setLines(lines.filter((_, idx) => idx !== i))} className="text-red-300 px-2"><Trash2 size={14}/></button>}
                     </div>
                 ))}
-                <div className="pt-2 border-t border-dashed flex justify-between font-black text-[10px] uppercase"><span>Total Peso: {totalW.toFixed(2)}g</span><span className="text-coral-400">Total Coste: {totalC.toFixed(2)}€</span></div>
             </div>
-            {movType === 'Recepción' && <div><label className="text-[10px] font-black text-amber-500 uppercase block mb-1">Faltan Gramos por pagar</label><input type="number" step="0.01" className="w-full border-2 border-amber-100 bg-amber-50 rounded-xl p-3 font-black" value={data.debt_added} onChange={e => setData({...data, debt_added: e.target.value})}/></div>}
-            {movType === 'Envío' && <div className="flex items-center gap-2 font-bold text-xs uppercase"><input type="checkbox" className="w-4 h-4" checked={data.is_debt_adjustment} onChange={e => setData({...data, is_debt_adjustment: e.target.checked})}/> Descontar del Ledger</div>}
-            <button type="submit" className="w-full py-5 bg-[#1A365D] text-white rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl">PROCESAR MOVIMIENTO</button>
+
+            {movType === 'Fundición' && (
+                <div className="bg-blue-50/50 p-6 rounded-3xl border border-blue-100">
+                    <label className="text-[10px] font-black text-blue-400 uppercase block mb-2">Coste Total de la Operativa (€)</label>
+                    <input type="number" step="0.01" required className="w-full bg-white border-2 border-transparent focus:border-blue-300 rounded-xl p-4 font-black text-blue-900" placeholder="Ej: 4500.00" value={data.total_cost} onChange={e => setData({...data, total_cost: e.target.value})}/>
+                </div>
+            )}
+
+            <div className="pt-2 flex justify-between font-black text-[10px] uppercase px-2 text-slate-400">
+                <span>Total Peso: {totalW.toFixed(2)}g</span>
+                {movType !== 'Recepción' && movType !== 'Fundición' && <span className="text-coral-400">Total Coste estim: {totalC.toFixed(2)}€</span>}
+            </div>
+
+            {movType === 'Recepción' && <div><label className="text-[10px] font-black text-amber-500 uppercase block mb-1">Gramos pendientes de pago (Ledger)</label><input type="number" step="0.01" className="w-full border-2 border-amber-100 bg-amber-50 rounded-xl p-3 font-black" value={data.debt_added} onChange={e => setData({...data, debt_added: e.target.value})}/></div>}
+            {movType === 'Envío' && <div className="flex items-center gap-2 font-bold text-xs uppercase"><input type="checkbox" className="w-4 h-4" checked={data.is_debt_adjustment} onChange={e => setData({...data, is_debt_adjustment: e.target.checked})}/> Descontar del Ledger del Socio</div>}
+            <button type="submit" className="w-full py-5 bg-[#1A365D] text-white rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl hover:scale-[1.01] transition-all">PROCESAR MOVIMIENTO</button>
         </form>
     );
 };
@@ -1261,7 +1483,7 @@ const RefineForm = ({ movement, onSave, onCancel }) => {
 };
 
 
-const BatteriesView = ({ batteries, onAdd, onCheck, onDelete, hideHeader }) => {
+const BatteriesView = ({ batteries, onAdd, onCheck, onDelete, hideHeader, isCompact }) => {
     const safeBatteries = Array.isArray(batteries) ? batteries : [];
 
     return (

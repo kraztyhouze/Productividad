@@ -64,6 +64,10 @@ const COINS = [2, 1, 0.50, 0.20, 0.10, 0.05, 0.02, 0.01];
 // --- HELPERS ---
 const formatPrice = (p) => Number(p || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const formatWeight = (w) => Number(w || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' gr';
+const getEmpName = (e) => {
+    if (!e) return '---';
+    return e.alias || `${e.firstName} ${e.lastName || ''}`.trim() || e.username;
+};
 
 // --- MAIN PAGE ---
 const Gerencia = () => {
@@ -264,6 +268,7 @@ const Gerencia = () => {
             <GlobalModal isOpen={modal.type === 'task'} onClose={() => setModal({ type: null, data: null })} title={modal.data ? 'Editar Tarea' : 'Nueva Tarea'}>
                 <TaskForm 
                     initialData={modal.data} 
+                    employees={employees}
                     onSave={handleSaveTask} 
                     onCancel={() => setModal({ type: null, data: null })} 
                     onDelete={handleDeleteTask}
@@ -646,6 +651,11 @@ const TasksView = ({ tasks, batteries, onEdit, onAdd, onAddBattery, onCheckBatte
                                 <div className="flex items-center gap-2 text-[10px] font-bold text-blue-200 bg-white/5 px-3 py-2 rounded-xl w-fit">
                                     <CalendarIcon size={14} className="text-[#FF8C9D]" /> {format(parseISO(selectedTask.date), "EEEE, d 'de' MMMM", { locale: es })}
                                 </div>
+                                {selectedTask.assigned_to && (
+                                    <div className="flex items-center gap-2 text-[10px] font-bold text-blue-200 bg-white/5 px-3 py-2 rounded-xl w-fit capitalize">
+                                        <Users size={14} className="text-[#FF8C9D]" /> {selectedTask.assigned_to}
+                                    </div>
+                                )}
                                 {selectedTask.recurring && (
                                     <div className="flex items-center gap-2 text-[10px] font-bold text-blue-200 bg-white/5 px-3 py-2 rounded-xl w-fit">
                                         <Clock size={14} className="text-[#FF8C9D]" /> {selectedTask.periodicity}
@@ -1115,7 +1125,7 @@ const CashView = ({ history, onSave, employees, user }) => {
                                     onChange={e => setData({...data, responsible_1: e.target.value})}
                                 >
                                     <option value="">Seleccionar...</option>
-                                    {countingStaff.map(e => <option key={e.id} value={e.nombre}>{e.nombre} ({e.role})</option>)}
+                                    {countingStaff.map(e => <option key={e.id} value={getEmpName(e)}>{getEmpName(e)} ({e.role})</option>)}
                                 </select>
                             </div>
                             <div>
@@ -1127,7 +1137,7 @@ const CashView = ({ history, onSave, employees, user }) => {
                                     onChange={e => setData({...data, responsible_2: e.target.value})}
                                 >
                                     <option value="">Ninguno</option>
-                                    {countingStaff.map(e => <option key={e.id} value={e.nombre}>{e.nombre} ({e.role})</option>)}
+                                    {countingStaff.map(e => <option key={e.id} value={getEmpName(e)}>{getEmpName(e)} ({e.role})</option>)}
                                 </select>
                             </div>
                         </div>
@@ -1177,7 +1187,7 @@ const CashView = ({ history, onSave, employees, user }) => {
 
 // --- FORMS ---
 
-const TaskForm = ({ initialData, onSave, onCancel, onDelete }) => {
+const TaskForm = ({ initialData, employees, onSave, onCancel, onDelete }) => {
     const [data, setData] = useState(initialData || { 
         title: '', 
         date: format(new Date(), 'yyyy-MM-dd'), 
@@ -1242,15 +1252,15 @@ const TaskForm = ({ initialData, onSave, onCancel, onDelete }) => {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                     <div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-2 tracking-widest">Fecha de Inicio</label>
+                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-2 tracking-widest">Fecha Inicio</label>
                         <div className="relative">
                             <CalendarIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                             <input 
                                 type="date" 
                                 required 
-                                className="w-full bg-[#F4F7FA] border-none rounded-2xl p-4 pl-12 font-bold text-[#1A365D]" 
+                                className="w-full bg-[#F4F7FA] border-none rounded-2xl p-4 pl-12 font-bold text-[#1A365D] text-xs" 
                                 value={data.date} 
                                 onChange={e => setData({...data, date: e.target.value})}
                             />
@@ -1259,13 +1269,26 @@ const TaskForm = ({ initialData, onSave, onCancel, onDelete }) => {
                     <div>
                         <label className="text-[10px] font-black text-slate-400 uppercase block mb-2 tracking-widest">Prioridad</label>
                         <select 
-                            className="w-full bg-[#F4F7FA] border-none rounded-2xl p-4 font-bold text-[#1A365D] appearance-none cursor-pointer" 
+                            className="w-full bg-[#F4F7FA] border-none rounded-2xl p-4 font-bold text-[#1A365D] appearance-none cursor-pointer text-xs" 
                             value={data.priority} 
                             onChange={e => setData({...data, priority: e.target.value})}
                         >
                             <option value="Baja">Baja</option>
-                            <option value="Media">Media (Normal)</option>
-                            <option value="Alta">Alta (Urgente)</option>
+                            <option value="Media">Media</option>
+                            <option value="Alta">Alta</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-2 tracking-widest">Asignar a</label>
+                        <select 
+                            className="w-full bg-[#F4F7FA] border-none rounded-2xl p-4 font-bold text-[#1A365D] appearance-none cursor-pointer text-xs" 
+                            value={data.assigned_to} 
+                            onChange={e => setData({...data, assigned_to: e.target.value})}
+                        >
+                            <option value="">Sin Asignar</option>
+                            {(employees || []).map(e => (
+                                <option key={e.id} value={getEmpName(e)}>{getEmpName(e)} ({e.role})</option>
+                            ))}
                         </select>
                     </div>
                 </div>

@@ -90,6 +90,8 @@ export const initDb = async () => {
                 id SERIAL PRIMARY KEY,
                 name TEXT NOT NULL,
                 contact_info TEXT,
+                phone TEXT,
+                email TEXT,
                 debt_grams NUMERIC DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 store_id TEXT DEFAULT 'store_1'
@@ -151,7 +153,9 @@ export const initDb = async () => {
             "ALTER TABLE goldsmith_movements ADD COLUMN IF NOT EXISTS refining_percentage NUMERIC DEFAULT 0;",
             "ALTER TABLE goldsmith_movements ADD COLUMN IF NOT EXISTS received_amount NUMERIC DEFAULT 0;",
             "ALTER TABLE goldsmith_movements ADD COLUMN IF NOT EXISTS is_debt_adjustment BOOLEAN DEFAULT FALSE;",
-            "ALTER TABLE cash_control_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;"
+            "ALTER TABLE cash_control_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;",
+            "ALTER TABLE goldsmith_partners ADD COLUMN IF NOT EXISTS phone TEXT;",
+            "ALTER TABLE goldsmith_partners ADD COLUMN IF NOT EXISTS email TEXT;"
         ];
         for (const sql of alters) {
             try { await client.query(sql); } catch (e) { /* ignore already exists */ }

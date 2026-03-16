@@ -141,11 +141,30 @@ const Gerencia = () => {
     };
 
     const handleSavePartner = async (pData) => {
-        const res = await fetch('/api/gerencia/goldsmith/partners', {
-            method: 'POST', headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore },
+        const method = pData.id ? 'PUT' : 'POST';
+        const url = pData.id ? `/api/gerencia/goldsmith/partners/${pData.id}` : '/api/gerencia/goldsmith/partners';
+        const res = await fetch(url, {
+            method, headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore },
             body: JSON.stringify(pData)
         });
         if (res.ok) { setModal({ type: null, data: null }); loadData(); }
+        else { const err = await res.json(); alert('Error: ' + (err.error || 'Server error')); }
+    };
+
+    const handleDeletePartner = async (id) => {
+        if (!confirm('¿Seguro quieres eliminar este joyero? Se perderá su historial local.')) return;
+        const res = await fetch(`/api/gerencia/goldsmith/partners/${id}`, { 
+            method: 'DELETE', headers: { 'x-store-id': currentStore } 
+        });
+        if (res.ok) loadData();
+    };
+
+    const handleDeleteMovement = async (id) => {
+        if (!confirm('¿Seguro quieres eliminar este registro? Si afectó a la deuda del joyero, se revertirá.')) return;
+        const res = await fetch(`/api/gerencia/goldsmith/movements/${id}`, { 
+            method: 'DELETE', headers: { 'x-store-id': currentStore } 
+        });
+        if (res.ok) loadData();
     };
 
     const handleSaveCash = async (cashData) => {
@@ -188,7 +207,7 @@ const Gerencia = () => {
             <div className="min-h-[70vh]">
                 {activeTab === 'summary' && <GerenciaDashboard tasks={tasks} partners={partners} movements={movements} cashHistory={cashHistory} />}
                 {activeTab === 'tasks' && <TasksView tasks={tasks} onEdit={(t) => setModal({ type: 'task', data: t })} onAdd={() => setModal({ type: 'task', data: null })} loadData={loadData} currentStore={currentStore} />}
-                {activeTab === 'jewelry' && <JewelryView partners={partners} movements={movements} onAddPartner={() => setModal({ type: 'partner', data: null })} onAddMovement={(type) => setModal({ type: 'movement', data: type })} onRefine={(m) => setModal({ type: 'refine', data: m })} />}
+                {activeTab === 'jewelry' && <JewelryView partners={partners} movements={movements} onAddPartner={() => setModal({ type: 'partner', data: null })} onEditPartner={(p) => setModal({ type: 'partner', data: p })} onDeletePartner={handleDeletePartner} onAddMovement={(type) => setModal({ type: 'movement', data: type })} onDeleteMovement={handleDeleteMovement} onRefine={(m) => setModal({ type: 'refine', data: m })} />}
                 {activeTab === 'cash' && <CashView history={Array.isArray(cashHistory) ? cashHistory : []} onSave={handleSaveCash} user={user} />}
             </div>
 
@@ -201,8 +220,8 @@ const Gerencia = () => {
                 />
             </GlobalModal>
 
-            <GlobalModal isOpen={modal.type === 'partner'} onClose={() => setModal({ type: null, data: null })} title="Nuevo Joyero">
-                <PartnerForm onSave={handleSavePartner} onCancel={() => setModal({ type: null, data: null })} />
+            <GlobalModal isOpen={modal.type === 'partner'} onClose={() => setModal({ type: null, data: null })} title={modal.data ? 'Editar Joyero' : 'Nuevo Joyero'}>
+                <PartnerForm initialData={modal.data} onSave={handleSavePartner} onCancel={() => setModal({ type: null, data: null })} />
             </GlobalModal>
 
             <GlobalModal isOpen={modal.type === 'movement'} onClose={() => setModal({ type: null, data: null })} title={modal.data === 'Fundición' ? 'Lote de Fundición' : modal.data === 'Recepción' ? 'Recepción de Oro' : 'Envío a Joyería'} maxWidth="max-w-4xl">
@@ -352,9 +371,13 @@ const TasksView = ({ tasks, onEdit, onAdd, loadData, currentStore }) => {
                     }
                 }
             } else if (periodicity === 'Mensual') {
-                next = addMonths(next, interval);
                 if (recurring_type === 'on_day' && recurring_month_day) {
+                    // Safety to avoid date jumps on short months
+                    next.setDate(1);
+                    next = addMonths(next, interval);
                     next.setDate(Number(recurring_month_day));
+                } else {
+                    next = addMonths(next, interval);
                 }
             } else if (periodicity === 'Anual') {
                 next = addYears(next, interval);
@@ -616,19 +639,233 @@ const TasksView = ({ tasks, onEdit, onAdd, loadData, currentStore }) => {
     );
 };
 
-const JewelryView = ({ partners, movements, onAddPartner, onAddMovement, onRefine }) => {
+const JewelryView = ({ partners, movements, onAddPartner, onEditPartner, onDeletePartner, onAddMovement, onDeleteMovement, onRefine }) => {
+    const [viewMode, setViewMode] = useState('ops'); // 'ops' or 'report'
     const safeMovements = Array.isArray(movements) ? movements : [];
     const safePartners = Array.isArray(partners) ? partners : [];
+
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="flex flex-col lg:flex-row gap-8">
-                <div className="flex-1 space-y-6">
-                    <div className="flex justify-between items-center"><h2 className="text-2xl font-black text-[#1A365D] tracking-tighter">Operativa de Joyería</h2><div className="flex gap-2"><button onClick={onAddPartner} className="bg-white border-2 border-slate-100 p-4 rounded-2xl font-black text-[10px] uppercase hover:bg-slate-50"><UserPlus size={18}/></button><button onClick={() => onAddMovement('Recepción')} className="bg-white border-2 border-slate-100 text-[#1A365D] px-6 py-4 rounded-2xl font-black text-[10px] uppercase hover:bg-slate-50">Recibir</button><button onClick={() => onAddMovement('Envío')} className="bg-[#F4F7FA] text-[#1A365D] px-6 py-4 rounded-2xl font-black text-[10px] uppercase hover:bg-slate-200">Enviar</button><button onClick={() => onAddMovement('Fundición')} className="bg-[#FF8C9D] text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-coral-100">Fundición</button></div></div>
-                    <div className="bg-white rounded-[40px] border border-[#E2E8F0] shadow-sm overflow-hidden text-sm"><table className="w-full text-left uppercase text-[10px] font-bold"><thead className="bg-[#F4F7FA] font-black text-[#A0AEC0] tracking-widest border-b"><tr><th className="p-5 pl-10">Fecha</th><th className="p-5">Tipo</th><th className="p-5">Socio</th><th className="p-5">Peso</th><th className="p-5">Estado</th><th className="p-5 text-right pr-10">Acción</th></tr></thead><tbody className="divide-y divide-slate-100">{safeMovements.map(m => (<tr key={m.id} className="hover:bg-slate-50"><td className="p-5 pl-10 font-bold text-[#1A365D]">{format(parseISO(m.date), 'dd/MM/yyyy')}</td><td className="p-5"><span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase ${m.type === 'Envío' ? 'bg-blue-100 text-blue-600' : m.type === 'Recepción' ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'}`}>{m.type}</span></td><td className="p-5">{m.partner_name}</td><td className="p-5 font-mono">{m.weight} gr</td><td className="p-5"><span className={`text-[9px] font-black ${m.status?.includes('Pendiente') ? 'text-coral-400' : 'text-green-500'}`}>{m.status}</span></td><td className="p-5 text-right pr-10">{m.status?.includes('Pendiente') && <button onClick={() => onRefine(m)} className="bg-[#1A365D] text-white text-[9px] font-black px-4 py-2 rounded-xl">REFINAR</button>}</td></tr>))}</tbody></table></div>
+            <div className="flex justify-between items-center bg-white p-2 rounded-[32px] border border-[#E2E8F0] w-fit mx-auto lg:mx-0">
+                <button onClick={() => setViewMode('ops')} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all ${viewMode === 'ops' ? 'bg-[#1A365D] text-white shadow-lg' : 'text-[#A0AEC0] hover:text-[#1A365D]'}`}>Operativa</button>
+                <button onClick={() => setViewMode('report')} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all ${viewMode === 'report' ? 'bg-[#1A365D] text-white shadow-lg' : 'text-[#A0AEC0] hover:text-[#1A365D]'}`}>Reporte Detallado</button>
+            </div>
+
+            {viewMode === 'ops' ? (
+                <div className="flex flex-col lg:flex-row gap-8">
+                    <div className="flex-1 space-y-6">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                            <h2 className="text-2xl font-black text-[#1A365D] tracking-tighter uppercase">Registro de Movimientos</h2>
+                            <div className="flex flex-wrap gap-2">
+                                <button onClick={() => onAddMovement('Recepción')} className="bg-amber-50 text-amber-600 px-6 py-3 rounded-2xl font-black text-[10px] uppercase hover:bg-amber-100 transition-all">Recibir Oro</button>
+                                <button onClick={() => onAddMovement('Envío')} className="bg-blue-50 text-blue-600 px-6 py-3 rounded-2xl font-black text-[10px] uppercase hover:bg-blue-100 transition-all">Enviar a Joyero</button>
+                                <button onClick={() => onAddMovement('Fundición')} className="bg-[#FF8C9D] text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-coral-100 hover:scale-[1.02] active:scale-95 transition-all">Fundición</button>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-[40px] border border-[#E2E8F0] shadow-sm overflow-hidden text-sm">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left uppercase text-[10px] font-bold min-w-[700px]">
+                                    <thead className="bg-[#F4F7FA] font-black text-[#A0AEC0] tracking-widest border-b">
+                                        <tr>
+                                            <th className="p-5 pl-10">Fecha</th>
+                                            <th className="p-5">Tipo</th>
+                                            <th className="p-5">Socio</th>
+                                            <th className="p-5">Peso</th>
+                                            <th className="p-5">Estado</th>
+                                            <th className="p-5 text-right pr-10">Acción</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {safeMovements.length === 0 ? (
+                                            <tr><td colSpan="6" className="p-10 text-center text-slate-400 italic">No hay movimientos registrados.</td></tr>
+                                        ) : (
+                                            safeMovements.map(m => (
+                                                <tr key={m.id} className="hover:bg-slate-50 transition-colors group">
+                                                    <td className="p-5 pl-10 font-bold text-[#1A365D]">{format(parseISO(m.date), 'dd/MM/yyyy')}</td>
+                                                    <td className="p-5">
+                                                        <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase ${m.type === 'Envío' ? 'bg-blue-100 text-blue-600' : m.type === 'Recepción' ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'}`}>
+                                                            {m.type}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-5 font-black text-slate-600">{m.partner_name}</td>
+                                                    <td className="p-5 font-mono text-[#1A365D] font-black">{m.weight} gr</td>
+                                                    <td className="p-5">
+                                                        <span className={`text-[9px] font-black ${m.status?.includes('Pendiente') ? 'text-coral-400 animate-pulse' : 'text-green-500'}`}>
+                                                            {m.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-5 text-right pr-10">
+                                                        <div className="flex items-center justify-end gap-3">
+                                                            {m.status?.includes('Pendiente') && (
+                                                                <button onClick={() => onRefine(m)} className="bg-[#1A365D] text-white text-[9px] font-black px-4 py-2 rounded-xl hover:scale-105 transition-all">REFINAR</button>
+                                                            )}
+                                                            <button 
+                                                                onClick={() => onDeleteMovement(m.id)}
+                                                                className="text-slate-300 hover:text-red-400 p-2 opacity-0 group-hover:opacity-100 transition-all"
+                                                            >
+                                                                <Trash2 size={16}/>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="w-full lg:w-96 space-y-6">
+                        <div className="bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-xs font-black text-[#1A365D] uppercase tracking-widest flex items-center gap-2">
+                                    Mis Joyeros <Users size={16} className="text-[#FF8C9D]"/>
+                                </h3>
+                                <button onClick={onAddPartner} className="text-[9px] font-black text-[#FF8C9D] bg-coral-50 px-3 py-1.5 rounded-lg hover:bg-coral-100 transition-all uppercase">Añadir</button>
+                            </div>
+                            <div className="space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+                                {safePartners.length === 0 ? (
+                                    <p className="text-[10px] text-slate-400 italic text-center py-4">No tienes socios registrados.</p>
+                                ) : (
+                                    safePartners.map(p => (
+                                        <div key={p.id} className="p-5 bg-[#F8F9FB] rounded-[32px] border border-slate-100 group transition-all hover:bg-white hover:shadow-lg hover:shadow-slate-200/50">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <p className="text-[10px] font-black text-[#1A365D] uppercase tracking-tighter">{p.name}</p>
+                                                    <p className="text-[8px] font-bold text-slate-400 mt-0.5">{p.email || 'Sin email'} | {p.phone || 'Sin tlf'}</p>
+                                                </div>
+                                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                                    <button onClick={() => onEditPartner(p)} className="p-1.5 text-slate-400 hover:text-blue-500"><Edit3 size={12}/></button>
+                                                    <button onClick={() => onDeletePartner(p.id)} className="p-1.5 text-slate-400 hover:text-red-500"><Trash2 size={12}/></button>
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-between items-center mt-3 pt-3 border-t border-dashed border-slate-200">
+                                                <span className="text-[8px] font-black text-slate-300 uppercase">Saldo Pendiente</span>
+                                                <span className={`text-[10px] font-black ${Number(p.debt_grams) > 0 ? 'text-[#FF8C9D]' : 'text-green-500'}`}>{p.debt_grams}g</span>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="bg-[#1A365D] p-8 rounded-[40px] text-white space-y-4">
+                            <h4 className="text-[9px] font-black text-blue-300 uppercase tracking-widest">Resumen de Stocks</h4>
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs font-bold text-blue-100 opacity-60">En Joyeros (Exterior)</span>
+                                    <span className="text-sm font-black text-[#FF8C9D]">{safePartners.reduce((acc, p) => acc + Number(p.debt_grams || 0), 0)} gr</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs font-bold text-blue-100 opacity-60">Lotes Pendientes</span>
+                                    <span className="text-sm font-black">{safeMovements.filter(m => m.status?.includes('Pendiente')).length}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div className="w-full lg:w-80 bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm h-fit">
-                    <h3 className="text-xs font-black text-[#1A365D] uppercase tracking-widest mb-6 flex items-center justify-between">CONTROLES DE METAL <ArrowUpRight size={16} className="text-[#FF8C9D]"/></h3>
-                    <div className="space-y-4">{safePartners.filter(p => Number(p.debt_grams) > 0).map(p => (<div key={p.id} className="flex justify-between items-center p-4 bg-coral-50 rounded-2xl"><div><p className="text-[10px] font-black text-[#1A365D] uppercase">{p.name}</p><p className="text-[8px] font-bold text-coral-400">Pendiente Libro</p></div><p className="font-black text-[#FF8C9D]">{p.debt_grams}g</p></div>))}</div>
+            ) : (
+                <JewelryReport movements={safeMovements} partners={safePartners} />
+            )}
+        </div>
+    );
+};
+
+const JewelryReport = ({ movements, partners }) => {
+    const [filterPartner, setFilterPartner] = useState('all');
+    
+    const filteredMovements = movements.filter(m => 
+        filterPartner === 'all' || m.partner_id.toString() === filterPartner
+    );
+
+    const stats = useMemo(() => {
+        const res = { totalWeight: 0, totalCost: 0, receivedVal: 0, smeltingCount: 0, shipmentsCount: 0 };
+        filteredMovements.forEach(m => {
+            if (m.type === 'Envío') {
+                res.totalWeight += Number(m.weight || 0);
+                res.shipmentsCount++;
+            } else if (m.type === 'Fundición') {
+                res.totalCost += Number(m.acquisition_cost || 0);
+                res.receivedVal += Number(m.received_amount || 0);
+                res.smeltingCount++;
+            }
+        });
+        return res;
+    }, [filteredMovements]);
+
+    return (
+        <div className="space-y-8 animate-in zoom-in duration-300">
+            <div className="bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm flex flex-col md:flex-row justify-between items-center gap-6">
+                <div>
+                    <h3 className="text-xl font-black text-[#1A365D] tracking-tighter uppercase">Informe de Joyas</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Análisis por socio y operativa</p>
+                </div>
+                <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-black text-slate-400 uppercase">Filtrar por:</span>
+                    <select 
+                        className="bg-[#F4F7FA] border-none rounded-2xl p-3 pr-10 font-black text-[10px] uppercase text-[#1A365D]"
+                        value={filterPartner}
+                        onChange={(e) => setFilterPartner(e.target.value)}
+                    >
+                        <option value="all">Todos los Joyeros</option>
+                        {partners.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white p-6 rounded-[32px] border border-[#E2E8F0] shadow-sm flex flex-col justify-between h-32">
+                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Peso Total Enviado</span>
+                    <p className="text-3xl font-black text-[#1A365D] tracking-tighter">{stats.totalWeight.toFixed(2)} gr</p>
+                </div>
+                <div className="bg-white p-6 rounded-[32px] border border-[#E2E8F0] shadow-sm flex flex-col justify-between h-32">
+                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Margen Generativo</span>
+                    <p className="text-3xl font-black text-green-500 tracking-tighter">{(stats.receivedVal - stats.totalCost).toFixed(2)} €</p>
+                </div>
+                <div className="bg-white p-6 rounded-[32px] border border-[#E2E8F0] shadow-sm flex flex-col justify-between h-32">
+                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Operaciones Totales</span>
+                    <p className="text-3xl font-black text-blue-500 tracking-tighter">{stats.shipmentsCount + stats.smeltingCount}</p>
+                </div>
+            </div>
+
+            <div className="bg-white rounded-[40px] border border-[#E2E8F0] shadow-sm overflow-hidden">
+                <div className="p-8 border-b border-[#F4F7FA] flex justify-between items-center">
+                    <h4 className="text-xs font-black text-[#1A365D] uppercase tracking-widest">Desglose de Operaciones</h4>
+                </div>
+                <div className="p-4 overflow-x-auto">
+                    <table className="w-full text-left uppercase text-[9px] font-bold min-w-[600px]">
+                        <thead className="text-[#A0AEC0] border-b">
+                            <tr>
+                                <th className="p-4">Fecha</th>
+                                <th className="p-4">Tipo</th>
+                                <th className="p-4">Socio</th>
+                                <th className="p-4">Peso</th>
+                                <th className="p-4">Costo Adq.</th>
+                                <th className="p-4">Valor Rec.</th>
+                                <th className="p-4 text-right">Margen</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {filteredMovements.map(m => {
+                                const margin = Number(m.received_amount || 0) - Number(m.acquisition_cost || 0);
+                                return (
+                                    <tr key={m.id} className="hover:bg-slate-50">
+                                        <td className="p-4 font-black">{format(parseISO(m.date), 'dd/MM/yy')}</td>
+                                        <td className="p-4"><span className={`px-2 py-0.5 rounded-full ${m.type === 'Envío' ? 'bg-blue-50 text-blue-500' : 'bg-green-50 text-green-500'}`}>{m.type}</span></td>
+                                        <td className="p-4 text-slate-600">{m.partner_name}</td>
+                                        <td className="p-4 font-mono">{m.weight}g</td>
+                                        <td className="p-4 font-mono">{m.acquisition_cost || '-'} €</td>
+                                        <td className="p-4 font-mono">{m.received_amount || '-'} €</td>
+                                        <td className={`p-4 text-right font-black ${margin > 0 ? 'text-green-500' : margin < 0 ? 'text-red-400' : 'text-slate-300'}`}>
+                                            {m.type === 'Fundición' ? `${margin.toFixed(2)} €` : '-'}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -848,15 +1085,19 @@ const TaskForm = ({ initialData, onSave, onCancel, onDelete }) => {
 
                             {data.periodicity === 'Mensual' && (
                                 <div className="space-y-4">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Día del mes</label>
-                                    <input 
-                                        type="number" 
-                                        min="1" max="31"
-                                        placeholder="Ej: 15"
-                                        className="w-full bg-white border-none rounded-xl p-3 font-bold text-[#1A365D]" 
-                                        value={data.recurring_month_day || ''} 
-                                        onChange={e => setData({...data, recurring_month_day: e.target.value, recurring_type: 'on_day'})}
-                                    />
+                                    <label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Día concreto del mes</label>
+                                    <div className="flex items-center gap-3">
+                                        <input 
+                                            type="number" 
+                                            min="1" max="31"
+                                            placeholder="Ej: 15"
+                                            className="flex-1 bg-white border-none rounded-xl p-3 font-black text-[#1A365D]" 
+                                            value={data.recurring_month_day || ''} 
+                                            onChange={e => setData({...data, recurring_month_day: e.target.value, recurring_type: 'on_day'})}
+                                        />
+                                        <span className="text-[9px] font-bold text-slate-400 uppercase">Se repetirá el día {data.recurring_month_day || 'X'}</span>
+                                    </div>
+                                    <p className="text-[8px] text-slate-400 italic">Si el día es 31, se ajustará automáticamente al último día de meses más cortos.</p>
                                 </div>
                             )}
 
@@ -904,14 +1145,26 @@ const TaskForm = ({ initialData, onSave, onCancel, onDelete }) => {
     );
 };
 
-const PartnerForm = ({ onSave, onCancel }) => {
-    const [name, setName] = useState('');
-    const [info, setInfo] = useState('');
+const PartnerForm = ({ initialData, onSave, onCancel }) => {
+    const [name, setName] = useState(initialData?.name || '');
+    const [info, setInfo] = useState(initialData?.contact_info || '');
+    const [phone, setPhone] = useState(initialData?.phone || '');
+    const [email, setEmail] = useState(initialData?.email || '');
+
     return (
-        <form onSubmit={(e) => { e.preventDefault(); onSave({ name, contact_info: info }); }} className="space-y-6">
-            <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Nombre Comercial</label><input type="text" required className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold" value={name} onChange={e => setName(e.target.value)}/></div>
-            <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Información</label><input type="text" className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold" value={info} onChange={e => setInfo(e.target.value)}/></div>
-            <div className="flex gap-4 pt-4"><button type="button" onClick={onCancel} className="flex-1 py-4 font-black text-[10px] text-slate-400">CANCELAR</button><button type="submit" className="flex-1 py-4 bg-[#1A365D] text-white rounded-2xl font-black text-[10px]">GUARDAR</button></div>
+        <form onSubmit={(e) => { e.preventDefault(); onSave({ id: initialData?.id, name, contact_info: info, phone, email }); }} className="space-y-6">
+            <div className="grid grid-cols-1 gap-6">
+                <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Nombre Comercial / Profesional</label><input type="text" required className="w-full bg-slate-50 border-none rounded-2xl p-4 font-black text-[#1A365D]" value={name} onChange={e => setName(e.target.value)}/></div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Teléfono</label><input type="tel" className="w-full bg-slate-50 border-none rounded-2xl p-4 font-black" value={phone} onChange={e => setPhone(e.target.value)}/></div>
+                    <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Email</label><input type="email" className="w-full bg-slate-50 border-none rounded-2xl p-4 font-black" value={email} onChange={e => setEmail(e.target.value)}/></div>
+                </div>
+                <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Notas / Dirección / Información Extra</label><textarea className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold resize-none" rows={3} value={info} onChange={e => setInfo(e.target.value)}/></div>
+            </div>
+            <div className="flex gap-4 pt-4 shrink-0">
+                <button type="button" onClick={onCancel} className="flex-1 py-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">CANCELAR</button>
+                <button type="submit" className="flex-1 py-4 bg-[#1A365D] text-white rounded-[24px] font-black text-[10px] uppercase tracking-widest shadow-xl shadow-blue-900/10 hover:scale-101 transition-all">GUARDAR SOCIO</button>
+            </div>
         </form>
     );
 };

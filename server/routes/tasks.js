@@ -46,9 +46,12 @@ function getNextOccurrence(currentDateStr, task) {
                 }
             }
         } else if (periodicity === 'Mensual') {
-            next.setMonth(next.getMonth() + interval);
             if (recurring_type === 'on_day' && recurring_month_day) {
-                next.setDate(Number(recurring_month_day));
+                // Set to 1st of month first to avoid overflows (e.g. from 31st to short month)
+                next.setDate(1);
+                next.setMonth(next.getMonth() + interval, Number(recurring_month_day));
+            } else {
+                next.setMonth(next.getMonth() + interval);
             }
         } else if (periodicity === 'Anual') {
             next.setFullYear(next.getFullYear() + interval);

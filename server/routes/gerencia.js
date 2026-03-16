@@ -23,17 +23,43 @@ router.get('/goldsmith/partners', async (req, res) => {
 });
 
 router.post('/goldsmith/partners', async (req, res) => {
-    const { name, contact_info } = req.body;
+    const { name, contact_info, phone, email } = req.body;
     const storeId = req.headers['x-store-id'] || 'store_1';
     try {
         const result = await pool.query(
-            'INSERT INTO goldsmith_partners (name, contact_info, store_id, debt_grams) VALUES ($1, $2, $3, 0) RETURNING *',
-            [name, contact_info, storeId]
+            'INSERT INTO goldsmith_partners (name, contact_info, phone, email, store_id, debt_grams) VALUES ($1, $2, $3, $4, $5, 0) RETURNING *',
+            [name, contact_info, phone, email, storeId]
         );
         res.json(result.rows[0]);
     } catch (err) { 
         logError(err, 'POST /goldsmith/partners');
         res.status(500).json({ error: err.message, stack: err.stack });
+    }
+});
+
+router.put('/goldsmith/partners/:id', async (req, res) => {
+    const { id } = req.params;
+    const { name, contact_info, phone, email } = req.body;
+    try {
+        const result = await pool.query(
+            'UPDATE goldsmith_partners SET name=$1, contact_info=$2, phone=$3, email=$4 WHERE id=$5 RETURNING *',
+            [name, contact_info, phone, email, id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        logError(err, 'PUT /goldsmith/partners');
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.delete('/goldsmith/partners/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.query('DELETE FROM goldsmith_partners WHERE id=$1', [id]);
+        res.json({ success: true });
+    } catch (err) {
+        logError(err, 'DELETE /goldsmith/partners');
+        res.status(500).json({ error: err.message });
     }
 });
 
@@ -114,6 +140,37 @@ router.put('/goldsmith/movements/:id', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+router.delete('/goldsmith/movements/:id', async (req, res) => {
+    const { id } = req.params;
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        
+        // Get movement details before deleting
+        const movRes = await client.query('SELECT * FROM goldsmith_movements WHERE id=$1', [id]);
+        if (movRes.rows.length === 0) throw new Error('Movimiento no encontrado.');
+        
+        const movement = movRes.rows[0];
+        
+        // If it was a debt adjustment, we reverse it
+        if (movement.is_debt_adjustment && movement.weight > 0) {
+            await client.query('UPDATE goldsmith_partners SET debt_grams = debt_grams + $1 WHERE id = $2', [movement.weight, movement.partner_id]);
+        }
+
+        await client.query('DELETE FROM goldsmith_movements WHERE id=$1', [id]);
+        
+        await client.query('COMMIT');
+        res.json({ success: true });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        logError(err, 'DELETE /goldsmith/movements');
+        res.status(500).json({ error: err.message });
+    } finally {
+        client.release();
+    }
+});
+
 
 router.get('/cash-control', async (req, res) => {
     const storeId = req.headers['x-store-id'] || 'store_1';

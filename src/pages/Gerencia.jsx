@@ -298,7 +298,85 @@ const TasksView = ({ tasks, onEdit, onAdd, loadData, currentStore }) => {
     const endDate = endOfWeek(endOfMonth(month), { weekStartsOn: 1 });
     const days = eachDayOfInterval({ start: startDate, end: endDate });
 
+    const projectTasks = (physicalTasks) => {
+        const projected = [];
+        const horizon = addMonths(new Date(), 6); // Project 6 months ahead
+        
+        // Only project from "Pendiente" recurring tasks to avoid duplicates
+        physicalTasks.filter(t => t.recurring && t.status !== 'Hecha').forEach(task => {
+            let current = parseISO(task.date);
+            const limit = task.recurring_end_date ? parseISO(task.recurring_end_date) : horizon;
+            const stopDate = limit < horizon ? limit : horizon;
+            
+            // Generate up to 50 instances to prevent infinite loops
+            for (let i = 0; i < 50; i++) {
+                const nextDate = getNextOccurrenceDate(format(current, 'yyyy-MM-dd'), task);
+                if (!nextDate || nextDate > format(stopDate, 'yyyy-MM-dd')) break;
+                
+                projected.push({
+                    ...task,
+                    id: `virtual-${task.id}-${nextDate}`,
+                    date: nextDate,
+                    isVirtual: true
+                });
+                current = parseISO(nextDate);
+            }
+        });
+        return projected;
+    };
+
+    // Frontend version of getNextOccurrence
+    const getNextOccurrenceDate = (currentDateStr, task) => {
+        try {
+            const { periodicity, recurring_days, recurring_month_day, recurring_interval = 1, recurring_type = 'simple' } = task;
+            let next = parseISO(currentDateStr);
+            const interval = Number(recurring_interval) || 1;
+
+            if (periodicity === 'Diario') {
+                next = addDays(next, interval);
+            } else if (periodicity === 'Semanal') {
+                const dayMap = { 'D': 0, 'L': 1, 'M': 2, 'X': 3, 'J': 4, 'V': 5, 'S': 6 };
+                const selectedDays = (Array.isArray(recurring_days) ? recurring_days : []).map(d => dayMap[d]).filter(d => d !== undefined).sort((a,b) => a - b);
+                
+                if (selectedDays.length === 0) {
+                    next = addDays(next, 7 * interval);
+                } else {
+                    let currentDay = next.getDay();
+                    let nextDay = selectedDays.find(d => d > currentDay);
+                    if (nextDay === undefined) {
+                        nextDay = selectedDays[0];
+                        next = addDays(next, (7 * interval - currentDay + nextDay));
+                    } else {
+                        next = addDays(next, nextDay - currentDay);
+                    }
+                }
+            } else if (periodicity === 'Mensual') {
+                next = addMonths(next, interval);
+                if (recurring_type === 'on_day' && recurring_month_day) {
+                    next.setDate(Number(recurring_month_day));
+                }
+            } else if (periodicity === 'Anual') {
+                next = addYears(next, interval);
+            } else {
+                return null;
+            }
+            return format(next, 'yyyy-MM-dd');
+        } catch (e) { return null; }
+    };
+
+    const allTasks = [...safeTasks, ...projectTasks(safeTasks)];
+
     const toggleStatus = async (task) => {
+        if (task.isVirtual) {
+            // Instantiate virtual task before completing
+            const res = await fetch('/api/tasks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore },
+                body: JSON.stringify({ ...task, id: undefined, status: 'Hecha', isVirtual: undefined })
+            });
+            if (res.ok) loadData();
+            return;
+        }
         const newStatus = task.status === 'Hecha' ? 'Pendiente' : 'Hecha';
         await fetch(`/api/tasks/${task.id}`, {
             method: 'PUT',
@@ -312,6 +390,10 @@ const TasksView = ({ tasks, onEdit, onAdd, loadData, currentStore }) => {
     };
 
     const deleteTask = async (id) => {
+        if (typeof id === 'string' && id.startsWith('virtual-')) {
+            alert('Para eliminar una serie de tareas, edita la tarea principal y desactiva la periodicidad.');
+            return;
+        }
         if (!confirm('¿Seguro que quieres eliminar esta tarea?')) return;
         await fetch(`/api/tasks/${id}`, { method: 'DELETE', headers: { 'x-store-id': currentStore } });
         setSelectedTask(null);
@@ -379,7 +461,7 @@ const TasksView = ({ tasks, onEdit, onAdd, loadData, currentStore }) => {
                         </div>
                         <div className="grid grid-cols-7 bg-slate-50/20">
                             {days.map((day, i) => {
-                                const dayTasks = safeTasks.filter(t => isSameDay(parseISO(t.date), day));
+                                const dayTasks = allTasks.filter(t => isSameDay(parseISO(t.date), day));
                                 const isCurrentMonth = isSameMonth(day, month);
                                 const isTodayDay = isToday(day);
 
@@ -392,49 +474,51 @@ const TasksView = ({ tasks, onEdit, onAdd, loadData, currentStore }) => {
                                             {format(day, 'd')}
                                         </div>
                                         <div className="space-y-1.5 overflow-y-auto max-h-[90px] custom-scrollbar pr-1">
-                                            {dayTasks.map(t => (
-                                                <button 
-                                                    key={t.id} 
-                                                    onClick={() => setSelectedTask(t)} 
-                                                    className={`w-full text-left text-[8px] px-2.5 py-1.5 rounded-xl font-black truncate uppercase transition-all active:scale-95 flex items-center gap-1.5 ${
-                                                        t.status === 'Hecha' 
-                                                        ? 'bg-green-50 text-green-500 border border-green-100' 
-                                                        : t.priority === 'Alta'
-                                                        ? 'bg-red-50 text-red-500 border border-red-100'
-                                                        : 'bg-blue-50 text-[#1A365D] border border-blue-100 shadow-sm'
-                                                    }`}
-                                                >
-                                                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${t.status === 'Hecha' ? 'bg-green-500' : t.priority === 'Alta' ? 'bg-red-500' : 'bg-[#1A365D]'}`} />
-                                                    {t.title}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                );
+                                             {dayTasks.map(t => (
+                                                 <button 
+                                                     key={t.id} 
+                                                     onClick={() => setSelectedTask(t)} 
+                                                     className={`w-full text-left text-[8px] px-2.5 py-1.5 rounded-xl font-black truncate uppercase transition-all active:scale-95 flex items-center gap-1.5 ${
+                                                         t.status === 'Hecha' 
+                                                         ? 'bg-green-50 text-green-500 border border-green-100' 
+                                                         : t.priority === 'Alta'
+                                                         ? 'bg-red-50 text-red-500 border border-red-100'
+                                                         : t.isVirtual
+                                                         ? 'bg-slate-50 text-slate-400 border border-dashed border-slate-200 opacity-60'
+                                                         : 'bg-blue-50 text-[#1A365D] border border-blue-100 shadow-sm'
+                                                     }`}
+                                                 >
+                                                     <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${t.status === 'Hecha' ? 'bg-green-500' : t.priority === 'Alta' ? 'bg-red-500' : t.isVirtual ? 'bg-slate-300' : 'bg-[#1A365D]'}`} />
+                                                     {t.title}
+                                                 </button>
+                                             ))}
+                                         </div>
+                                     </div>
+                                 );
                             })}
                         </div>
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        {safeTasks.length === 0 ? (
+                        {allTasks.length === 0 ? (
                             <div className="bg-white p-20 rounded-[40px] border border-dashed border-slate-200 text-center">
                                 <p className="text-slate-400 font-bold text-sm">No hay tareas programadas.</p>
                             </div>
                         ) : (
-                            safeTasks.sort((a, b) => a.date.localeCompare(b.date)).map(t => (
+                            allTasks.sort((a, b) => a.date.localeCompare(b.date)).map(t => (
                                 <div 
                                     key={t.id} 
                                     onClick={() => setSelectedTask(t)}
-                                    className="bg-white p-6 rounded-[32px] border border-[#E2E8F0] shadow-sm hover:shadow-md transition-all cursor-pointer flex items-center gap-6 group"
+                                    className={`bg-white p-6 rounded-[32px] border border-[#E2E8F0] shadow-sm hover:shadow-md transition-all cursor-pointer flex items-center gap-6 group ${t.isVirtual ? 'opacity-60 border-dashed' : ''}`}
                                 >
-                                    <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center shrink-0 ${isToday(parseISO(t.date)) ? 'bg-[#FF8C9D] text-white shadow-xl shadow-coral-100' : 'bg-[#F4F7FA] text-slate-400'}`}>
+                                    <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center shrink-0 ${isToday(parseISO(t.date)) ? 'bg-[#FF8C9D] text-white shadow-xl shadow-coral-100' : t.isVirtual ? 'bg-slate-50 text-slate-300' : 'bg-[#F4F7FA] text-slate-400'}`}>
                                         <span className="text-xs font-black uppercase leading-none">{format(parseISO(t.date), 'MMM', { locale: es })}</span>
                                         <span className="text-xl font-black leading-tight">{format(parseISO(t.date), 'd')}</span>
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
                                             <span className={`text-[8px] font-black px-2 py-0.5 rounded-md uppercase ${t.priority === 'Alta' ? 'bg-red-100 text-red-500' : 'bg-blue-100 text-[#1A365D]'}`}>{t.priority}</span>
-                                            {t.recurring && <span className="text-[8px] font-black px-2 py-0.5 rounded-md bg-coral-50 text-[#FF8C9D] flex items-center gap-1 uppercase"><Clock size={8}/> Periódica</span>}
+                                            {t.recurring && <span className="text-[8px] font-black px-2 py-0.5 rounded-md bg-coral-50 text-[#FF8C9D] flex items-center gap-1 uppercase"><Clock size={8}/> {t.isVirtual ? 'Proyectada' : 'Periódica'}</span>}
                                         </div>
                                         <h4 className="text-sm font-black text-[#1A365D] uppercase truncate">{t.title}</h4>
                                         <p className="text-[10px] text-slate-400 font-bold truncate mt-1">{t.description || 'Sin descripción'}</p>
@@ -460,7 +544,7 @@ const TasksView = ({ tasks, onEdit, onAdd, loadData, currentStore }) => {
                     <div className="bg-[#1A365D] text-white p-8 rounded-[40px] shadow-2xl space-y-8 sticky top-32 border border-blue-800">
                         <div className="flex justify-between items-start">
                              <div className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest ${selectedTask.status === 'Hecha' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-coral-500/20 text-[#FF8C9D] border border-coral-500/30'}`}>
-                                {selectedTask.status}
+                                {selectedTask.isVirtual ? 'Programada' : selectedTask.status}
                              </div>
                              <button onClick={() => setSelectedTask(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/50"><X size={20}/></button>
                         </div>
@@ -495,11 +579,17 @@ const TasksView = ({ tasks, onEdit, onAdd, loadData, currentStore }) => {
                                     : 'bg-[#FF8C9D] text-white shadow-lg shadow-coral-500/20'
                                 }`}
                             >
-                                <Check size={16} /> {selectedTask.status === 'Hecha' ? 'COMPLETADA' : 'MARCAR HECHA'}
+                                <Check size={16} /> {selectedTask.isVirtual ? 'CONFIRMAR Y COMPLETAR' : selectedTask.status === 'Hecha' ? 'COMPLETADA' : 'MARCAR HECHA'}
                             </button>
                             <button 
-                                onClick={() => onEdit(selectedTask)}
-                                className="flex-1 py-4 bg-white/10 hover:bg-white/20 text-white rounded-2xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2"
+                                onClick={() => {
+                                    if(selectedTask.isVirtual) {
+                                        alert('Para editar esta tarea futura, primero complétala o edita la tarea actual de la serie.');
+                                        return;
+                                    }
+                                    onEdit(selectedTask);
+                                }}
+                                className={`flex-1 py-4 bg-white/10 hover:bg-white/20 text-white rounded-2xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2 ${selectedTask.isVirtual ? 'opacity-30' : ''}`}
                             >
                                 <Edit3 size={16} /> EDITAR
                             </button>

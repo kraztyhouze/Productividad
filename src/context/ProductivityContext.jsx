@@ -46,8 +46,24 @@ export const ProductivityProvider = ({ children }) => {
 
             const data = await res.json();
 
-            setActiveSessions(data.activeSessions || []);
-            setDailyRecords(data.dailyRecords || []);
+            // SANIZE AND DEDUPLICATE ACTIVE SESSIONS
+            const rawSessions = data.activeSessions || [];
+            const sanitizedSessions = [];
+            const seenIds = new Set();
+            rawSessions.forEach(s => {
+                const cid = String(s.employeeId || '').trim();
+                if (cid && !seenIds.has(cid)) {
+                    sanitizedSessions.push({ ...s, employeeId: cid });
+                    seenIds.add(cid);
+                }
+            });
+            setActiveSessions(sanitizedSessions);
+
+            // SANIZE DAILY RECORDS
+            setDailyRecords((data.dailyRecords || []).map(r => ({
+                ...r,
+                employeeId: String(r.employeeId || '').trim()
+            })));
 
             // NORMALIZE DAILY GROUPS KEYS (Fix for "JMH/RML Mixup")
             const rawGroups = data.dailyGroups || {};
@@ -164,8 +180,8 @@ export const ProductivityProvider = ({ children }) => {
     // --- ACTIONS ---
 
     const startSession = async (employeeId, employeeName) => {
-        const idStr = String(employeeId);
-        if (activeSessions.find(s => String(s.employeeId) === idStr)) return;
+        const idStr = String(employeeId).trim();
+        if (activeSessions.find(s => String(s.employeeId).trim() === idStr)) return;
 
         const newSession = {
             employeeId: idStr,
@@ -189,10 +205,10 @@ export const ProductivityProvider = ({ children }) => {
     };
 
     const toggleClientSession = async (employeeId, isStarting) => {
-        const idStr = String(employeeId);
+        const idStr = String(employeeId).trim();
 
         // Find current session to get start time if stopping
-        const currentSession = activeSessions.find(s => String(s.employeeId) === idStr);
+        const currentSession = activeSessions.find(s => String(s.employeeId).trim() === idStr);
         const startTime = isStarting ? new Date().toISOString() : null;
 
         // If stopping, log the transaction
@@ -215,7 +231,7 @@ export const ProductivityProvider = ({ children }) => {
         }
 
         setActiveSessions(prev => prev.map(s =>
-            String(s.employeeId) === idStr ? { ...s, clientStartTime: startTime } : s
+            String(s.employeeId).trim() === idStr ? { ...s, clientStartTime: startTime } : s
         ));
 
         try {
@@ -228,8 +244,8 @@ export const ProductivityProvider = ({ children }) => {
     };
 
     const endSession = async (employeeId) => {
-        const idStr = String(employeeId);
-        const sessionIndex = activeSessions.findIndex(s => String(s.employeeId) === idStr);
+        const idStr = String(employeeId).trim();
+        const sessionIndex = activeSessions.findIndex(s => String(s.employeeId).trim() === idStr);
         if (sessionIndex === -1) return;
 
         const session = activeSessions[sessionIndex];
@@ -293,6 +309,23 @@ export const ProductivityProvider = ({ children }) => {
         }
     };
 
+    const cancelSession = async (employeeId) => {
+        const idStr = String(employeeId).trim();
+        const sessionIndex = activeSessions.findIndex(s => String(s.employeeId).trim() === idStr);
+        if (sessionIndex === -1) return;
+
+        // Optimistic UI
+        const newSessions = [...activeSessions];
+        newSessions.splice(sessionIndex, 1);
+        setActiveSessions(newSessions);
+
+        try {
+            await fetch(`/api/active-sessions/${idStr}`, { method: 'DELETE', headers: getHeaders() });
+        } catch (err) {
+            console.error("Error canceling session", err);
+        }
+    };
+
     const updateDailyGroups = async (employeeId, date, updates) => {
         // SANITIZE ID: ensure it is a clean string (e.g. " 55 " -> "55")
         const cleanId = String(parseInt(employeeId) || employeeId).trim();
@@ -345,10 +378,10 @@ export const ProductivityProvider = ({ children }) => {
     };
 
     const updateEmployeeShiftTime = async (employeeId, date, newTotalSeconds) => {
-        const idStr = String(employeeId);
+        const idStr = String(employeeId).trim();
 
-        const employeeRecords = dailyRecords.filter(r => String(r.employeeId) === idStr && r.date === date);
-        const activeSession = formatLocal(new Date()) === date ? activeSessions.find(s => String(s.employeeId) === idStr) : null;
+        const employeeRecords = dailyRecords.filter(r => String(r.employeeId).trim() === idStr && r.date === date);
+        const activeSession = formatLocal(new Date()) === date ? activeSessions.find(s => String(s.employeeId).trim() === idStr) : null;
         const activeDuration = activeSession ? (new Date() - new Date(activeSession.startTime)) / 1000 : 0;
         const currentClosedTotal = employeeRecords.reduce((sum, r) => sum + (r.durationSeconds || 0), 0);
 
@@ -357,7 +390,7 @@ export const ProductivityProvider = ({ children }) => {
         if (employeeRecords.length === 0) {
             if (activeSession) {
                 const newStartTime = new Date(Date.now() - newTotalSeconds * 1000).toISOString();
-                setActiveSessions(prev => prev.map(s => String(s.employeeId) === idStr ? { ...s, startTime: newStartTime } : s));
+                setActiveSessions(prev => prev.map(s => String(s.employeeId).trim() === idStr ? { ...s, startTime: newStartTime } : s));
                 try {
                     await fetch(`/api/active-sessions/${idStr}`, { method: 'PUT', headers: getHeaders(), body: JSON.stringify({ startTime: newStartTime }) });
                 } catch (e) { console.error(e); }
@@ -445,21 +478,21 @@ export const ProductivityProvider = ({ children }) => {
     };
 
     const deleteEmployeeDayData = async (employeeId, date) => {
-        const idStr = String(employeeId);
+        const idStr = String(employeeId).trim();
 
         try {
             // 1. If Today, remove active session immediately
             const isToday = formatLocal(new Date()) === date;
             if (isToday) {
                 // Optimistic local update
-                setActiveSessions(prev => prev.filter(s => String(s.employeeId) !== idStr));
+                setActiveSessions(prev => prev.filter(s => String(s.employeeId).trim() !== idStr));
                 await fetch(`/api/active-sessions/${idStr}`, { method: 'DELETE', headers: getHeaders() });
             }
 
             // 2. Identify and remove records locally & remotely
-            const recordsToDelete = dailyRecords.filter(r => String(r.employeeId) === idStr && r.date === date);
+            const recordsToDelete = dailyRecords.filter(r => String(r.employeeId).trim() === idStr && r.date === date);
             const recordIds = recordsToDelete.map(r => r.id);
-            setDailyRecords(prev => prev.filter(r => !(String(r.employeeId) === idStr && r.date === date)));
+            setDailyRecords(prev => prev.filter(r => !(String(r.employeeId).trim() === idStr && r.date === date)));
 
             await Promise.all(recordIds.map(id => fetch(`/api/daily-records/${id}`, { method: 'DELETE', headers: getHeaders() })));
 
@@ -472,7 +505,7 @@ export const ProductivityProvider = ({ children }) => {
             await fetch(`/api/daily-groups/${groupKey}`, { method: 'DELETE', headers: getHeaders() });
 
             // 4. Remove Transaction Logs locally and recursively delete
-            setTransactionLogs(prev => prev.filter(l => !(String(l.employee_id) === idStr && String(l.start_time).startsWith(date))));
+            setTransactionLogs(prev => prev.filter(l => !(String(l.employee_id).trim() === idStr && String(l.start_time).startsWith(date))));
             await fetch(`/api/transaction-logs/employee/${idStr}/${date}`, { method: 'DELETE', headers: getHeaders() });
 
             // 5. Force Sync
@@ -521,6 +554,7 @@ export const ProductivityProvider = ({ children }) => {
             dailyRecords,
             startSession,
             endSession,
+            cancelSession,
             toggleClientSession,
             dailyGroups,
             updateDailyGroups,

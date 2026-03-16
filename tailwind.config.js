@@ -7,7 +7,7 @@ export default {
     theme: {
         extend: {
             fontFamily: {
-                sans: ['Outfit', 'sans-serif'],
+                sans: ['Inter', 'sans-serif'],
             },
             animation: {
                 'spin-slow': 'spin 3s linear infinite',

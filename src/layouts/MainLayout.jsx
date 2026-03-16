@@ -3,17 +3,19 @@ import { Outlet } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 
 const MainLayout = () => {
-    // State for sidebar expansion using the same logic as DashboardLayout
     const [expanded, setExpanded] = useState(true);
 
     return (
-        <div className="flex bg-slate-950 min-h-screen font-sans text-slate-50 selection:bg-blue-500/30">
+        <div className="flex bg-[#F4F7FA] min-h-screen font-sans text-[#1A365D]">
             {/* Modular Sidebar */}
             <Sidebar expanded={expanded} setExpanded={setExpanded} />
 
             {/* Main Content Area */}
-            <main className={`flex-1 p-6 lg:p-10 transition-all duration-300 ${expanded ? 'ml-64' : 'ml-20'}`}>
-                <div className="max-w-[1920px] mx-auto animate-in fade-in duration-500">
+            <main
+                className="flex-1 transition-all duration-300 min-h-screen"
+                style={{ marginLeft: expanded ? 'var(--sidebar-width)' : 'var(--sidebar-collapsed)' }}
+            >
+                <div className="max-w-[1920px] mx-auto p-6 lg:p-8 animate-in">
                     <Outlet />
                 </div>
             </main>

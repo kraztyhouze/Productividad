@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { Smartphone, CheckCircle, Mic, Speaker, Battery, MapPin, Activity, ShieldAlert, Zap, Wifi, Grid, Maximize } from 'lucide-react';
+import { Smartphone, CheckCircle, Mic, Speaker, Battery, MapPin, Activity, ShieldAlert, Zap, Wifi, Grid, Maximize, X } from 'lucide-react';
 
 const MobileDiagnostics = () => {
     const { sessionId } = useParams();
-    // Order: Intro -> IMEI -> Network -> Cosmetic -> Security -> Pixels -> Touch -> Vibration -> Sensors -> Mic -> Audio -> FrontCam -> RearCam -> Flash -> GPS -> Charging -> Done
     const [step, setStep] = useState('intro');
     const [results, setResults] = useState([]);
     const [deviceInfo, setDeviceInfo] = useState({});
@@ -14,28 +13,18 @@ const MobileDiagnostics = () => {
         if (sessionId) {
             const getDeviceName = () => {
                 const ua = navigator.userAgent;
-                // Try modern User-Agent Client Hints API first (Chrome/Android)
                 if (navigator.userAgentData) {
                     const mobileBrand = navigator.userAgentData.brands.find(b => b.brand !== "Not A;Brand" && b.brand !== "Chromium" && b.brand !== "Google Chrome");
                     if (mobileBrand) return `${mobileBrand.brand} ${navigator.userAgentData.mobile ? '(Mobile)' : ''}`;
                 }
-
-                // Enhanced Regex for Android Model
-                // Looks for text between "; " and " Build/" or ")"
-                // Common formats: "Linux; Android 10; K)" -> "K", "Linux; Android 13; SM-G991B)" -> "SM-G991B"
                 const androidMatch = ua.match(/Android.*?; (.*?)(?:\)| Build)/);
-
                 if (androidMatch && androidMatch[1]) {
-                    // Filter out language codes if accidentally captured (e.g. "en-us")
                     const candidate = androidMatch[1].trim();
-                    if (candidate.length > 2 && !candidate.includes('wv')) {
-                        return candidate;
-                    }
+                    if (candidate.length > 2 && !candidate.includes('wv')) return candidate;
                 }
-
                 if (ua.match(/iPhone/i)) return "Apple iPhone";
                 if (ua.match(/iPad/i)) return "Apple iPad";
-                return "Dispositivo Android / Genérico";
+                return "Dispositivo Móvil";
             };
 
             const info = {
@@ -46,21 +35,13 @@ const MobileDiagnostics = () => {
                 language: navigator.language
             };
             setDeviceInfo(info);
-
-            // We do NOT update immediately here, we wait for Employee Name in next step.
-            // But we can pre-fill device info.
-
         }
     }, [sessionId]);
 
     const handleResult = async (testId, passed, details) => {
         const newResult = { name: testId, passed, details };
-        const updatedResults = [...results, newResult]; // Append new result
+        setResults(prev => [...prev, newResult]);
 
-        // Prevent duplicates if re-running? For now we just append.
-        setResults(updatedResults);
-
-        // Sync partial result
         fetch(`/api/diagnostics/update/${sessionId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -70,33 +51,37 @@ const MobileDiagnostics = () => {
 
     const next = (nextStep) => setStep(nextStep);
 
-    // Common Button Styles
-    const btnBase = "w-full max-w-xs py-3 rounded-xl font-bold text-lg shadow-lg transition-transform active:scale-95 mb-3 flex items-center justify-center gap-2";
-    const btnPrimary = `${btnBase} bg-pink-600 text-white shadow-pink-600/20`;
-    const btnSecondary = `${btnBase} bg-white text-slate-900`;
-    const btnDanger = `${btnBase} bg-slate-800 text-red-500 border border-red-500/30`;
+    // Common Button Styles - New Theme
+    const btnBase = "w-full max-w-xs py-4 rounded-2xl font-bold text-lg transition-all active:scale-95 mb-4 flex items-center justify-center gap-3 shadow-md";
+    const btnPrimary = `${btnBase} bg-[#FF8C9D] text-white hover:bg-[#ff7a8d] shadow-[#FF8C9D]/20`;
+    const btnSecondary = `${btnBase} bg-white text-[#1A365D] border border-[#E2E8F0] hover:bg-[#F4F7FA]`;
+    const btnDanger = `${btnBase} bg-red-50 text-red-500 border border-red-100 hover:bg-red-100`;
 
     // --- STEPS ---
 
     if (step === 'intro') {
         return (
-            <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-8 text-center safe-area-inset">
-                <Smartphone size={64} className="text-pink-500 mb-6 animate-pulse" />
-                <h1 className="text-3xl font-black mb-2">PhoneCheck AI</h1>
-                <p className="text-slate-400 mb-2">ID: <span className="font-mono text-pink-400">{sessionId ? sessionId.slice(0, 8) : '...'}</span></p>
-                <p className="text-slate-500 mb-6 max-w-xs text-sm">{deviceInfo.model || 'Detectando...'}</p>
+            <div className="min-h-screen bg-[#F4F7FA] text-[#1A365D] flex flex-col items-center justify-center p-8 text-center">
+                <div className="w-24 h-24 bg-white rounded-3xl shadow-xl flex items-center justify-center mb-8 border border-white">
+                    <Smartphone size={48} className="text-[#FF8C9D] animate-pulse" />
+                </div>
+                <h1 className="text-4xl font-black mb-2 tracking-tight">Diagnóstico <span className="text-[#FF8C9D]">IA</span></h1>
+                <p className="text-[#718096] mb-8 font-medium">Análisis de hardware para ID: <span className="font-mono text-[#FF8C9D]">{sessionId ? sessionId.slice(0, 8).toUpperCase() : '...'}</span></p>
 
-                <input
-                    type="text"
-                    placeholder="Tu Alias / Nombre"
-                    className="w-full max-w-xs bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white mb-6 focus:border-pink-500 outline-none text-center font-bold"
-                    onChange={(e) => setDeviceInfo(prev => ({ ...prev, employee: e.target.value }))}
-                />
+                <div className="w-full max-w-xs bg-white p-6 rounded-3xl shadow-sm border border-[#E2E8F0] mb-8">
+                    <p className="text-[10px] uppercase font-bold text-[#A0AEC0] mb-2">Dispositivo Detectado</p>
+                    <p className="text-sm font-bold text-[#1A365D] mb-4">{deviceInfo.model || 'Detectando...'}</p>
+                    <input
+                        type="text"
+                        placeholder="Tu Nombre o Alias"
+                        className="w-full bg-[#F4F7FA] border border-[#E2E8F0] rounded-xl px-4 py-3 text-[#1A365D] focus:border-[#FF8C9D] outline-none text-center font-bold placeholder:text-[#A0AEC0]"
+                        onChange={(e) => setDeviceInfo(prev => ({ ...prev, employee: e.target.value }))}
+                    />
+                </div>
 
                 <button
                     onClick={() => {
                         if (!deviceInfo.employee) return alert("Introduce tu nombre/alias");
-                        // Register session start with alias
                         fetch(`/api/diagnostics/update/${sessionId}`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -106,7 +91,7 @@ const MobileDiagnostics = () => {
                     }}
                     className={btnPrimary}
                 >
-                    COMENZAR TEST
+                    COMENZAR ANÁLISIS
                 </button>
             </div>
         );
@@ -116,32 +101,23 @@ const MobileDiagnostics = () => {
     if (step === 'network') return <NetworkTest btnPrimary={btnPrimary} onComplete={(res) => { handleResult('network', true, res); next('cosmetic'); }} />;
     if (step === 'cosmetic') return <CosmeticTest onComplete={(res) => { handleResult('cosmetic', true, res); next('security'); }} />;
     if (step === 'security') return <SecurityTest onComplete={(res) => { handleResult('security', res.passed, res.details); next('pixels'); }} />;
-
-    // Hardware Tests
     if (step === 'pixels') return <PixelTest onComplete={(res) => { handleResult('pixels', true, 'Verificado'); next('touch'); }} />;
     if (step === 'touch') return <TouchTest onComplete={(res) => { handleResult('touch', true, res); next('vibration'); }} />;
     if (step === 'vibration') return <VibrationTest btnSecondary={btnSecondary} btnDanger={btnDanger} onComplete={(res) => { handleResult('vibration', res.passed, res.details); next('sensors'); }} />;
     if (step === 'sensors') return <SensorTest onComplete={(res) => { handleResult('sensors', res.passed, res.details); next('mic'); }} />;
-
-    // Audio
     if (step === 'mic') return <MicTest btnPrimary={btnPrimary} btnSecondary={btnSecondary} btnDanger={btnDanger} onComplete={(res) => { handleResult('mic', res.passed, res.details); next('audio'); }} />;
     if (step === 'audio') return <AudioTest btnPrimary={btnPrimary} btnSecondary={btnSecondary} btnDanger={btnDanger} onComplete={(res) => { handleResult('audio', res.passed, res.details); next('front-camera'); }} />;
-
-    // Cameras
     if (step === 'front-camera') return <CameraTest type="user" title="Cámara Frontal" onComplete={(res) => { handleResult('front-camera', res.passed, res.details); next('camera'); }} />;
     if (step === 'camera') return <CameraTest type="environment" title="Cámara Trasera" sessionId={sessionId} upload={true} onComplete={(res) => { handleResult('camera', res.passed, res.details); next('flashlight'); }} />;
     if (step === 'flashlight') return <FlashlightTest btnPrimary={btnPrimary} btnSecondary={btnSecondary} btnDanger={btnDanger} onComplete={(res) => { handleResult('flashlight', res.passed, res.details); next('gps'); }} />;
-
-    // Connectivity & Power
     if (step === 'gps') return <GPSTest onComplete={(res) => { handleResult('gps', res.passed, res.details); next('charging'); }} />;
     if (step === 'charging') return <ChargingTest onComplete={(res) => { handleResult('charging', res.passed, res.details); next('done'); }} />;
-
     if (step === 'done') return <FinalStep sessionId={sessionId} results={results} />;
 
     return null;
 };
 
-/* 0. DONE STEP (Extracted to fix Hook Rules) */
+/* 0. DONE STEP */
 const FinalStep = ({ sessionId, results }) => {
     useEffect(() => {
         if (sessionId) {
@@ -154,38 +130,38 @@ const FinalStep = ({ sessionId, results }) => {
     }, [sessionId]);
 
     return (
-        <div className="min-h-screen bg-green-600 text-white flex flex-col items-center justify-center p-8 text-center safe-area-inset">
-            <CheckCircle size={80} className="mb-6 animate-bounce" />
-            <h1 className="text-4xl font-black mb-4">¡FINALIZADO!</h1>
-            <p className="text-xl font-medium opacity-90 mb-8">Resultados enviados al PC.</p>
-            <div className="bg-white/20 p-4 rounded-xl backdrop-blur-sm text-sm">
-                <p>Ya puedes cerrar esta ventana.</p>
+        <div className="min-h-screen bg-green-500 text-white flex flex-col items-center justify-center p-8 text-center">
+            <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center mb-8 border border-white/30 animate-bounce">
+                <CheckCircle size={64} />
+            </div>
+            <h1 className="text-4xl font-black mb-4">¡ANÁLISIS COMPLETADO!</h1>
+            <p className="text-xl font-medium opacity-90 mb-12">Los resultados ya están disponibles en el panel de control.</p>
+            <div className="bg-white/10 p-6 rounded-2xl border border-white/20 backdrop-blur-md">
+                <p className="font-bold">Ya puedes cerrar esta pestaña</p>
             </div>
         </div>
     );
 };
 
-
-
-// --- SUB-COMPONENTS ---
-
 /* 1. IMEI */
 const IMEITest = ({ btnPrimary, onComplete }) => {
     const [val, setVal] = useState('');
     return (
-        <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-8 text-center">
-            <Grid size={64} className="mb-6 text-pink-500" />
-            <h2 className="text-2xl font-bold mb-4">Registro IMEI</h2>
-            <p className="text-slate-400 mb-8">Marca <b className="text-white">*#06#</b> y escribe los últimos 4 dígitos.</p>
+        <div className="min-h-screen bg-[#F4F7FA] text-[#1A365D] flex flex-col items-center justify-center p-8 text-center">
+            <div className="w-20 h-20 bg-white rounded-2xl shadow-md border border-[#E2E8F0] flex items-center justify-center mb-8">
+                <Grid size={40} className="text-[#FF8C9D]" />
+            </div>
+            <h2 className="text-3xl font-black mb-4">Registro IMEI</h2>
+            <p className="text-[#718096] mb-12">Marca <b className="text-[#1A365D]">*#06#</b> en el teclado y escribe los últimos 4 dígitos.</p>
             <input
                 type="tel"
-                maxLength={15}
+                maxLength={4}
                 value={val}
                 onChange={e => setVal(e.target.value)}
-                className="bg-slate-800 border-2 border-pink-500 rounded-xl px-6 py-4 text-4xl font-black text-center w-full max-w-xs mb-8 focus:outline-none focus:ring-4 focus:ring-pink-500/20"
+                className="bg-white border-2 border-[#E2E8F0] rounded-2xl px-6 py-4 text-5xl font-black text-center w-full max-w-[200px] mb-12 focus:border-[#FF8C9D] outline-none shadow-sm text-[#1A365D]"
                 placeholder="0000"
             />
-            <button onClick={() => val.length >= 4 ? onComplete(val) : alert('Introduce al menos 4 dígitos')} className={btnPrimary}>GUARDAR</button>
+            <button onClick={() => val.length >= 4 ? onComplete(val) : alert('Introduce 4 dígitos')} className={btnPrimary}>GUARDAR IMEI</button>
         </div>
     );
 };
@@ -195,11 +171,15 @@ const NetworkTest = ({ btnPrimary, onComplete }) => {
     const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
     const type = conn ? conn.effectiveType : '4g';
     return (
-        <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-8 text-center">
-            <Wifi size={64} className="mb-6 text-green-400" />
-            <h2 className="text-2xl font-bold mb-4">Conectividad</h2>
-            <p className="text-3xl font-black mb-2">{type.toUpperCase()}</p>
-            <p className="text-slate-400 mb-8 text-xl border px-4 py-1 rounded-full border-slate-700 bg-slate-800">{navigator.onLine ? 'Conectado' : 'Sin Internet'}</p>
+        <div className="min-h-screen bg-[#F4F7FA] text-[#1A365D] flex flex-col items-center justify-center p-8 text-center">
+            <div className="w-20 h-20 bg-green-50 rounded-2xl border border-green-100 flex items-center justify-center mb-8">
+                <Wifi size={40} className="text-green-500" />
+            </div>
+            <h2 className="text-3xl font-black mb-4">Conexión</h2>
+            <p className="text-5xl font-black mb-4 text-green-600">{type.toUpperCase()}</p>
+            <div className={`px-6 py-2 rounded-full font-bold text-sm mb-12 ${navigator.onLine ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                {navigator.onLine ? 'ESTADO: ONLINE' : 'ESTADO: SIN CONEXIÓN'}
+            </div>
             <button onClick={() => onComplete(`${type} (${navigator.onLine ? 'Online' : 'Offline'})`)} className={btnPrimary}>CONFIRMAR</button>
         </div>
     );
@@ -209,34 +189,34 @@ const NetworkTest = ({ btnPrimary, onComplete }) => {
 const CosmeticTest = ({ onComplete }) => {
     const [damages, setDamages] = useState([]);
     const steps = [
-        { id: 'screen', text: '¿Pantalla Rota/Astillada?' },
-        { id: 'body', text: '¿Chasis golpeado o doblado?' },
-        { id: 'buttons', text: '¿Botones físicos en mal estado?' }
+        { id: 'screen', text: '¿Pantalla Rota u Orilla Astillada?' },
+        { id: 'body', text: '¿Chasis golpeado o marcas de caída?' },
+        { id: 'buttons', text: '¿Botones físicos dañados o sueltos?' }
     ];
     const [curr, setCurr] = useState(0);
 
     const handle = (hasDamage) => {
         let newDamages = damages;
-        if (hasDamage) newDamages = [...damages, steps[curr].text]; // capture damage text
-
+        if (hasDamage) newDamages = [...damages, steps[curr].text];
         if (curr < steps.length - 1) {
             setDamages(newDamages);
             setCurr(curr + 1);
         } else {
-            // Finish
             const finalList = hasDamage ? [...damages, steps[curr].text] : damages;
-            onComplete(finalList.length > 0 ? "Daños: " + finalList.join(', ') : "Impecable");
+            onComplete(finalList.length > 0 ? "Daños: " + finalList.join(', ') : "Estado Impecable");
         }
     };
 
     return (
-        <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-8 text-center">
-            <Maximize size={64} className="mb-6 text-amber-500" />
-            <h2 className="text-2xl font-bold mb-4">Estado Físico ({curr + 1}/{steps.length})</h2>
-            <p className="text-xl mb-12 min-h-[60px] font-medium">{steps[curr].text}</p>
+        <div className="min-h-screen bg-[#F4F7FA] text-[#1A365D] flex flex-col items-center justify-center p-8 text-center">
+            <div className="w-20 h-20 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm flex items-center justify-center mb-8">
+                <Maximize size={40} className="text-amber-500" />
+            </div>
+            <h2 className="text-2xl font-black mb-2 uppercase tracking-wide opacity-60">TEST FÍSICO ({curr + 1}/{steps.length})</h2>
+            <p className="text-2xl font-bold mb-12 min-h-[80px] flex items-center justify-center px-4 leading-tight">{steps[curr].text}</p>
             <div className="flex gap-4 w-full max-w-md">
-                <button onClick={() => handle(true)} className="flex-1 py-6 bg-red-500/10 text-red-400 border border-red-500/50 rounded-2xl font-bold text-xl active:bg-red-500/30">SÍ</button>
-                <button onClick={() => handle(false)} className="flex-1 py-6 bg-green-500/10 text-green-400 border border-green-500/50 rounded-2xl font-bold text-xl active:bg-green-500/30">NO</button>
+                <button onClick={() => handle(true)} className="flex-1 py-8 bg-red-50 text-red-600 border border-red-100 rounded-3xl font-black text-2xl shadow-sm transition-all active:scale-95">SÍ</button>
+                <button onClick={() => handle(false)} className="flex-1 py-8 bg-white text-[#1A365D] border border-[#E2E8F0] rounded-3xl font-black text-2xl shadow-sm transition-all active:scale-95">NO</button>
             </div>
         </div>
     );
@@ -246,37 +226,35 @@ const CosmeticTest = ({ onComplete }) => {
 const SecurityTest = ({ onComplete }) => {
     const [flags, setFlags] = useState([]);
     const questions = [
-        { id: 'MDM', text: '¿Apps de gestión (MDM) o perfil "Empresa" en ajustes?' },
-        { id: 'ICLOUD', text: '¿Cuenta iCloud / Google vinculada?' },
-        { id: 'PIN', text: '¿Pide PIN/Patrón al reiniciar?' }
+        { id: 'MDM', text: '¿Perfil de Gestión (MDM) en Ajustes?' },
+        { id: 'ICLOUD', text: '¿Sigue vinculado a alguna Cuenta?' },
+        { id: 'PIN', text: '¿Tiene Código de Bloqueo activo?' }
     ];
     const [curr, setCurr] = useState(0);
 
     const handle = (isBad) => {
         let newFlags = flags;
         if (isBad) newFlags = [...flags, questions[curr].id];
-
         if (curr < questions.length - 1) {
             setFlags(newFlags);
             setCurr(curr + 1);
         } else {
             const finalFlags = isBad ? [...flags, questions[curr].id] : flags;
             const hasIssues = finalFlags.length > 0;
-            onComplete({
-                passed: !hasIssues,
-                details: hasIssues ? "Alertas: " + finalFlags.join(', ') : "Limpio"
-            });
+            onComplete({ passed: !hasIssues, details: hasIssues ? "Alertas: " + finalFlags.join(', ') : "Sin Cuentas" });
         }
     };
 
     return (
-        <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-8 text-center">
-            <ShieldAlert size={64} className="mb-6 text-purple-500" />
-            <h2 className="text-2xl font-bold mb-4">Seguridad</h2>
-            <p className="text-xl mb-12 min-h-[80px] font-medium max-w-xs">{questions[curr].text}</p>
+        <div className="min-h-screen bg-[#F4F7FA] text-[#1A365D] flex flex-col items-center justify-center p-8 text-center">
+            <div className="w-20 h-20 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm flex items-center justify-center mb-8">
+                <ShieldAlert size={40} className="text-purple-500" />
+            </div>
+            <h2 className="text-2xl font-black mb-2 uppercase tracking-wide opacity-60 text-purple-600">SEGURIDAD ({curr + 1}/{questions.length})</h2>
+            <p className="text-2xl font-bold mb-12 min-h-[80px] flex items-center justify-center px-4 leading-tight">{questions[curr].text}</p>
             <div className="flex gap-4 w-full max-w-md">
-                <button onClick={() => handle(true)} className="flex-1 py-6 bg-red-500/10 text-red-400 border border-red-500/50 rounded-2xl font-bold text-xl active:bg-red-500/30">SÍ</button>
-                <button onClick={() => handle(false)} className="flex-1 py-6 bg-green-500/10 text-green-400 border border-green-500/50 rounded-2xl font-bold text-xl active:bg-green-500/30">NO</button>
+                <button onClick={() => handle(true)} className="flex-1 py-8 bg-[#F5F3FF] text-purple-600 border border-purple-100 rounded-3xl font-black text-2xl shadow-sm transition-all active:scale-95">SÍ</button>
+                <button onClick={() => handle(false)} className="flex-1 py-8 bg-white text-[#1A365D] border border-[#E2E8F0] rounded-3xl font-black text-2xl shadow-sm transition-all active:scale-95">NO</button>
             </div>
         </div>
     );
@@ -284,22 +262,22 @@ const SecurityTest = ({ onComplete }) => {
 
 /* 5. PIXELS */
 const PixelTest = ({ onComplete }) => {
-    const colors = ['red', 'green', 'blue', 'white', 'black'];
+    const colors = ['#FF0000', '#00FF00', '#0000FF', '#FFFFFF', '#000000'];
     const [idx, setIdx] = useState(0);
     return (
         <div
             onClick={() => idx < colors.length - 1 ? setIdx(idx + 1) : onComplete()}
-            className="fixed inset-0 z-50 flex items-center justify-center cursor-pointer touch-manipulation"
+            className="fixed inset-0 z-50 flex flex-col items-center justify-end p-12 transition-colors duration-200"
             style={{ backgroundColor: colors[idx] }}
         >
-            <p className="bg-black/50 text-white px-6 py-3 rounded-full pointer-events-none backdrop-blur font-bold uppercase tracking-wider text-sm">
-                Toca para seguir ({idx + 1}/{colors.length})
-            </p>
+            <div className="bg-white/90 backdrop-blur-md text-[#1A365D] px-8 py-4 rounded-3xl shadow-2xl font-black uppercase tracking-widest text-sm flex items-center gap-3 border border-white">
+                Analizando Píxeles <span className="text-[#FF8C9D]">{idx + 1}/{colors.length}</span>
+            </div>
         </div>
     );
 };
 
-/* 6. TOUCH (Canvas) */
+/* 6. TOUCH */
 const TouchTest = ({ onComplete }) => {
     const canvasRef = useRef(null);
     const [progress, setProgress] = useState(0);
@@ -311,14 +289,12 @@ const TouchTest = ({ onComplete }) => {
         canvas.width = innerWidth;
         canvas.height = innerHeight;
 
-        // Grid setup
         const cols = 8; const rows = 12;
         const cw = innerWidth / cols;
         const ch = innerHeight / rows;
         const grid = new Array(cols * rows).fill(false);
 
-        // Draw grid lines
-        ctx.strokeStyle = '#333';
+        ctx.strokeStyle = '#E2E8F0';
         ctx.lineWidth = 1;
         for (let i = 0; i <= cols; i++) { ctx.beginPath(); ctx.moveTo(i * cw, 0); ctx.lineTo(i * cw, innerHeight); ctx.stroke(); }
         for (let i = 0; i <= rows; i++) { ctx.beginPath(); ctx.moveTo(0, i * ch); ctx.lineTo(innerWidth, i * ch); ctx.stroke(); }
@@ -329,17 +305,15 @@ const TouchTest = ({ onComplete }) => {
             const idx = r * cols + c;
             if (idx >= 0 && idx < grid.length && !grid[idx]) {
                 grid[idx] = true;
-                ctx.fillStyle = 'rgba(236, 72, 153, 0.8)'; // pink-500
+                ctx.fillStyle = '#FF8C9D';
                 ctx.fillRect(c * cw + 1, r * ch + 1, cw - 2, ch - 2);
-
                 const p = (grid.filter(Boolean).length / grid.length) * 100;
                 setProgress(p);
-                if (p > 85) setTimeout(() => onComplete(`Cobertura: ${p.toFixed(0)}%`), 200);
+                if (p > 90) setTimeout(() => onComplete(`Cobertura: ${p.toFixed(0)}%`), 200);
             }
         };
 
         const handle = (e) => {
-            // Prevent default to stop scrolling
             if (e.cancelable) e.preventDefault();
             const touch = e.touches ? e.touches[0] : e;
             fill(touch.clientX, touch.clientY);
@@ -347,24 +321,22 @@ const TouchTest = ({ onComplete }) => {
 
         canvas.addEventListener('touchmove', handle, { passive: false });
         canvas.addEventListener('mousemove', handle);
-        canvas.addEventListener('touchstart', handle, { passive: false }); // Start painting immediately
+        canvas.addEventListener('touchstart', handle, { passive: false });
 
         return () => {
-            if (canvas) {
-                canvas.removeEventListener('touchmove', handle);
-                canvas.removeEventListener('mousemove', handle);
-                canvas.removeEventListener('touchstart', handle);
-            }
+            canvas.removeEventListener('touchmove', handle);
+            canvas.removeEventListener('mousemove', handle);
+            canvas.removeEventListener('touchstart', handle);
         };
     }, []);
 
     return (
-        <div className="fixed inset-0 bg-black z-50 overscroll-none touch-none">
+        <div className="fixed inset-0 bg-[#F4F7FA] z-50 touch-none overscroll-none">
             <canvas ref={canvasRef} className="block w-full h-full" />
-            <div className="absolute top-8 left-0 w-full text-center pointer-events-none p-4">
-                <span className="bg-slate-900/80 border border-white/20 text-white font-bold px-6 py-3 rounded-full backdrop-blur shadow-xl text-lg">
-                    Pinta la pantalla: <span className="text-pink-500">{progress.toFixed(0)}%</span>
-                </span>
+            <div className="absolute top-12 left-0 w-full flex justify-center pointer-events-none">
+                <div className="bg-white/80 border border-[#E2E8F0] text-[#1A365D] font-black px-8 py-4 rounded-3xl backdrop-blur-md shadow-2xl text-xl uppercase tracking-tighter">
+                    Táctil: <span className="text-[#FF8C9D]">{progress.toFixed(0)}%</span>
+                </div>
             </div>
         </div>
     );
@@ -372,107 +344,65 @@ const TouchTest = ({ onComplete }) => {
 
 /* 7. VIBRATION */
 const VibrationTest = ({ btnSecondary, btnDanger, onComplete }) => {
-    const vibrate = () => {
-        if (navigator.vibrate) {
-            navigator.vibrate([200, 100, 200]);
-        } else {
-            alert("Tu navegador/dispositivo (probablemente iOS) no permite vibración web. Verifica manualmente.");
-        }
-    };
-
+    const vibrate = () => { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); };
     return (
-        <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-8 text-center">
-            <Activity size={64} className="mb-6 text-white" />
-            <h2 className="text-2xl font-bold mb-4">Vibración</h2>
-            <button onClick={vibrate} className="w-full max-w-xs py-4 rounded-xl font-bold text-lg bg-slate-700 hover:bg-slate-600 mb-12 shadow-lg">PROBAR VIBRACIÓN</button>
-
-            <p className="mb-4 text-slate-400">¿Vibró el dispositivo?</p>
+        <div className="min-h-screen bg-[#F4F7FA] text-[#1A365D] flex flex-col items-center justify-center p-8 text-center">
+            <div className="w-20 h-20 bg-white rounded-2xl shadow-sm border border-[#E2E8F0] flex items-center justify-center mb-8">
+                <Activity size={40} className="text-[#FF8C9D]" />
+            </div>
+            <h2 className="text-3xl font-black mb-12">Test de Vibración</h2>
+            <button onClick={vibrate} className="w-full max-w-xs py-6 rounded-2xl font-black text-xl bg-[#1A365D] text-white hover:bg-[#2D3748] mb-12 shadow-xl flex items-center justify-center gap-3">
+                ACTIVAR VIBRACIÓN
+            </button>
+            <p className="mb-6 font-bold text-[#718096] uppercase tracking-wide">¿Has sentido la vibración?</p>
             <div className="flex gap-4 w-full max-w-xs">
                 <button onClick={() => onComplete({ passed: true, details: 'OK' })} className={btnSecondary}>SÍ</button>
-                <button onClick={() => onComplete({ passed: false, details: 'Fallo' })} className={btnDanger}>NO</button>
+                <button onClick={() => onComplete({ passed: false, details: 'FALLA' })} className={btnDanger}>NO</button>
             </div>
         </div>
     );
 };
 
-/* 8. SENSORS */
+/* 8. SENSOR */
 const SensorTest = ({ onComplete }) => {
-    const [status, setStatus] = useState('started'); // started, listening, error
-    const [val, setVal] = useState(0);
-
+    const [status, setStatus] = useState('started');
     const start = () => {
-        // iOS 13+ requires permission
         if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-            DeviceMotionEvent.requestPermission()
-                .then(response => {
-                    if (response === 'granted') {
-                        startListening();
-                    } else {
-                        alert("Permiso denegado para sensores.");
-                        setStatus('error');
-                    }
-                })
-                .catch(e => {
-                    console.error(e);
-                    alert("Error al pedir permiso (necesitas HTTPS): " + e.message);
-                    setStatus('error');
-                });
-        } else {
-            // Non-iOS 13+ devices
-            startListening();
-        }
+            DeviceMotionEvent.requestPermission().then(r => r === 'granted' ? startListening() : setStatus('error')).catch(e => setStatus('error'));
+        } else { startListening(); }
     };
-
     const startListening = () => {
         setStatus('listening');
         const handler = (e) => {
             const acc = e.accelerationIncludingGravity;
             if (acc) {
                 const total = Math.abs(acc.x) + Math.abs(acc.y) + Math.abs(acc.z);
-                // setVal(total); // debug
-                if (total > 25) { // Shake detected threshold
+                if (total > 25) {
                     window.removeEventListener('devicemotion', handler);
-                    onComplete({ passed: true, details: 'Acelerómetro OK' });
+                    onComplete({ passed: true, details: 'OK' });
                 }
             }
         };
-
         if ('DeviceMotionEvent' in window) {
             window.addEventListener('devicemotion', handler);
-            // Timeout to fail if no motion detected after 5s
-            setTimeout(() => {
-                window.removeEventListener('devicemotion', handler);
-                if (status === 'listening') setStatus('error'); // Show fallbacks
-            }, 5000);
-        } else {
-            setStatus('error');
-        }
+            setTimeout(() => { window.removeEventListener('devicemotion', handler); if (status === 'listening') setStatus('error'); }, 6000);
+        } else { setStatus('error'); }
     };
 
     return (
-        <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-8 text-center">
-            <Maximize size={64} className="mb-6 text-blue-500 animate-spin-slow" />
-            <h2 className="text-2xl font-bold mb-4">Sensores (Acelerómetro)</h2>
-
-            {status === 'started' && (
-                <button
-                    onClick={start}
-                    className="w-full max-w-xs py-4 bg-blue-600 rounded-xl font-bold text-lg shadow-lg mb-8"
-                >
-                    INICIAR TEST
-                </button>
-            )}
-
-            {status === 'listening' && (
-                <p className="text-xl animate-pulse text-blue-300">¡Agita el dispositivo!</p>
-            )}
-
+        <div className="min-h-screen bg-[#F4F7FA] text-[#1A365D] flex flex-col items-center justify-center p-8 text-center">
+            <div className="w-20 h-20 bg-blue-50 rounded-2xl border border-blue-100 flex items-center justify-center mb-8">
+                <Maximize size={40} className="text-blue-500 animate-spin-slow" />
+            </div>
+            <h2 className="text-3xl font-black mb-8">Sensor Movimiento</h2>
+            {status === 'started' && <button onClick={start} className="w-full max-w-xs py-6 bg-blue-500 text-white rounded-2xl font-black text-xl shadow-xl">INICIAR TEST</button>}
+            {status === 'listening' && <p className="text-2xl font-black animate-pulse text-blue-500">¡AGITA EL MÓVIL AHORA!</p>}
             {(status === 'error' || status === 'listening') && (
-                <div className="mt-8 w-full max-w-xs animate-in fade-in">
-                    <p className="text-sm text-slate-400 mb-4">Si no detecta movimiento (por falta de HTTPS/Permisos):</p>
+                <div className="mt-12 bg-white p-6 rounded-3xl border border-[#E2E8F0] shadow-sm w-full max-w-xs">
+                    <p className="text-sm text-[#718096] mb-6 font-medium">Si no se detecta automáticamente:</p>
                     <div className="flex gap-4">
-                        <button onClick={() => onComplete({ passed: true, details: 'Sensor Manual OK' })} className="flex-1 py-3 bg-white text-slate-900 rounded-xl font-bold">FUNCIONA</button>
-                        <button onClick={() => onComplete({ passed: false, details: 'Fallo Sensor' })} className="flex-1 py-3 bg-slate-800 text-red-500 border border-red-500/50 rounded-xl font-bold">FALLO</button>
+                        <button onClick={() => onComplete({ passed: true, details: 'OK (Manual)' })} className="flex-1 py-4 bg-white text-[#1A365D] border border-[#E2E8F0] rounded-xl font-bold">OK</button>
+                        <button onClick={() => onComplete({ passed: false, details: 'FALLA' })} className="flex-1 py-4 bg-red-50 text-red-500 border border-red-100 rounded-xl font-bold">FALLA</button>
                     </div>
                 </div>
             )}
@@ -482,51 +412,43 @@ const SensorTest = ({ onComplete }) => {
 
 /* 9. MIC */
 const MicTest = ({ btnPrimary, btnSecondary, btnDanger, onComplete }) => {
-    const [status, setStatus] = useState('idle'); // idle, recording, playback
+    const [status, setStatus] = useState('idle');
     const [audioUrl, setAudioUrl] = useState(null);
-    const mediaRecorderRef = useRef(null);
-
     const start = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' :
-                MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '';
-
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '';
             const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
             const chunks = [];
             recorder.ondataavailable = e => chunks.push(e.data);
             recorder.onstop = () => {
-                const blob = new Blob(chunks, { type: mimeType || 'audio/webm' });
-                setAudioUrl(URL.createObjectURL(blob));
+                setAudioUrl(URL.createObjectURL(new Blob(chunks, { type: mimeType || 'audio/webm' })));
                 setStatus('playback');
                 stream.getTracks().forEach(t => t.stop());
             };
             recorder.start();
             setStatus('recording');
-            setTimeout(() => { if (recorder.state === 'recording') recorder.stop(); }, 3000);
-        } catch (e) {
-            onComplete({ passed: false, details: 'Error Mic: ' + e.message });
-        }
+            setTimeout(() => { if (recorder.state === 'recording') recorder.stop(); }, 3500);
+        } catch (e) { onComplete({ passed: false, details: 'Error: ' + e.message }); }
     };
 
     return (
-        <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-8 text-center">
-            <Mic size={64} className={`mb-6 transition-colors duration-300 ${status === 'recording' ? 'text-red-500 animate-pulse' : 'text-slate-500'}`} />
-            <h2 className="text-2xl font-bold mb-4">Micrófono</h2>
-
-            {status === 'idle' && (
-                <button onClick={start} className={btnPrimary}>GRABAR (3s)</button>
-            )}
-
-            {status === 'recording' && <p className="text-xl font-mono text-red-500">GRABANDO...</p>}
-
+        <div className="min-h-screen bg-[#F4F7FA] text-[#1A365D] flex flex-col items-center justify-center p-8 text-center">
+            <div className={`w-28 h-28 rounded-full border-4 flex items-center justify-center mb-8 transition-all ${status === 'recording' ? 'bg-red-50 border-red-200 animate-pulse' : 'bg-white border-[#E2E8F0] shadow-sm'}`}>
+                <Mic size={56} className={`${status === 'recording' ? 'text-red-500' : 'text-[#A0AEC0]'}`} />
+            </div>
+            <h2 className="text-3xl font-black mb-8">Micrófono</h2>
+            {status === 'idle' && <button onClick={start} className={btnPrimary}>GRABAR PRUEBA</button>}
+            {status === 'recording' && <p className="text-2xl font-black text-red-500 tracking-widest">GRABANDO...</p>}
             {status === 'playback' && (
-                <div className="flex flex-col gap-6 w-full max-w-xs animate-in fade-in">
-                    <p className="text-slate-400">Escucha tu grabación:</p>
-                    <audio src={audioUrl} controls className="w-full" />
-                    <div className="flex gap-4 mt-4">
-                        <button onClick={() => onComplete({ passed: true, details: 'Audio Claro' })} className={btnSecondary}>OK</button>
-                        <button onClick={() => onComplete({ passed: false, details: 'Ruido/Silencio' })} className={btnDanger}>MAL</button>
+                <div className="w-full max-w-xs animate-in fade-in zoom-in duration-300">
+                    <div className="bg-white p-6 rounded-3xl border border-[#E2E8F0] shadow-sm mb-8">
+                        <p className="text-xs font-bold text-[#A0AEC0] uppercase mb-4 tracking-widest">Escucha tu voz</p>
+                        <audio src={audioUrl} controls className="w-full h-12" />
+                    </div>
+                    <div className="flex gap-4">
+                        <button onClick={() => onComplete({ passed: true, details: 'OK' })} className={btnSecondary}>SE OYE BIEN</button>
+                        <button onClick={() => onComplete({ passed: false, details: 'FALLA' })} className={btnDanger}>FALLA</button>
                     </div>
                 </div>
             )}
@@ -534,96 +456,50 @@ const MicTest = ({ btnPrimary, btnSecondary, btnDanger, onComplete }) => {
     );
 };
 
-/* 10. AUDIO (Speakers) */
+/* 10. AUDIO */
 const AudioTest = ({ btnPrimary, btnSecondary, btnDanger, onComplete }) => {
     const play = () => {
-        const Ctx = window.AudioContext || window.webkitAudioContext;
-        const ctx = new Ctx();
-        const now = ctx.currentTime;
-
-        // Bass Sweep
-        const osc1 = ctx.createOscillator();
-        osc1.frequency.setValueAtTime(60, now);
-        osc1.frequency.linearRampToValueAtTime(300, now + 1);
-        osc1.connect(ctx.destination);
-        osc1.start(now); osc1.stop(now + 1);
-
-        // Treble Sweep
-        const osc2 = ctx.createOscillator();
-        osc2.start(now + 1.2); osc2.stop(now + 2.2);
-        osc2.frequency.setValueAtTime(3000, now + 1.2);
-        osc2.frequency.linearRampToValueAtTime(8000, now + 2.2);
-        osc2.connect(ctx.destination);
-
-        // Chord
-        [440, 554, 659].forEach(f => {
-            const o = ctx.createOscillator();
-            o.frequency.setValueAtTime(f, now + 2.5);
-            o.connect(ctx.destination);
-            o.start(now + 2.5); o.stop(now + 3.5);
-        });
+        const Ctx = window.AudioContext || window.webkitAudioContext; const ctx = new Ctx(); const n = ctx.currentTime;
+        [60, 150, 300].forEach((f, i) => { const o = ctx.createOscillator(); o.frequency.setValueAtTime(f, n + i * 0.5); o.connect(ctx.destination); o.start(n + i * 0.5); o.stop(n + i * 0.5 + 0.4); });
+        [3000, 5000].forEach((f, i) => { const o = ctx.createOscillator(); o.frequency.setValueAtTime(f, n + 1.5 + i * 0.5); o.connect(ctx.destination); o.start(n + 1.5 + i * 0.5); o.stop(n + 1.5 + i * 0.5 + 0.4); });
     };
 
     return (
-        <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-8 text-center">
-            <Speaker size={64} className="mb-6 text-blue-500" />
-            <h2 className="text-2xl font-bold mb-4">Altavoces</h2>
-            <button onClick={play} className={`${btnPrimary} bg-blue-600`}>REPRODUCIR SONIDOS</button>
-
-            <p className="mb-6 text-sm text-slate-400 max-w-xs">¿Escuchaste un bajo, un agudo chillón y un acorde final?</p>
+        <div className="min-h-screen bg-[#F4F7FA] text-[#1A365D] flex flex-col items-center justify-center p-8 text-center">
+            <div className="w-20 h-20 bg-blue-50 rounded-2xl border border-blue-100 flex items-center justify-center mb-8">
+                <Speaker size={40} className="text-blue-500" />
+            </div>
+            <h2 className="text-3xl font-black mb-12">Altavoces</h2>
+            <button onClick={play} className={`${btnPrimary} bg-blue-600`}>REPRODUCIR TEST</button>
+            <p className="mb-6 font-bold text-[#718096] uppercase tracking-wide">¿Has oído los pitidos?</p>
             <div className="flex gap-4 w-full max-w-xs">
                 <button onClick={() => onComplete({ passed: true, details: 'OK' })} className={btnSecondary}>SÍ</button>
-                <button onClick={() => onComplete({ passed: false, details: 'Fallo' })} className={btnDanger}>NO</button>
+                <button onClick={() => onComplete({ passed: false, details: 'FALLA' })} className={btnDanger}>NO</button>
             </div>
         </div>
     );
 };
 
 /* 11. CAMERA */
-const CameraTest = ({ type, title, sessionId, upload, onComplete }) => {
+const CameraTest = ({ type, title, onComplete }) => {
     const videoRef = useRef(null);
-    const canvasRef = useRef(null);
-
     useEffect(() => {
         navigator.mediaDevices.getUserMedia({ video: { facingMode: type } })
-            .then(stream => { if (videoRef.current) videoRef.current.srcObject = stream; })
-            .catch(e => {
-                // Fail gracefully if camera not found
-                console.error(e);
-                onComplete({ passed: false, details: 'Error acceso cámara' });
-            });
+            .then(s => { if (videoRef.current) videoRef.current.srcObject = s; })
+            .catch(e => { onComplete({ passed: false, details: 'Error acceso' }); });
+        return () => { if (videoRef.current?.srcObject) videoRef.current.srcObject.getTracks().forEach(t => t.stop()); };
     }, [type]);
 
-    const capture = () => {
-        if (!videoRef.current) return;
-        const vid = videoRef.current;
-        const stream = vid.srcObject;
-
-        if (upload && sessionId) {
-            // Local mode: Skip image upload, just pass
-            // In a real app we'd post to /api/upload or similar
-            const stream = vid.srcObject;
-            if (stream) stream.getTracks().forEach(t => t.stop());
-            onComplete({ passed: true, details: 'Foto Capturada (Local)' });
-        } else {
-            if (stream) stream.getTracks().forEach(t => t.stop());
-            onComplete({ passed: true, details: 'OK' });
-        }
-    };
-
     return (
-        <div className="fixed inset-0 bg-black flex flex-col p-0">
-            <div className="absolute top-0 w-full p-4 bg-gradient-to-b from-black/80 to-transparent z-10 text-center">
-                <h2 className="text-white font-bold drop-shadow-md">{title}</h2>
+        <div className="fixed inset-0 bg-black flex flex-col items-center justify-center">
+            <div className="absolute top-0 w-full p-8 bg-gradient-to-b from-black/60 to-transparent z-10 text-center">
+                <h2 className="text-white text-xl font-black tracking-widest uppercase">{title}</h2>
             </div>
-
-            <video ref={videoRef} autoPlay playsInline muted={true} className="w-full h-full object-cover" />
-            <canvas ref={canvasRef} className="hidden" />
-
-            <div className="absolute bottom-0 w-full p-8 bg-gradient-to-t from-black/90 to-transparent flex justify-center items-center gap-12">
-                <button onClick={() => onComplete({ passed: false, details: 'Fallo/Negro' })} className="text-red-500 font-bold text-sm bg-black/50 px-4 py-2 rounded-full">NO FUNCIONA</button>
-                <button onClick={capture} className="bg-white border-4 border-slate-300 w-20 h-20 rounded-full shadow-lg hover:scale-105 transition-transform"></button>
-                <div className="w-24"></div> {/* Spacer */}
+            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+            <div className="absolute bottom-12 w-full flex items-center justify-center gap-12 px-8">
+                <button onClick={() => onComplete({ passed: false, details: 'FALLA' })} className="px-6 py-3 bg-red-600 text-white rounded-2xl font-bold text-xs">FALLA</button>
+                <button onClick={() => onComplete({ passed: true, details: 'OK' })} className="w-20 h-20 bg-white rounded-full border-8 border-white/30 shadow-2xl active:scale-90 transition-all"></button>
+                <div className="w-[88px]"></div>
             </div>
         </div>
     );
@@ -633,55 +509,30 @@ const CameraTest = ({ type, title, sessionId, upload, onComplete }) => {
 const FlashlightTest = ({ btnPrimary, btnSecondary, btnDanger, onComplete }) => {
     const toggle = async (on) => {
         try {
-            // Stop previous tracks if any to release camera
-            if (window.flashlightTrack) {
-                window.flashlightTrack.stop();
-                window.flashlightTrack = null;
-            }
-
-            if (!on) return; // Just turning off = stop track (done above)
-
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode: 'environment',
-                    advanced: [{ torch: true }] // Try requesting torch immediately
-                }
-            });
-
-            const track = stream.getVideoTracks()[0];
-            window.flashlightTrack = track; // Keep ref to stop it later
-
-            // Apply constraints explicitly just in case 'advanced' in getUserMedia didn't work
-            const cap = track.getCapabilities();
-            if (cap.torch) {
-                await track.applyConstraints({ advanced: [{ torch: true }] });
-            } else {
-                // Warning: Torrent not supported on this track/device
-                console.warn("Torch capability missing");
-            }
-
-        } catch (e) {
-            console.warn("Flashlight Error:", e);
-            // alert("No se pudo iniciar el Flash: " + e.message); 
-        }
+            if (window.flashlightTrack) { window.flashlightTrack.stop(); window.flashlightTrack = null; }
+            if (!on) return;
+            const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', advanced: [{ torch: true }] } });
+            const t = s.getVideoTracks()[0]; window.flashlightTrack = t;
+            if (t.getCapabilities().torch) await t.applyConstraints({ advanced: [{ torch: true }] });
+        } catch (e) { console.warn(e); }
     };
 
     return (
-        <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-8 text-center">
-            <Zap size={64} className="mb-6 text-yellow-400" />
-            <h2 className="text-2xl font-bold mb-4">Linterna / Flash</h2>
+        <div className="min-h-screen bg-[#F4F7FA] text-[#1A365D] flex flex-col items-center justify-center p-8 text-center">
+            <div className="w-20 h-20 bg-yellow-50 rounded-2xl border border-yellow-100 flex items-center justify-center mb-8">
+                <Zap size={40} className="text-yellow-500" />
+            </div>
+            <h2 className="text-3xl font-black mb-12">Linterna / Flash</h2>
             <button
-                onMouseDown={() => toggle(true)}
-                onMouseUp={() => toggle(false)}
-                onTouchStart={() => toggle(true)}
-                onTouchEnd={() => toggle(false)}
-                className={`${btnPrimary} bg-yellow-600 mb-12`}
+                onMouseDown={() => toggle(true)} onMouseUp={() => toggle(false)}
+                onTouchStart={() => toggle(true)} onTouchEnd={() => toggle(false)}
+                className="w-full max-w-xs py-8 bg-yellow-500 text-white rounded-3xl font-black text-2xl shadow-xl active:bg-yellow-600 active:scale-95 transition-all mb-12"
             >
-                MANTENER PARA ENCENDER
+                MANTENER FLASHLIGHT
             </button>
             <div className="flex gap-4 w-full max-w-xs">
-                <button onClick={() => onComplete({ passed: true, details: 'OK' })} className={btnSecondary}>FUNCIONA</button>
-                <button onClick={() => onComplete({ passed: false, details: 'Fallo' })} className={btnDanger}>NO VA</button>
+                <button onClick={() => onComplete({ passed: true, details: 'OK' })} className={btnSecondary}>OK</button>
+                <button onClick={() => onComplete({ passed: false, details: 'FALLA' })} className={btnDanger}>FALLA</button>
             </div>
         </div>
     );
@@ -689,52 +540,35 @@ const FlashlightTest = ({ btnPrimary, btnSecondary, btnDanger, onComplete }) => 
 
 /* 13. GPS */
 const GPSTest = ({ onComplete }) => {
-    const [status, setStatus] = useState('idle'); // idle, locating, error
-
+    const [status, setStatus] = useState('idle');
     const start = () => {
         setStatus('locating');
-        if ("geolocation" in navigator) {
-            navigator.geolocation.getCurrentPosition(
-                (p) => onComplete({ passed: true, details: `${p.coords.latitude.toFixed(4)},${p.coords.longitude.toFixed(4)}` }),
-                (e) => {
-                    console.error("GPS Error", e);
-                    setStatus('error');
-                    // alert("Error GPS: " + e.message); // Opcional: mostrar alerta nativa
-                },
-                { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-            );
-        } else {
-            onComplete({ passed: false, details: 'No soportado' });
-        }
+        if (!("geolocation" in navigator)) return onComplete({ passed: false, details: 'NP' });
+        navigator.geolocation.getCurrentPosition(
+            p => onComplete({ passed: true, details: 'Localizado OK' }),
+            e => setStatus('error'),
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
     };
 
     return (
-        <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-8 text-center">
-            <MapPin size={64} className={`mb-6 text-red-500 ${status === 'locating' ? 'animate-bounce' : ''}`} />
-            <h2 className="text-2xl font-bold mb-4">Prueba GPS</h2>
-
+        <div className="min-h-screen bg-[#F4F7FA] text-[#1A365D] flex flex-col items-center justify-center p-8 text-center">
+            <div className="w-20 h-20 bg-red-50 rounded-2xl border border-red-100 flex items-center justify-center mb-8">
+                <MapPin size={40} className={`text-red-500 ${status === 'locating' ? 'animate-bounce' : ''}`} />
+            </div>
+            <h2 className="text-3xl font-black mb-12">Prueba GPS</h2>
             {status === 'idle' && (
-                <>
-                    <p className="text-slate-400 mb-8 max-w-xs text-sm">Se solicitará permiso para acceder a la ubicación precisa.</p>
-                    <button
-                        onClick={start}
-                        className="w-full max-w-xs py-4 bg-red-600 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-transform"
-                    >
-                        OBTENER UBICACIÓN
-                    </button>
-                </>
+                <button onClick={start} className="w-full max-w-xs py-5 bg-[#1A365D] text-white rounded-2xl font-black text-lg shadow-xl uppercase">
+                    OBTENER POSICIÓN
+                </button>
             )}
-
-            {status === 'locating' && <p className="text-slate-400 animate-pulse">Solicitando permiso / satélites...</p>}
-
+            {status === 'locating' && <p className="text-xl font-bold text-red-500 animate-pulse tracking-widest">BUSCANDO SATÉLITES...</p>}
             {status === 'error' && (
-                <div className="w-full max-w-xs animate-in fade-in">
-                    <p className="text-sm text-yellow-500 mb-4 bg-yellow-500/10 p-3 rounded-lg border border-yellow-500/20">
-                        ⚠️ No se pudo obtener la ubicación. Verifica los permisos del navegador.
-                    </p>
-                    <div className="flex flex-col gap-3">
-                        <button onClick={start} className="w-full py-3 bg-slate-700 rounded-xl font-bold">REINTENTAR</button>
-                        <button onClick={() => onComplete({ passed: false, details: 'Fallo GPS (Manual)' })} className="w-full py-3 bg-slate-800 text-slate-400 border border-slate-700 rounded-xl font-bold text-sm">SALTAR ESTA PRUEBA</button>
+                <div className="w-full max-w-xs animate-in zoom-in">
+                    <p className="bg-red-50 p-4 border border-red-100 text-red-600 rounded-2xl text-xs font-bold mb-6">Error de Permisos o Tiempo de respuesta.</p>
+                    <div className="flex flex-col gap-4">
+                        <button onClick={start} className="w-full py-4 bg-white border border-[#E2E8F0] rounded-xl font-bold">REINTENTAR</button>
+                        <button onClick={() => onComplete({ passed: true, details: 'Ignorado' })} className="w-full py-4 bg-[#F4F7FA] text-[#A0AEC0] rounded-xl font-bold text-sm">SALTAR TEST</button>
                     </div>
                 </div>
             )}
@@ -744,50 +578,29 @@ const GPSTest = ({ onComplete }) => {
 
 /* 14. CHARGING */
 const ChargingTest = ({ onComplete }) => {
-    const [status, setStatus] = useState('Esperando cable...');
-    const [isSupported, setIsSupported] = useState(true);
-
+    const [loading, setLoading] = useState(true);
     useEffect(() => {
         if (navigator.getBattery) {
             navigator.getBattery().then(b => {
-                const check = () => {
-                    const level = (b.level * 100).toFixed(0);
-                    if (b.charging) {
-                        setStatus(`⚡ Cargando (${level}%)`);
-                        setTimeout(() => onComplete({ passed: true, details: `Carga OK (${level}%)` }), 1500);
-                    } else {
-                        setStatus(`Conecta el cargador... (${level}%)`);
-                    }
-                };
-                check();
-                b.addEventListener('chargingchange', check);
-            }).catch(e => {
-                console.error(e);
-                setIsSupported(false);
-                setStatus('Error API Batería');
-            });
-        } else {
-            setIsSupported(false);
-            setStatus('Detección automática no soportada (iOS/Otros)');
-        }
+                const check = () => { if (b.charging) setTimeout(() => onComplete({ passed: true, details: 'OK' }), 1000); };
+                check(); b.addEventListener('chargingchange', check);
+            }).catch(() => setLoading(false));
+        } else { setLoading(false); }
     }, []);
 
     return (
-        <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-8 text-center">
-            <Battery size={64} className={`mb-6 ${isSupported ? 'text-green-500 animate-pulse' : 'text-slate-500'}`} />
-            <h2 className="text-2xl font-bold mb-2">Prueba de Carga</h2>
-            <p className="text-slate-400 mb-8">{status}</p>
-
-            {!isSupported && (
-                <div className="flex flex-col gap-3 w-full max-w-xs">
-                    <p className="text-xs text-slate-500 mb-2">Por favor, verifica visualmente que carga:</p>
-                    <button onClick={() => onComplete({ passed: true, details: 'Carga Visual OK' })} className="w-full py-3 bg-green-600 rounded-xl font-bold text-white">CARGA CORRECTAMENTE</button>
-                    <button onClick={() => onComplete({ passed: false, details: 'Fallo Carga' })} className="w-full py-3 bg-red-600/20 text-red-500 border border-red-600/50 rounded-xl font-bold">NO CARGA</button>
+        <div className="min-h-screen bg-[#F4F7FA] text-[#1A365D] flex flex-col items-center justify-center p-8 text-center">
+            <div className="w-24 h-24 bg-green-50 rounded-full border-4 border-green-100 flex items-center justify-center mb-8">
+                <Battery size={56} className="text-green-500 animate-pulse" />
+            </div>
+            <h2 className="text-3xl font-black mb-4 tracking-tighter uppercase text-green-600">🔋 TEST DE CARGA</h2>
+            <p className="text-[#718096] font-bold mb-12">CONECTA EL CARGADOR AHORA...</p>
+            {!loading && (
+                <div className="w-full max-w-xs flex flex-col gap-4 animate-in slide-in-from-bottom duration-500">
+                    <p className="text-xs font-bold text-[#A0AEC0]">Verifica visualmente:</p>
+                    <button onClick={() => onComplete({ passed: true, details: 'OK (Manual)' })} className="w-full py-5 bg-green-500 text-white rounded-2xl font-black text-xl shadow-xl">CARGA CORRECTA</button>
+                    <button onClick={() => onComplete({ passed: false, details: 'FALLA' })} className="w-full py-5 bg-white border border-[#E2E8F0] text-red-500 rounded-2xl font-bold">NO CARGA</button>
                 </div>
-            )}
-
-            {isSupported && (
-                <button onClick={() => onComplete({ passed: false, details: 'Puerto Roto/Saltado' })} className="text-xs text-slate-500 underline mt-8">Saltar Test (Sin cargador)</button>
             )}
         </div>
     );

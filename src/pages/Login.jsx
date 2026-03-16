@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
-import { Lock, User, AlertCircle, Store } from 'lucide-react';
+import { Lock, User, AlertCircle, Store, ArrowRight } from 'lucide-react';
 
 const Login = () => {
     const { login } = useAuth();
@@ -22,15 +22,9 @@ const Login = () => {
         e.preventDefault();
         setError('');
         setLoading(true);
-
         const result = await login(username, password);
-
         if (result.success) {
-            if (result.role === 'Puesto Compras') {
-                navigate('/productivity');
-            } else {
-                navigate('/');
-            }
+            navigate(result.role === 'Puesto Compras' ? '/productivity' : '/');
         } else {
             setError(result.message);
             setLoading(false);
@@ -38,91 +32,108 @@ const Login = () => {
     };
 
     return (
-        <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4 relative overflow-hidden font-sans">
-            {/* Ambient Background - Enhanced Glare */}
-            <div className="absolute top-[-20%] left-[-10%] w-[50rem] h-[50rem] bg-pink-600/30 rounded-full blur-[120px] pointer-events-none opacity-60 mix-blend-screen"></div>
-            <div className="absolute bottom-[-20%] right-[-10%] w-[50rem] h-[50rem] bg-purple-600/30 rounded-full blur-[120px] pointer-events-none opacity-60 mix-blend-screen"></div>
+        <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{ background: '#F4F7FA' }}>
 
-            {/* Geometric Accents */}
-            <div className="absolute top-1/2 left-1/4 w-96 h-1 bg-gradient-to-r from-transparent via-pink-500/50 to-transparent -rotate-45 blur-sm opacity-50"></div>
-            <div className="absolute top-1/3 right-1/4 w-96 h-1 bg-gradient-to-r from-transparent via-purple-500/50 to-transparent rotate-45 blur-sm opacity-50"></div>
+            {/* Subtle background decorations */}
+            <div className="absolute top-0 right-0 w-[600px] h-[600px] rounded-full opacity-40 pointer-events-none"
+                style={{ background: 'radial-gradient(circle, rgba(255,140,157,0.15) 0%, transparent 70%)' }} />
+            <div className="absolute bottom-0 left-0 w-[500px] h-[500px] rounded-full opacity-30 pointer-events-none"
+                style={{ background: 'radial-gradient(circle, rgba(66,153,225,0.12) 0%, transparent 70%)' }} />
 
-            <div className="max-w-[26rem] w-full relative z-10 group">
-                {/* Glowing Border Effect */}
-                <div className="absolute -inset-0.5 bg-gradient-to-b from-pink-500/50 to-purple-600/50 rounded-[2rem] blur opacity-75 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
+            <div className="w-full max-w-[420px] relative z-10">
+                {/* Card */}
+                <div className="bg-white rounded-2xl p-10 border border-[#E2E8F0]" style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.08)' }}>
 
-                <div className="relative bg-slate-900/40 backdrop-blur-2xl rounded-[2rem] border border-white/10 shadow-2xl overflow-hidden p-8 px-10">
-
+                    {/* Store indicator */}
                     <button
                         onClick={handleBackToStore}
-                        className="absolute top-4 right-4 text-slate-400 hover:text-white flex items-center gap-1.5 text-xs bg-slate-800/50 px-2 py-1 rounded-full transition-colors"
+                        className="flex items-center gap-1.5 text-xs text-[#A0AEC0] hover:text-[#FF8C9D] transition-colors mb-8 group"
                     >
                         <Store size={12} />
-                        {selectedStoreData?.name || 'Cambiar Tienda'}
+                        <span>{selectedStoreData?.name || 'Cambiar Tienda'}</span>
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity">→</span>
                     </button>
 
-                    <div className="flex flex-col items-center justify-center mb-8">
-                        {/* Logo - Natural Aspect Ratio */}
-                        <div className="mb-4">
-                            <img src="/logo_tiktak.jpg" alt="TikTak" className="h-20 w-auto object-contain drop-shadow-[0_0_15px_rgba(236,72,153,0.5)] rounded-2xl" />
-                        </div>
-
-                        <h1 className="text-3xl font-bold text-white tracking-tight text-center" style={{ fontFamily: '"Varela Round", sans-serif' }}>
-                            Bienvenido a TikTak
-                        </h1>
+                    {/* Logo + Title */}
+                    <div className="flex flex-col items-center mb-8">
+                        <img
+                            src="/logo_tiktak.jpg"
+                            alt="TikTak"
+                            className="h-16 w-auto object-contain rounded-xl mb-5"
+                            style={{ boxShadow: '0 4px 20px rgba(255,140,157,0.2)' }}
+                        />
+                        <h1 className="text-2xl font-black text-[#1A365D] text-center">Bienvenido</h1>
+                        <p className="text-sm text-[#718096] mt-1 text-center">Inicia sesión en TikTak Suite</p>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-5" autoComplete="off">
+                    <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
                         {error && (
-                            <div className="bg-red-500/10 border border-red-500/50 text-red-200 px-4 py-3 rounded-xl flex items-center gap-2 text-sm animate-in fade-in slide-in-from-top-2 backdrop-blur-md">
-                                <AlertCircle size={18} />
+                            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl flex items-center gap-2 text-sm animate-in">
+                                <AlertCircle size={16} className="shrink-0" />
                                 {error}
                             </div>
                         )}
 
-                        <div className="space-y-2">
-                            <div className="relative group/input">
-                                <User size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-pink-400/70 group-focus-within/input:text-pink-400 transition-colors" />
-                                <input
-                                    type="text"
-                                    value={username}
-                                    onChange={(e) => setUsername(e.target.value)}
-                                    required
-                                    placeholder="Usuario"
-                                    autoComplete="off"
-                                    className="w-full pl-12 pr-4 py-4 rounded-xl border border-pink-500/30 bg-slate-950/50 text-white placeholder:text-slate-400 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 transition-all font-medium"
-                                />
-                            </div>
+                        {/* Username */}
+                        <div className="relative group">
+                            <User size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#A0AEC0] group-focus-within:text-[#FF8C9D] transition-colors" />
+                            <input
+                                type="text"
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
+                                required
+                                placeholder="Usuario"
+                                autoComplete="off"
+                                id="login-username"
+                                className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-[#E2E8F0] bg-[#F4F7FA] text-[#1A365D] placeholder:text-[#A0AEC0] text-sm outline-none transition-all font-medium focus:border-[#FF8C9D] focus:bg-white"
+                                style={{ '--tw-ring-color': 'rgba(255,140,157,0.2)' }}
+                            />
                         </div>
 
-                        <div className="space-y-2">
-                            <div className="relative group/input">
-                                <Lock size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-pink-400/70 group-focus-within/input:text-pink-400 transition-colors" />
-                                <input
-                                    type="password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    required
-                                    placeholder="Contraseña"
-                                    autoComplete="new-password"
-                                    className="w-full pl-12 pr-4 py-4 rounded-xl border border-pink-500/30 bg-slate-950/50 text-white placeholder:text-slate-400 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 transition-all font-medium"
-                                />
-                            </div>
+                        {/* Password */}
+                        <div className="relative group">
+                            <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#A0AEC0] group-focus-within:text-[#FF8C9D] transition-colors" />
+                            <input
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                required
+                                placeholder="Contraseña"
+                                autoComplete="new-password"
+                                id="login-password"
+                                className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-[#E2E8F0] bg-[#F4F7FA] text-[#1A365D] placeholder:text-[#A0AEC0] text-sm outline-none transition-all font-medium focus:border-[#FF8C9D] focus:bg-white"
+                            />
                         </div>
 
+                        {/* Submit */}
                         <button
                             type="submit"
+                            id="login-submit"
                             disabled={loading}
-                            className="w-full py-4 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white rounded-xl font-bold text-lg shadow-[0_0_20px_-5px_rgba(236,72,153,0.5)] transition-all hover:scale-[1.02] active:scale-[0.98] mt-6 disabled:opacity-70 disabled:cursor-not-allowed"
+                            className="w-full py-3.5 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all mt-2 disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90 active:scale-[0.98]"
+                            style={{ background: '#FF8C9D', boxShadow: '0 8px 24px rgba(255,140,157,0.35)' }}
                         >
-                            {loading ? 'Entrando...' : 'Iniciar Sesión'}
+                            {loading ? (
+                                <span className="flex items-center gap-2">
+                                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                    </svg>
+                                    Entrando...
+                                </span>
+                            ) : (
+                                <>Iniciar Sesión <ArrowRight size={16} /></>
+                            )}
                         </button>
 
-                        <div className="flex flex-col items-center gap-2 text-sm text-slate-400 pt-2">
-                            <button type="button" className="hover:text-pink-400 transition-colors underline decoration-pink-500/30 underline-offset-4">Olvidé mi contraseña</button>
-                        </div>
+                        <p className="text-center text-xs text-[#A0AEC0] pt-1">
+                            <button type="button" className="hover:text-[#FF8C9D] transition-colors">¿Olvidaste tu contraseña?</button>
+                        </p>
                     </form>
                 </div>
+
+                {/* Footer */}
+                <p className="text-center text-xs text-[#CBD5E0] mt-6">TikTak Suite · {new Date().getFullYear()}</p>
             </div>
         </div>
     );

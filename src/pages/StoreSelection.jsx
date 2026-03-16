@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import { Store, MapPin, ArrowRight } from 'lucide-react';
@@ -8,88 +8,92 @@ const StoreSelection = () => {
     const { selectStore, stores } = useStore();
     const navigate = useNavigate();
 
-    // Explicitly logout when entering Store Selection to prevent cross-store session pollution
-    useEffect(() => {
-        localStorage.removeItem('is_user');
-    }, []);
-
     const handleSelect = (storeId) => {
         selectStore(storeId);
         navigate('/select-module');
     };
 
     return (
-
-        <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4 relative overflow-hidden font-sans">
-            {/* Ambient Background - Enhanced Glare (Same as Login) */}
-            <div className="absolute top-[-20%] left-[-10%] w-[50rem] h-[50rem] bg-pink-600/30 rounded-full blur-[120px] pointer-events-none opacity-60 mix-blend-screen"></div>
-            <div className="absolute bottom-[-20%] right-[-10%] w-[50rem] h-[50rem] bg-purple-600/30 rounded-full blur-[120px] pointer-events-none opacity-60 mix-blend-screen"></div>
-
-            {/* Geometric Accents */}
-            <div className="absolute top-1/2 left-1/4 w-96 h-1 bg-gradient-to-r from-transparent via-pink-500/50 to-transparent -rotate-45 blur-sm opacity-50"></div>
-            <div className="absolute top-1/3 right-1/4 w-96 h-1 bg-gradient-to-r from-transparent via-purple-500/50 to-transparent rotate-45 blur-sm opacity-50"></div>
+        <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{ background: '#F4F7FA' }}>
+            {/* Subtle background decorations */}
+            <div className="absolute top-0 right-0 w-[700px] h-[700px] rounded-full opacity-30 pointer-events-none"
+                style={{ background: 'radial-gradient(circle, rgba(255,140,157,0.2) 0%, transparent 65%)' }} />
+            <div className="absolute bottom-0 left-0 w-[600px] h-[600px] rounded-full opacity-20 pointer-events-none"
+                style={{ background: 'radial-gradient(circle, rgba(66,153,225,0.15) 0%, transparent 65%)' }} />
 
             <div className="relative z-10 w-full max-w-4xl flex flex-col items-center">
 
-                {/* Header Section with Logo */}
+                {/* Header */}
                 <div className="flex flex-col items-center justify-center mb-12">
-                    <div className="mb-6 group">
-                        <div className="absolute inset-0 bg-pink-500/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                        <img src="/logo_tiktak.jpg" alt="TikTak" className="relative h-28 w-auto object-contain drop-shadow-[0_0_25px_rgba(236,72,153,0.6)] rounded-3xl transform group-hover:scale-105 transition-transform duration-300" />
-                    </div>
-                    <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight text-center mb-3 drop-shadow-md" style={{ fontFamily: '"Varela Round", sans-serif' }}>
+                    <img
+                        src="/logo_tiktak.jpg"
+                        alt="TikTak"
+                        className="h-24 w-auto object-contain rounded-2xl mb-6"
+                        style={{ boxShadow: '0 8px 32px rgba(255,140,157,0.25)' }}
+                    />
+                    <h1 className="text-4xl md:text-5xl font-black text-[#1A365D] tracking-tight text-center mb-3">
                         Bienvenido a TikTak
                     </h1>
-                    <p className="text-slate-400 text-lg font-medium tracking-wide">
+                    <p className="text-[#718096] text-lg font-medium">
                         Selecciona tu ubicación para continuar
                     </p>
                 </div>
 
                 {/* Store Cards Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-10 w-full px-4">
-                    {stores.map((store, index) => (
-                        <motion.button
-                            key={store.id}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: index * 0.1 }}
-                            onClick={() => handleSelect(store.id)}
-                            className="group relative h-64 rounded-[2rem] w-full text-left"
-                        >
-                            {/* Card Glowing Border */}
-                            <div className={`absolute -inset-0.5 bg-gradient-to-b ${store.id === 'store_2' ? 'from-emerald-500/50 to-teal-600/50' : 'from-pink-500/50 to-purple-600/50'} rounded-[2rem] blur opacity-50 group-hover:opacity-100 transition duration-500`}></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full px-4">
+                    {stores.map((store, index) => {
+                        const isSecond = store.id === 'store_2';
+                        return (
+                            <motion.button
+                                key={store.id}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: index * 0.1 }}
+                                onClick={() => handleSelect(store.id)}
+                                className="group relative h-56 rounded-2xl w-full text-left bg-white border border-[#E2E8F0] overflow-hidden transition-all duration-300 hover:-translate-y-1"
+                                style={{ boxShadow: 'var(--shadow-card)' }}
+                                onMouseEnter={e => e.currentTarget.style.boxShadow = 'var(--shadow-hover)'}
+                                onMouseLeave={e => e.currentTarget.style.boxShadow = 'var(--shadow-card)'}
+                            >
+                                {/* BG accent */}
+                                <div
+                                    className="absolute top-0 right-0 w-48 h-48 rounded-full opacity-10 translate-x-1/3 -translate-y-1/3 group-hover:opacity-20 transition-opacity"
+                                    style={{ background: isSecond ? '#48BB78' : '#FF8C9D' }}
+                                />
 
-                            {/* Main Card Body */}
-                            <div className="relative h-full bg-slate-900/40 backdrop-blur-2xl rounded-[2rem] border border-white/10 p-8 flex flex-col justify-between overflow-hidden group-hover:bg-slate-900/60 transition-colors">
-
-                                {/* Background Gradient Splash inside card */}
-                                <div className={`absolute top-0 right-0 w-64 h-64 ${store.color} opacity-10 blur-[60px] rounded-full translate-x-1/3 -translate-y-1/3 group-hover:opacity-20 transition-opacity`}></div>
-
-                                <div>
-                                    <div className="w-14 h-14 rounded-2xl bg-slate-800/80 border border-white/10 flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-slate-800 transition-all duration-300 shadow-lg">
-                                        <Store className={`w-7 h-7 ${store.id === 'store_2' ? 'text-emerald-400' : 'text-pink-400'}`} />
+                                <div className="relative h-full p-8 flex flex-col justify-between">
+                                    <div>
+                                        <div
+                                            className="w-12 h-12 rounded-xl flex items-center justify-center mb-5 transition-transform group-hover:scale-110"
+                                            style={{ background: isSecond ? '#F0FFF4' : '#FFF0F2', border: `1px solid ${isSecond ? '#C6F6D5' : '#FFD6DC'}` }}
+                                        >
+                                            <Store className="w-6 h-6" style={{ color: isSecond ? '#48BB78' : '#FF8C9D' }} />
+                                        </div>
+                                        <h3 className="text-2xl font-black text-[#1A365D] mb-1 tracking-tight">
+                                            {store.name}
+                                        </h3>
+                                        <div className="flex items-center text-[#718096] text-sm font-medium">
+                                            <MapPin className="w-4 h-4 mr-2 opacity-70" />
+                                            <span>Acceder al panel de gestión</span>
+                                        </div>
                                     </div>
-                                    <h3 className="text-3xl font-bold text-white mb-2 tracking-tight group-hover:translate-x-1 transition-transform" style={{ fontFamily: '"Varela Round", sans-serif' }}>
-                                        {store.name}
-                                    </h3>
-                                    <div className="flex items-center text-slate-400 text-sm font-medium">
-                                        <MapPin className="w-4 h-4 mr-2 opacity-70" />
-                                        <span>Acceder al panel de gestión</span>
+
+                                    <div
+                                        className="flex items-center font-bold text-sm uppercase tracking-wider transition-all duration-300 group-hover:gap-3 gap-2"
+                                        style={{ color: isSecond ? '#48BB78' : '#FF8C9D' }}
+                                    >
+                                        <span>Entrar ahora</span>
+                                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                                     </div>
                                 </div>
-
-                                <div className={`flex items-center font-bold text-sm uppercase tracking-wider mt-4 transform translate-y-2 opacity-80 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 ${store.id === 'store_2' ? 'text-emerald-400' : 'text-pink-400'}`}>
-                                    <span>Entrar ahora</span>
-                                    <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                                </div>
-                            </div>
-                        </motion.button>
-                    ))}
+                            </motion.button>
+                        );
+                    })}
                 </div>
 
-                <div className="mt-16 text-center">
-                    <p className="text-slate-600 text-xs font-mono">
-                        Sistema de Gestión Centralizado v2.1 • TikTak
+                <div className="mt-12 text-center">
+                    <p className="text-[#CBD5E0] text-xs font-mono">
+                        Sistema de Gestión Centralizado v2.1 · TikTak
                     </p>
                 </div>
             </div>

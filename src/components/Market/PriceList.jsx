@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth, ROLES } from '../../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Edit2, Save, X, Plus, Trash2, ShoppingCart, ChevronDown, ChevronRight } from 'lucide-react';
+import { Edit2, Save, X, Plus, Trash2, ShoppingCart, ChevronDown, ChevronRight, Package, Info } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 
 const PriceList = () => {
@@ -12,9 +12,8 @@ const PriceList = () => {
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [editingId, setEditingId] = useState(null);
-    const [newItem, setNewItem] = useState(null); // { category: 'CONSOLA', brand: '', ... }
+    const [newItem, setNewItem] = useState(null);
 
-    // Fetch Items
     const fetchItems = async () => {
         setLoading(true);
         try {
@@ -36,11 +35,6 @@ const PriceList = () => {
     useEffect(() => {
         fetchItems();
     }, [currentStore]);
-
-    // Group items by category for rendering
-    // Categories: 'THERMOMIX', 'PS5', 'PS4', 'SWITCH', etc.
-    // We should probably allow the user to type the category or select from existing.
-    // For simplicity, let's categorize by the 'category' field in DB.
 
     const handleSave = async (item) => {
         const storeId = currentStore || 'store_1';
@@ -86,7 +80,6 @@ const PriceList = () => {
         setNewItem(null);
     };
 
-    // Initial Data from User Image
     const INITIAL_DATA = [
         { category: 'THERMOMIX', brand: 'VORWERK', model: 'TM21', price_a: 0, price_b: 219, price_c: 199 },
         { category: 'THERMOMIX', brand: 'VORWERK', model: 'TM31', price_a: 0, price_b: 399, price_c: 349 },
@@ -130,11 +123,8 @@ const PriceList = () => {
         fetchItems();
     };
 
-
-
     const [expandedCategories, setExpandedCategories] = useState({});
 
-    // Group items by category
     const groupedItems = items.reduce((acc, item) => {
         const cat = item.category || 'OTROS';
         if (!acc[cat]) acc[cat] = [];
@@ -150,21 +140,17 @@ const PriceList = () => {
     };
 
     const EditableRow = ({ item, onSave, onCancel, isNew }) => {
-        // Local state for the form row
         const [formData, setFormData] = useState({ ...item });
-
         const handleChange = (e) => {
             setFormData({ ...formData, [e.target.name]: e.target.value });
         };
-
         const handleSubmit = () => onSave(formData);
 
-        // Common styles
-        const cellClass = "p-3 text-sm align-middle";
-        const inputClass = "w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs outline-none focus:border-amber-500 transition-colors";
+        const cellClass = "p-4 text-sm align-middle";
+        const inputClass = "w-full bg-white border-2 border-[#E2E8F0] focus:border-[#48BB78] rounded-xl px-4 py-2.5 text-[#1A365D] text-xs font-black outline-none transition-all shadow-inner";
 
         return (
-            <tr className="bg-slate-800/50 border-b border-white/5 animate-in fade-in">
+            <tr className="bg-[#F0FFF4]/50 border-b border-[#E2E8F0] animate-in fade-in">
                 {!isNew && <td className={cellClass}></td>}
                 <td className={cellClass}>
                     <input name="category" value={formData.category} onChange={handleChange} className={inputClass} placeholder="CAT" list="categories" autoFocus />
@@ -180,8 +166,8 @@ const PriceList = () => {
                 <td className={cellClass}><input name="price_c" type="number" value={formData.price_c} onChange={handleChange} className={inputClass} placeholder="€" /></td>
                 <td className={cellClass}>
                     <div className="flex gap-2">
-                        <button onClick={handleSubmit} className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded transition-colors"><Save size={14} /></button>
-                        <button onClick={onCancel} className="p-1.5 bg-red-600 hover:bg-red-500 text-white rounded transition-colors"><X size={14} /></button>
+                        <button onClick={handleSubmit} className="p-2.5 bg-[#48BB78] hover:bg-[#38A169] text-white rounded-xl shadow-md transition-all active:scale-95"><Save size={14} /></button>
+                        <button onClick={onCancel} className="p-2.5 bg-[#F56565] hover:bg-[#E53E3E] text-white rounded-xl shadow-md transition-all active:scale-95"><X size={14} /></button>
                     </div>
                 </td>
             </tr>
@@ -189,21 +175,21 @@ const PriceList = () => {
     };
 
     const StaticRow = ({ item }) => {
-        const rowClass = "border-b border-white/5 hover:bg-white/5 transition-colors group";
-        const cellClass = "p-3 text-sm align-middle";
+        const rowClass = "border-b border-[#F4F7FA] hover:bg-[#F4F7FA]/30 transition-colors group";
+        const cellClass = "p-5 text-sm align-middle";
 
         return (
             <tr className={rowClass}>
-                <td className={`${cellClass} text-slate-400 w-32 uppercase text-[10px]`}>{item.brand}</td>
-                <td className={`${cellClass} font-bold text-white text-xs`}>{item.model}</td>
-                <td className={`${cellClass} font-mono text-amber-400 font-bold text-right w-24`}>{item.price_a > 0 ? item.price_a + '€' : '-'}</td>
-                <td className={`${cellClass} font-mono text-emerald-400 text-right w-24`}>{item.price_b > 0 ? item.price_b + '€' : '-'}</td>
-                <td className={`${cellClass} font-mono text-slate-400 text-right w-24`}>{item.price_c > 0 ? item.price_c + '€' : '-'}</td>
+                <td className={`${cellClass} text-[#A0AEC0] w-32 uppercase text-[10px] font-black tracking-widest`}>{item.brand}</td>
+                <td className={`${cellClass} font-black text-[#1A365D] text-sm tracking-tight`}>{item.model}</td>
+                <td className={`${cellClass} font-mono text-[#D69E2E] font-black text-right w-24 text-[13px] italic bg-[#FFFBEB]/30`}>{item.price_a > 0 ? item.price_a + '€' : '-'}</td>
+                <td className={`${cellClass} font-mono text-[#2F855A] font-black text-right w-24 text-[13px] bg-[#F0FFF4]/30`}>{item.price_b > 0 ? item.price_b + '€' : '-'}</td>
+                <td className={`${cellClass} font-mono text-[#718096] font-black text-right w-24 text-[13px] opacity-60`}>{item.price_c > 0 ? item.price_c + '€' : '-'}</td>
                 {canEdit && (
                     <td className={cellClass}>
-                        <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => startEdit(item)} className="p-1.5 hover:bg-slate-700 text-slate-400 hover:text-white rounded"><Edit2 size={14} /></button>
-                            <button onClick={() => handleDelete(item.id)} className="p-1.5 hover:bg-slate-700 text-slate-400 hover:text-red-500 rounded"><Trash2 size={14} /></button>
+                        <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
+                            <button onClick={() => startEdit(item)} className="p-2 hover:bg-[#EBF8FF] text-[#4299E1] rounded-xl transition-all"><Edit2 size={16} /></button>
+                            <button onClick={() => handleDelete(item.id)} className="p-2 hover:bg-[#FFF5F5] text-[#F56565] rounded-xl transition-all"><Trash2 size={16} /></button>
                         </div>
                     </td>
                 )}
@@ -212,27 +198,36 @@ const PriceList = () => {
     };
 
     return (
-        <div className="max-w-6xl mx-auto w-full flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4">
-            <div className="bg-[#1e293b] rounded-2xl p-6 border border-white/5 shadow-2xl relative overflow-hidden min-h-[600px]">
+        <div className="max-w-6xl mx-auto w-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-8 duration-500">
+            <div className="bg-white border border-[#E2E8F0] rounded-[56px] p-12 shadow-[0_32px_128px_-16px_rgba(26,54,93,0.1)] relative overflow-hidden min-h-[700px]">
+                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#48BB78]/5 rounded-full blur-[120px] -mr-64 -mt-64 pointer-events-none"></div>
+                <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-[#4299E1]/5 rounded-full blur-[120px] -ml-64 -mb-64 pointer-events-none"></div>
+
                 {/* Header */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 relative z-10 gap-4">
-                    <div>
-                        <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-                            <ShoppingCart className="text-emerald-500" /> PVP Consolas y Thermomix
-                        </h2>
-                        <p className="text-slate-400 text-sm mt-1">Listado oficial de precios de compra.</p>
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 relative z-10 gap-8">
+                    <div className="flex items-center gap-6">
+                        <div className="p-4 bg-[#F0FFF4] rounded-[24px] border border-[#48BB78]/20 shadow-sm">
+                            <ShoppingCart className="text-[#48BB78]" size={32} />
+                        </div>
+                        <div>
+                            <h2 className="text-3xl font-black text-[#1A365D] uppercase tracking-tighter leading-none mb-1">
+                                Precios de Mercado
+                            </h2>
+                            <p className="text-[11px] font-black text-[#A0AEC0] uppercase tracking-[0.3em] pl-1">Listado Oficial de Adquisición</p>
+                        </div>
                     </div>
                     {canEdit && (
-                        <button
+                        <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
                             onClick={() => setNewItem({ category: 'CONSOLA', brand: '', model: '', price_a: '', price_b: '', price_c: '' })}
-                            className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-all shadow-lg shadow-emerald-900/40"
+                            className="bg-gradient-to-r from-[#48BB78] to-[#68D391] text-white px-8 py-4 rounded-[24px] font-black text-xs uppercase tracking-widest flex items-center gap-3 transition-all shadow-xl shadow-[#48BB78]/20"
                         >
-                            <Plus size={16} /> Añadir Precio
-                        </button>
+                            <Plus size={20} /> Añadir Precio
+                        </motion.button>
                     )}
                 </div>
 
-                {/* Datalist for categories */}
                 <datalist id="categories">
                     <option value="THERMOMIX" />
                     <option value="PS5" />
@@ -245,42 +240,50 @@ const PriceList = () => {
                 <AnimatePresence>
                     {newItem && (
                         <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="mb-8 overflow-hidden"
+                            initial={{ opacity: 0, y: -20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            className="mb-10 overflow-hidden relative z-20"
                         >
-                            <div className="bg-slate-900/50 border border-emerald-500/30 rounded-xl p-4">
-                                <h3 className="text-emerald-400 font-bold text-sm mb-4 uppercase tracking-wider">Nuevo Registro</h3>
-                                <table className="w-full text-left">
-                                    <thead>
-                                        <tr className="text-xs uppercase text-slate-500 border-b border-white/5">
-                                            <th className="p-2">Cat</th>
-                                            <th className="p-2">Marca</th>
-                                            <th className="p-2">Modelo</th>
-                                            <th className="p-2">A</th>
-                                            <th className="p-2">B</th>
-                                            <th className="p-2">C</th>
-                                            <th className="p-2">Acción</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <EditableRow item={newItem} onSave={handleSave} onCancel={cancelEdit} isNew={true} />
-                                    </tbody>
-                                </table>
+                            <div className="bg-[#F0FFF4]/30 border-2 border-[#48BB78]/30 rounded-[40px] p-8 shadow-inner">
+                                <h3 className="text-[#2F855A] font-black text-[10px] mb-6 uppercase tracking-[0.2em] flex items-center gap-3">
+                                    <div className="w-2 h-2 bg-[#48BB78] rounded-full animate-ping"></div>
+                                    Nuevo Registro de Inventario
+                                </h3>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead>
+                                            <tr className="text-[9px] font-black uppercase text-[#A0AEC0] tracking-widest border-b border-[#48BB78]/10">
+                                                <th className="p-4">Categoría</th>
+                                                <th className="p-4">Marca</th>
+                                                <th className="p-4">Modelo</th>
+                                                <th className="p-4 text-amber-600">PVP A</th>
+                                                <th className="p-4 text-[#2F855A]">PVP B</th>
+                                                <th className="p-4 text-[#718096]">PVP C</th>
+                                                <th className="p-4">Gestión</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <EditableRow item={newItem} onSave={handleSave} onCancel={cancelEdit} isNew={true} />
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </motion.div>
                     )}
                 </AnimatePresence>
 
                 {/* Collapsible Categories */}
-                <div className="flex flex-col gap-4 relative z-10">
+                <div className="flex flex-col gap-6 relative z-10">
                     {Object.keys(groupedItems).length === 0 && !loading && (
-                        <div className="text-center p-12 text-slate-500">
-                            <p>No hay precios definidos.</p>
+                        <div className="flex flex-col items-center justify-center py-24 text-center">
+                            <div className="w-32 h-32 bg-[#F4F7FA] rounded-[48px] border-4 border-dashed border-[#E2E8F0] flex items-center justify-center mb-8 shadow-inner">
+                                <Package size={64} className="text-[#A0AEC0] opacity-20" />
+                            </div>
+                            <p className="text-[12px] font-black text-[#A0AEC0] uppercase tracking-[0.4em]">No hay datos registrados</p>
                             {canEdit && (
-                                <button onClick={populateData} className="mt-4 px-4 py-2 bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-lg text-xs font-bold border border-white/5 transition-colors">
-                                    Cargar Datos Iniciales (Ejemplo)
+                                <button onClick={populateData} className="mt-8 px-8 py-3 bg-white text-[#1A365D] hover:bg-[#F4F7FA] rounded-[20px] text-[10px] font-black uppercase tracking-widest border border-[#E2E8F0] shadow-sm transition-all">
+                                    Importar Listado Base
                                 </button>
                             )}
                         </div>
@@ -290,20 +293,32 @@ const PriceList = () => {
                         const isExpanded = expandedCategories[category];
 
                         return (
-                            <div key={category} className="bg-slate-900/40 border border-white/5 rounded-xl overflow-hidden">
+                            <div key={category} className={`border-2 transition-all rounded-[40px] overflow-hidden ${isExpanded ? 'bg-white border-[#E2E8F0] shadow-xl scale-[1.01]' : 'bg-[#F4F7FA]/50 border-transparent hover:border-[#E2E8F0]'}`}>
                                 <button
                                     onClick={() => toggleCategory(category)}
-                                    className={`w-full flex items-center justify-between p-4 transition-all ${isExpanded ? 'bg-slate-800/80 text-emerald-400' : 'bg-slate-900/20 text-slate-300 hover:bg-slate-800/50 hover:text-white'}`}
+                                    className={`w-full flex items-center justify-between p-8 transition-all ${isExpanded ? 'bg-[#F4F7FA]/30' : 'hover:bg-white'}`}
                                 >
-                                    <div className="flex items-center gap-4">
-                                        <div className={`p-2 rounded-lg ${isExpanded ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
-                                            {isExpanded ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+                                    <div className="flex items-center gap-6">
+                                        <div className={`p-4 rounded-[24px] shadow-sm transition-all ${isExpanded ? 'bg-[#1A365D] text-white rotate-180' : 'bg-white text-[#A0AEC0]'}`}>
+                                            <ChevronDown size={24} />
                                         </div>
                                         <div className="text-left">
-                                            <span className="font-bold text-lg tracking-wide uppercase">{category}</span>
-                                            <span className="text-xs text-slate-500 font-medium ml-3 bg-slate-950 px-2 py-0.5 rounded-full border border-white/5">{catItems.length} Modelos</span>
+                                            <span className="font-black text-xl tracking-tighter text-[#1A365D] uppercase">{category}</span>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-[#48BB78]"></div>
+                                                <span className="text-[9px] text-[#A0AEC0] font-black uppercase tracking-widest">{catItems.length} Registros activos</span>
+                                            </div>
                                         </div>
                                     </div>
+                                    {!isExpanded && (
+                                        <div className="flex -space-x-2">
+                                            {[...new Set(catItems.map(i => i.brand))].slice(0, 3).map((brand, bIdx) => (
+                                                <div key={bIdx} className="w-8 h-8 rounded-full bg-[#1A365D] border-2 border-white flex items-center justify-center text-[8px] font-black text-white uppercase overflow-hidden shadow-sm">
+                                                    {brand.substring(0, 2)}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </button>
 
                                 <AnimatePresence>
@@ -312,32 +327,45 @@ const PriceList = () => {
                                             initial={{ height: 0, opacity: 0 }}
                                             animate={{ height: 'auto', opacity: 1 }}
                                             exit={{ height: 0, opacity: 0 }}
-                                            transition={{ duration: 0.3 }}
+                                            transition={{ duration: 0.4, ease: "easeOut" }}
                                         >
-                                            <div className="overflow-x-auto border-t border-white/5">
-                                                <table className="w-full text-left border-collapse">
-                                                    <thead>
-                                                        <tr className="bg-slate-950/50 text-[10px] uppercase tracking-wider text-slate-500">
-                                                            <th className="p-3 font-bold">Marca</th>
-                                                            <th className="p-3 font-bold">Modelo</th>
-                                                            <th className="p-3 font-bold text-right text-amber-500">A (Impecable)</th>
-                                                            <th className="p-3 font-bold text-right text-emerald-500">B (Bueno)</th>
-                                                            <th className="p-3 font-bold text-right text-slate-400">C (Usado)</th>
-                                                            {canEdit && <th className="p-3 text-right">Acciones</th>}
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-white/5">
-                                                        {catItems.map((item) => (
-                                                            <React.Fragment key={item.id}>
-                                                                {editingId === item.id ? (
-                                                                    <EditableRow item={item} onSave={handleSave} onCancel={cancelEdit} />
-                                                                ) : (
-                                                                    <StaticRow item={item} />
-                                                                )}
-                                                            </React.Fragment>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
+                                            <div className="overflow-x-auto p-4 pt-0">
+                                                <div className="bg-white rounded-[32px] overflow-hidden">
+                                                    <table className="w-full text-left border-collapse">
+                                                        <thead>
+                                                            <tr className="bg-[#F4F7FA]/50 text-[9px] font-black uppercase text-[#A0AEC0] tracking-[0.2em]">
+                                                                <th className="p-5">Fabricante</th>
+                                                                <th className="p-5">Versión/Modelo</th>
+                                                                <th className="p-5 text-right">PVP A (Exc)</th>
+                                                                <th className="p-5 text-right">PVP B (Std)</th>
+                                                                <th className="p-5 text-right text-[#A0AEC0]/40">PVP C (Inc)</th>
+                                                                {canEdit && <th className="p-5 text-right">Acciones</th>}
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-[#F4F7FA]">
+                                                            {catItems.map((item) => (
+                                                                <React.Fragment key={item.id}>
+                                                                    {editingId === item.id ? (
+                                                                        <EditableRow item={item} onSave={handleSave} onCancel={cancelEdit} />
+                                                                    ) : (
+                                                                        <StaticRow item={item} />
+                                                                    )}
+                                                                </React.Fragment>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                                <div className="mt-6 flex items-start gap-4 p-6 bg-[#EBF8FF] rounded-[32px] border border-[#BEE3F8] mb-4 mx-4">
+                                                    <div className="p-2.5 bg-[#4299E1] text-white rounded-xl shadow-md">
+                                                        <Info size={16} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[11px] font-black text-[#2B6CB0] leading-none uppercase tracking-tight mb-1">Nota de Calidad</p>
+                                                        <p className="text-[10px] font-bold text-[#4299E1] leading-tight opacity-80">
+                                                            Los precios 'A' requieren caja original y todos los accesorios. Los precios 'C' pueden presentar mermas estéticas leves.
+                                                        </p>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </motion.div>
                                     )}

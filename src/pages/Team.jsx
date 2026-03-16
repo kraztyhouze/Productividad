@@ -109,20 +109,28 @@ const Team = () => {
     };
 
     return (
-        <div className="space-y-6 pb-10">
+        <div className="space-y-6 pb-10 animate-in">
             {/* Header & Controls */}
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-extrabold text-white tracking-tight">Equipo y Plantilla</h1>
-                    <p className="text-slate-400 text-sm font-medium ml-1">Gestiona usuarios, roles y fichas.</p>
+                    <h1 className="text-2xl font-black text-[#1A365D] tracking-tight">Equipo y Plantilla</h1>
+                    <p className="text-[#718096] text-sm mt-0.5">Gestiona usuarios, roles y fichas.</p>
                 </div>
 
                 {user.role === ROLES.MANAGER && (
                     <div className="flex gap-3 w-full lg:w-auto">
-                        <button onClick={() => setIsRoleModalOpen(true)} className="px-5 py-2.5 bg-slate-950/50 hover:bg-slate-900 border border-white/10 hover:border-white/20 text-slate-300 hover:text-white rounded-xl font-bold text-xs flex items-center gap-2 transition-all">
+                        <button
+                            onClick={() => setIsRoleModalOpen(true)}
+                            className="px-5 py-2.5 bg-white border border-[#E2E8F0] text-[#718096] hover:text-[#1A365D] hover:border-[#FF8C9D] rounded-xl font-semibold text-xs flex items-center gap-2 transition-all"
+                            style={{ boxShadow: 'var(--shadow-card)' }}
+                        >
                             <Settings size={16} /> Roles
                         </button>
-                        <button onClick={() => { setEditingEmployee(null); setIsModalOpen(true); }} className="px-6 py-2.5 bg-pink-600 hover:bg-pink-500 text-white rounded-xl font-bold text-xs shadow-lg shadow-pink-600/20 flex items-center gap-2 transition-all">
+                        <button
+                            onClick={() => { setEditingEmployee(null); setIsModalOpen(true); }}
+                            className="px-6 py-2.5 text-white rounded-xl font-semibold text-xs flex items-center gap-2 transition-all"
+                            style={{ background: '#FF8C9D', boxShadow: '0 4px 12px rgba(255,140,157,0.35)' }}
+                        >
                             <Plus size={18} /> Nuevo
                         </button>
                     </div>
@@ -130,18 +138,28 @@ const Team = () => {
             </div>
 
             {/* Filters & Search */}
-            <div className="flex flex-col md:flex-row gap-4 items-center bg-[#1e293b]/60 backdrop-blur-xl p-2 rounded-2xl border border-white/5 shadow-lg">
+            <div className="flex flex-col md:flex-row gap-3 items-center bg-white p-3 rounded-xl border border-[#E2E8F0]" style={{ boxShadow: 'var(--shadow-card)' }}>
                 <div className="relative w-full md:w-64 shrink-0">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
-                    <input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-slate-900/50 border border-white/10 rounded-xl text-white text-sm outline-none focus:border-pink-500 transition-colors" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0AEC0]" size={16} />
+                    <input
+                        type="text"
+                        placeholder="Buscar..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 bg-[#F4F7FA] border border-[#E2E8F0] rounded-xl text-[#1A365D] text-sm outline-none focus:border-[#FF8C9D] transition-colors placeholder:text-[#A0AEC0]"
+                    />
                 </div>
 
-                <div className="flex gap-1 overflow-x-auto w-full pb-1 md:pb-0 custom-scrollbar">
+                <div className="flex gap-1 overflow-x-auto w-full pb-1 md:pb-0">
                     {[{ id: 'all', label: 'Todos' }, { id: 'buyers', label: 'Compradores' }, { id: 'responsibles', label: 'Responsables' }, { id: 'store', label: 'Tienda' }].map(filter => (
                         <button
                             key={filter.id}
                             onClick={() => setActiveFilter(filter.id)}
-                            className={`px-5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border ${activeFilter === filter.id ? 'bg-pink-600 border-pink-500 text-white shadow-lg shadow-pink-600/20' : 'bg-transparent border-transparent text-slate-400 hover:bg-white/5 hover:text-white'}`}
+                            className={`px-5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${activeFilter === filter.id
+                                    ? 'text-white'
+                                    : 'text-[#718096] hover:text-[#1A365D] hover:bg-[#F4F7FA]'
+                                }`}
+                            style={activeFilter === filter.id ? { background: '#FF8C9D' } : {}}
                         >
                             {filter.label}
                         </button>
@@ -163,7 +181,7 @@ const Team = () => {
                 ))}
             </div>
             {filteredEmployees.length === 0 && (
-                <div className="text-center py-20 text-slate-500 border border-white/5 border-dashed rounded-3xl bg-[#1e293b]/20">No hay empleados que coincidan con el filtro.</div>
+                <div className="text-center py-20 text-[#A0AEC0] border border-[#E2E8F0] border-dashed rounded-2xl bg-white text-sm" style={{ boxShadow: 'var(--shadow-card)' }}>No hay empleados que coincidan con el filtro.</div>
             )}
 
             {/* --- Modals --- */}

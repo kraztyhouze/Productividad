@@ -27,7 +27,7 @@ const Productivity = () => {
         getUnclosedPastDays, dayIncidents, updateDayIncident,
         updateRecord, addManualRecord, deleteEmployeeDayData,
         productFamilies, addProductFamily, removeProductFamily,
-        addNoDealDetail, toggleClientSession,
+        addNoDealDetail, toggleClientSession, cancelSession,
         goldPrice, updateGoldPrice, updateEmployeeShiftTime, logTransaction, transactionLogs // Added transactionLogs
     } = useProductivity();
 
@@ -365,7 +365,7 @@ const Productivity = () => {
     };
 
     return (
-        <div className="flex flex-col h-full overflow-hidden relative gap-4">
+        <div className="flex flex-col h-full overflow-hidden relative gap-4 animate-in bg-[#F8F9FB] p-6 -m-6">
 
             {/* ANNOUNCEMENT TICKER */}
             {settings.announcement && (
@@ -381,56 +381,57 @@ const Productivity = () => {
 
             {/* TOP SECTION: TEAM GRID */}
             <div className="flex-[3] flex flex-col xl:flex-row gap-6 min-h-0 overflow-hidden">
-                <div className="w-full xl:w-2/3 bg-[#1e293b]/60 backdrop-blur-xl rounded-[2.5rem] p-0 border border-white/5 flex flex-col shadow-2xl relative overflow-hidden shrink-0">
+                <div className="w-full xl:w-2/3 bg-white rounded-2xl p-0 border border-[#E2E8F0] flex flex-col shadow-sm relative overflow-hidden shrink-0" style={{ boxShadow: 'var(--shadow-card)' }}>
 
-                    {/* SETTINGS PANEL (Manager/Supervisor/Responsible) */}
+                    {/* SETTINGS PANEL */}
                     {canEditPanels && (
-                        <div className="bg-slate-900/80 backdrop-blur border-b border-white/5 py-2 px-6 flex flex-col gap-2 relative z-20">
+                        <div className="bg-[#F4F7FA] border-b border-[#E2E8F0] py-2 px-6 flex flex-col gap-2 relative z-20">
                             <div className="flex justify-between items-center cursor-pointer" onClick={() => setShowSettings(!showSettings)}>
-                                <div className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
-                                    <Settings size={14} className="text-pink-500" />
+                                <div className="flex items-center gap-2 text-[#718096] hover:text-[#1A365D] transition-colors">
+                                    <Settings size={14} style={{ color: '#FF8C9D' }} />
                                     <span className="text-[10px] font-bold uppercase tracking-widest">Configuración Tienda / Tablón</span>
                                 </div>
-                                <span className="text-[10px] text-slate-500">{showSettings ? 'Ocultar' : 'Mostrar'}</span>
+                                <span className="text-[10px] text-[#A0AEC0]">{showSettings ? 'Ocultar' : 'Mostrar'}</span>
                             </div>
 
                             {showSettings && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 animate-in slide-in-from-top-2">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 animate-in">
                                     {/* Closes */}
-                                    <div className="flex items-center gap-4 bg-slate-800/50 p-2 rounded-lg border border-white/5">
-                                        <span className="text-[10px] uppercase font-bold text-slate-500 w-20">Cierre Auto:</span>
+                                    <div className="flex items-center gap-4 bg-white p-2 rounded-lg border border-[#E2E8F0]">
+                                        <span className="text-[10px] uppercase font-bold text-[#A0AEC0] w-20">Cierre Auto:</span>
                                         <div className="flex items-center gap-2">
-                                            <span className="text-[10px] text-slate-400">Mediodía</span>
+                                            <span className="text-[10px] text-[#718096]">Mediodía</span>
                                             <input
                                                 type="time"
                                                 value={settings.midday}
                                                 onChange={e => setSettings({ ...settings, midday: e.target.value })}
-                                                className="bg-slate-900 border border-white/10 rounded px-2 py-0.5 text-xs text-white font-mono focus:border-pink-500 outline-none w-20"
+                                                className="bg-[#F4F7FA] border border-[#E2E8F0] rounded px-2 py-0.5 text-xs text-[#1A365D] font-mono focus:border-[#FF8C9D] outline-none w-20"
                                             />
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <span className="text-[10px] text-slate-400">Noche</span>
+                                            <span className="text-[10px] text-[#718096]">Noche</span>
                                             <input
                                                 type="time"
                                                 value={settings.night}
                                                 onChange={e => setSettings({ ...settings, night: e.target.value })}
-                                                className="bg-slate-900 border border-white/10 rounded px-2 py-0.5 text-xs text-white font-mono focus:border-pink-500 outline-none w-20"
+                                                className="bg-[#F4F7FA] border border-[#E2E8F0] rounded px-2 py-0.5 text-xs text-[#1A365D] font-mono focus:border-[#FF8C9D] outline-none w-20"
                                             />
                                         </div>
                                     </div>
                                     {/* Announcement */}
-                                    <div className="flex items-center gap-2 bg-slate-800/50 p-2 rounded-lg border border-white/5">
+                                    <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-[#E2E8F0]">
                                         <Megaphone size={14} className="text-red-500 shrink-0" />
                                         <input
                                             type="text"
                                             placeholder="Mensaje Urgente (Tablón)..."
                                             value={settings.announcement}
                                             onChange={e => setSettings({ ...settings, announcement: e.target.value })}
-                                            className="bg-slate-900 border border-white/10 rounded px-2 py-0.5 text-xs text-white flex-1 focus:border-red-500 outline-none"
+                                            className="bg-[#F4F7FA] border border-[#E2E8F0] rounded px-2 py-0.5 text-xs text-[#1A365D] flex-1 focus:border-red-400 outline-none"
                                         />
                                         <button
                                             onClick={handleSaveSettings}
-                                            className="p-1 px-3 bg-pink-600 hover:bg-pink-500 text-white rounded-md text-[10px] font-bold uppercase transition-colors"
+                                            className="p-1 px-3 text-white rounded-md text-[10px] font-bold uppercase transition-colors"
+                                            style={{ background: '#FF8C9D' }}
                                         >
                                             Guardar
                                         </button>
@@ -440,30 +441,32 @@ const Productivity = () => {
                         </div>
                     )}
 
-                    <div className="p-6 flex flex-col h-full overflow-hidden">
+                    <div className="p-8 flex flex-col h-full overflow-hidden">
                         {/* ... (Team Grid Header & Content - unchanged) ... */}
                         <div className="flex justify-between items-center mb-6 shrink-0">
                             <div>
-                                <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
-                                    <ShoppingBag className="text-pink-500" size={24} />
-                                    Productividad & Kiosco
+                                <h1 className="text-xl font-black text-[#1A365D] tracking-tight flex items-center gap-2">
+                                    <ShoppingBag style={{ color: '#FF8C9D' }} size={22} />
+                                    Productividad &amp; Kiosco
                                 </h1>
-                                <p className="text-slate-400 font-medium ml-1 text-xs">
-                                    {isToday ? "Gestiona tus clientes en tiempo real." : `Viendo registros del día ${selectedDate}`}
+                                <p className="text-[#718096] text-xs mt-0.5">
+                                    {isToday ? 'Gestiona tus clientes en tiempo real.' : `Viendo registros del día ${selectedDate}`}
                                 </p>
                             </div>
 
                             {/* VIEW TOGGLE */}
-                            <div className="flex bg-slate-900/50 p-1 rounded-lg border border-white/5 mr-4">
+                            <div className="flex bg-[#F4F7FA] p-1 rounded-lg border border-[#E2E8F0] mr-4">
                                 <button
                                     onClick={() => setViewMode('grid')}
-                                    className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-pink-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                                    className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'text-white shadow-sm' : 'text-[#A0AEC0] hover:text-[#1A365D]'}`}
+                                    style={viewMode === 'grid' ? { background: '#FF8C9D' } : {}}
                                 >
                                     <LayoutGrid size={16} />
                                 </button>
                                 <button
                                     onClick={() => setViewMode('timeline')}
-                                    className={`p-1.5 rounded-md transition-all ${viewMode === 'timeline' ? 'bg-pink-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                                    className={`p-1.5 rounded-md transition-all ${viewMode === 'timeline' ? 'text-white shadow-sm' : 'text-[#A0AEC0] hover:text-[#1A365D]'}`}
+                                    style={viewMode === 'timeline' ? { background: '#FF8C9D' } : {}}
                                 >
                                     <List size={16} />
                                 </button>
@@ -474,21 +477,26 @@ const Productivity = () => {
                                     <>
                                         <button
                                             onClick={() => setShowCloseModal(true)}
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${isDayClosed
-                                                ? 'bg-green-500/20 text-green-400 border-green-500/50 hover:bg-green-500/30'
-                                                : 'bg-red-500/20 text-red-400 border-red-500/50 hover:bg-red-500/30'
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${isDayClosed
+                                                ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
+                                                : 'bg-red-50 text-red-500 border-red-200 hover:bg-red-100'
                                                 }`}
                                         >
                                             {isDayClosed ? 'Día Cerrado (Ver)' : 'Cerrar Día'}
                                         </button>
-                                        <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="bg-slate-900 text-white border border-slate-800 rounded-lg px-2 py-1 font-mono text-xs focus:border-pink-500 outline-none" />
+                                        <input
+                                            type="date"
+                                            value={selectedDate}
+                                            onChange={(e) => setSelectedDate(e.target.value)}
+                                            className="bg-[#F4F7FA] text-[#1A365D] border border-[#E2E8F0] rounded-lg px-2 py-1 font-mono text-xs focus:border-[#FF8C9D] outline-none"
+                                        />
                                     </>
                                 )}
-                                <p className="text-3xl font-mono font-bold text-slate-200 tracking-tighter">{currentTime.toLocaleTimeString()}</p>
+                                <p className="text-3xl font-mono font-bold text-[#1A365D] tracking-tighter">{currentTime.toLocaleTimeString()}</p>
                             </div>
                         </div>
 
-                        <div className={`${viewMode === 'timeline' ? 'flex flex-col' : 'grid grid-cols-4 xl:grid-cols-5'} gap-3 overflow-y-auto custom-scrollbar flex-1 content-start p-2 -mx-2`}>
+                        <div className={`${viewMode === 'timeline' ? 'flex flex-col' : 'grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5'} gap-6 overflow-y-auto custom-scrollbar flex-1 content-start p-2 -mx-2`}>
                             {viewMode === 'timeline' ? (
                                 <ProductivityTimeline
                                     selectedDate={selectedDate}
@@ -514,12 +522,13 @@ const Productivity = () => {
                                             onClick={() => {
                                                 if (!isToday) return;
                                                 if (isClientActive) { setActiveClientModal(emp.id); return; }
-                                                if (!isSessionActive) { startSession(emp.id, `${emp.firstName} ${emp.lastName}`); return; }
-                                                startClient(emp.id);
+                                                if (!isSessionActive) { 
+                                                    startSession(emp.id, `${emp.firstName} ${emp.lastName}`); 
+                                                } else {
+                                                    startClient(emp.id);
+                                                }
                                             }}
-                                            onEndSession={(id) => {
-                                                if (confirm(`¿Terminar turno de ${emp.alias || emp.firstName}?`)) endSession(id);
-                                            }}
+                                            onEndSession={(id) => endSession(id)}
                                             onOpenRewards={(id) => setRewardModalEmployeeId(id)}
                                             onResetGamification={handleResetGamification}
                                             isManagerial={isManagerial}
@@ -576,14 +585,14 @@ const Productivity = () => {
                             </div>
                         </div>
 
-                        <div className="w-1/3 bg-slate-800 rounded-3xl border border-white/10 flex flex-col items-center justify-center relative overflow-hidden">
-                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest absolute top-3">Tiempo Tienda</p>
-                            <span className={`text-xl font-mono font-bold ${Object.keys(clientSessions).length > 0 ? 'text-green-400 animate-pulse' : 'text-slate-400'}`}>
+                        <div className="w-1/3 bg-white border border-[#E2E8F0] rounded-[32px] flex flex-col items-center justify-center relative shadow-sm overflow-hidden group hover:border-[#FF8C9D]/30 transition-all">
+                            <p className="text-[9px] font-black text-[#A0AEC0] uppercase tracking-widest absolute top-4 group-hover:text-[#FF8C9D] transition-colors">Tiempo Tienda</p>
+                            <span className={`text-2xl font-mono font-black tracking-tighter ${Object.keys(clientSessions).length > 0 ? 'text-[#FF8C9D] animate-pulse' : 'text-[#1A365D]'}`}>
                                 {formatDuration(shopActiveSeconds * 1000)}
                             </span>
                             <div className="absolute bottom-2 flex gap-1">
                                 {Array.from({ length: Object.keys(clientSessions).length }).map((_, i) => (
-                                    <div key={i} className="w-1.5 h-1.5 rounded-full bg-green-500 animate-bounce" style={{ animationDelay: `${i * 0.1}s` }} />
+                                    <div key={i} className="w-1.5 h-1.5 rounded-full bg-[#FF8C9D] animate-bounce" style={{ animationDelay: `${i * 0.1}s` }} />
                                 ))}
                             </div>
                         </div>
@@ -620,7 +629,7 @@ const Productivity = () => {
             </div>
 
             {/* BOTTOM SECTION: DETAILED TABLE */}
-            <div className="flex-[1] bg-[#1e293b]/60 backdrop-blur-xl rounded-[2.5rem] border border-white/5 p-6 min-h-0 shadow-xl flex flex-col">
+            <div className="flex-[1] bg-white rounded-3xl border border-[#E2E8F0] p-8 min-h-0 flex flex-col shadow-sm" style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
                 {isManagerial && (
                     <AnomalyPanel
                         dailyStats={dailyStats}
@@ -631,25 +640,25 @@ const Productivity = () => {
                     />
                 )}
 
-                <div className="overflow-y-auto custom-scrollbar flex-1 mt-4">
+                <div className="overflow-y-auto flex-1 mt-4">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="text-xs font-bold text-slate-400 uppercase border-b border-white/5">
+                            <tr className="text-xs font-bold text-[#A0AEC0] uppercase border-b border-[#E2E8F0]">
                                 <th className="pb-3 pl-2">Empleado</th>
-                                {canSeeDeepStats && <th className="pb-3 text-center text-slate-400">Eficiencia/Ocupación</th>}
-                                <th className="pb-3 text-center text-blue-400">T. Compras</th>
+                                {canSeeDeepStats && <th className="pb-3 text-center text-[#718096]">Eficiencia/Ocupación</th>}
+                                <th className="pb-3 text-center text-[#4299E1]">T. Compras</th>
                                 {canSeeDeepStats && (
                                     <>
-                                        <th className="pb-3 text-center text-slate-400">Gen</th>
-                                        <th className="pb-3 text-center text-slate-400">Joy</th>
-                                        <th className="pb-3 text-center text-slate-400">Rec</th>
+                                        <th className="pb-3 text-center text-[#A0AEC0]">Gen</th>
+                                        <th className="pb-3 text-center text-[#ECC94B]">Joy</th>
+                                        <th className="pb-3 text-center text-[#4299E1]">Rec</th>
                                         <th className="pb-3 text-center text-red-500">NO</th>
                                     </>
                                 )}
-                                <th className="pb-3 text-right text-pink-500">Total</th>
+                                <th className="pb-3 text-right" style={{ color: '#FF8C9D' }}>Total</th>
                                 {canSeeDeepStats && (
                                     <>
-                                        <th className="pb-3 text-right text-amber-500">Gr/h</th>
+                                        <th className="pb-3 text-right text-[#ECC94B]">Gr/h</th>
                                         <th className="pb-3 text-right">Hit Rate</th>
                                         <th className="pb-3 text-right">T. Medio/Cli</th>
                                     </>
@@ -657,7 +666,7 @@ const Productivity = () => {
                                 {isManagerial && <th className="pb-3 text-right">Acciones</th>}
                             </tr>
                         </thead>
-                        <tbody className="text-sm divide-y divide-white/5">
+                        <tbody className="text-sm divide-y divide-[#E2E8F0]">
                             {Object.keys(dailyStats).sort((a, b) => {
                                 const nA = employees.find(e => e.id == a)?.firstName || '';
                                 const nB = employees.find(e => e.id == b)?.firstName || '';
@@ -694,29 +703,29 @@ const Productivity = () => {
                                 const showSuspicion = isSuspicious && canSeeDeepStats;
 
                                 return (
-                                    <tr key={empId} className={`group border-b border-transparent hover:bg-white/5 transition-colors ${showSuspicion ? 'bg-red-500/10 border-red-500/20' : ''}`}>
+                                    <tr key={empId} className={`group border-b border-transparent hover:bg-[#F4F7FA] transition-colors ${showSuspicion ? 'bg-red-50 border-red-100' : ''}`}>
                                         <td className="py-3 pl-2">
                                             <div className="flex flex-col">
-                                                <span className={`font-bold ${showSuspicion ? 'text-red-400' : 'text-slate-300'}`}>{displayName}</span>
-                                                {canSeeDeepStats && <span className="text-[10px] text-slate-500 font-mono">Turno: {formatDuration(stat.totalSeconds * 1000)}</span>}
+                                                <span className={`font-semibold ${showSuspicion ? 'text-red-500' : 'text-[#1A365D]'}`}>{displayName}</span>
+                                                {canSeeDeepStats && <span className="text-[10px] text-[#A0AEC0] font-mono">Turno: {formatDuration(stat.totalSeconds * 1000)}</span>}
                                             </div>
                                         </td>
 
                                         {canSeeDeepStats && (
-                                            <td className="py-3 px-2">
-                                                <div className="flex flex-col gap-1">
-                                                    <div className="flex justify-between items-end text-[10px] uppercase font-bold text-slate-500">
-                                                        <span>Ocupación</span>
-                                                        <span className={isSuspicious ? 'text-red-400' : 'text-white'}>{occupationRate}%</span>
+                                            <td className="py-5 px-4 w-64">
+                                                <div className="flex flex-col gap-2">
+                                                    <div className="flex justify-between items-end text-[10px] uppercase font-black text-[#A0AEC0] tracking-widest">
+                                                        <span>Eficiencia</span>
+                                                        <span className={isSuspicious ? 'text-red-500' : 'text-[#1A365D]'}>{occupationRate}%</span>
                                                     </div>
-                                                    <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                                    <div className="w-full h-[10px] bg-[#F1F5F9] rounded-full overflow-hidden">
                                                         <div
-                                                            className={`h-full rounded-full ${isSuspicious ? 'bg-red-500' : 'bg-emerald-500'}`}
+                                                            className={`h-full rounded-full ${isSuspicious ? 'bg-red-500' : 'bg-[#48BB78]'}`}
                                                             style={{ width: `${occupationRate}%` }}
                                                         />
                                                     </div>
                                                     {isSuspicious && (
-                                                        <div className="flex items-center gap-1 text-[10px] text-red-400 font-bold mt-0.5 animate-pulse">
+                                                        <div className="flex items-center gap-1 text-[10px] text-red-500 font-bold mt-1 animate-pulse">
                                                             <AlertTriangle size={10} /> POSIBLE MANIPULACIÓN
                                                         </div>
                                                     )}
@@ -724,38 +733,50 @@ const Productivity = () => {
                                             </td>
                                         )}
 
-                                        <td className="py-3 text-center font-mono text-blue-400 font-bold text-xs">
+                                        <td className="py-3 text-center font-mono text-[#4299E1] font-bold text-xs">
                                             {formatDuration(data.clientSeconds * 1000)}
-                                            {canSeeDeepStats && <div className="text-[9px] text-slate-600 font-normal">Idle: {formatDuration(idleTime * 1000)}</div>}
+                                            {canSeeDeepStats && <div className="text-[9px] text-[#A0AEC0] font-normal">Idle: {formatDuration(idleTime * 1000)}</div>}
                                         </td>
 
                                         {canSeeDeepStats && (
                                             <>
-                                                <td className="py-3 text-center font-mono text-slate-300">{data.standard}</td>
-                                                <td className="py-3 text-center font-mono text-slate-300">{data.jewelry}</td>
-                                                <td className="py-3 text-center font-mono text-slate-300">{data.recoverable}</td>
+                                                <td className="py-3 text-center font-mono text-[#718096]">{data.standard}</td>
+                                                <td className="py-3 text-center font-mono text-[#ECC94B]">{data.jewelry}</td>
+                                                <td className="py-3 text-center font-mono text-[#4299E1]">{data.recoverable}</td>
                                                 <td className="py-3 text-center font-bold text-red-500 font-mono">{data.noDeal}</td>
                                             </>
                                         )}
 
-                                        <td className="py-3 text-right font-bold text-pink-500 text-lg">{data.totalSold}</td>
+                                        <td className="py-3 text-right font-bold text-lg" style={{ color: '#FF8C9D' }}>{data.totalSold}</td>
 
                                         {canSeeDeepStats && (
                                             <>
-                                                <td className="py-3 text-right font-mono font-bold text-amber-500">{groupsPerHour}</td>
+                                                <td className="py-3 text-right font-mono font-bold text-[#ECC94B]">{groupsPerHour}</td>
                                                 <td className="py-3 text-right font-mono">
-                                                    <span className={`${hitRate < 50 ? 'text-red-500' : hitRate > 80 ? 'text-green-500' : 'text-amber-500'}`}>{hitRate}%</span>
+                                                    <span className={`${hitRate < 50 ? 'text-red-500' : hitRate > 80 ? 'text-[#48BB78]' : 'text-[#ECC94B]'}`}>{hitRate}%</span>
                                                 </td>
-                                                <td className="py-3 text-right font-mono text-slate-400">
+                                                <td className="py-3 text-right font-mono text-[#718096]">
                                                     {avgTimeMin}m {avgTimeSec}s
                                                 </td>
                                             </>
                                         )}
                                         {isManagerial && (
                                             <td className="py-2.5 text-right flex justify-end gap-2">
+                                                {activeSessions.find(s => String(s.employeeId) === empId) && (
+                                                    <button
+                                                        onClick={() => {
+                                                            if (confirm(`¿Cancelar el turno actual de ${displayName} sin guardar?`)) {
+                                                                cancelSession(empId);
+                                                            }
+                                                        }}
+                                                        className="p-1 hover:bg-orange-500/20 text-slate-500 hover:text-orange-400 rounded transition-colors" title="Cancelar Turno Actual"
+                                                    >
+                                                        <UserX size={12} />
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={() => setEditingStats({ empId: parseInt(empId), date: selectedDate, currentStats: data })}
-                                                    className="p-1 hover:bg-amber-500/20 text-slate-500 hover:text-amber-400 rounded" title="Modificar Grupos"
+                                                    className="p-1 hover:bg-amber-500/20 text-slate-500 hover:text-amber-400 rounded transition-colors" title="Modificar Grupos"
                                                 >
                                                     <BarChart2 size={12} />
                                                 </button>
@@ -891,36 +912,36 @@ const Productivity = () => {
             {/* CLIENT INTERACTION MODAL */}
             {
                 activeClientModal && (
-                    <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur flex justify-center items-center p-4 animate-in fade-in duration-200">
-                        <div className="bg-[#1e293b] w-full max-w-lg rounded-3xl p-8 border border-white/10 shadow-2xl relative">
+                    <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex justify-center items-center p-4 animate-in">
+                        <div className="bg-white w-full max-w-lg rounded-2xl p-8 border border-[#E2E8F0] shadow-2xl relative" style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
                             {/* Timer Header */}
                             <div className="text-center mb-8">
-                                <p className="text-amber-500 font-bold uppercase tracking-widest text-xs mb-2 animate-pulse">Atendiendo Cliente...</p>
+                                <p className="font-bold uppercase tracking-widest text-xs mb-3 animate-soft-pulse" style={{ color: '#FF8C9D' }}>Atendiendo Cliente...</p>
                                 <ClientTimer startTime={clientSessions[activeClientModal]} />
                             </div>
 
                             {/* Actions */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <button onClick={() => endClient(activeClientModal, 'standard')} className="bg-slate-700 hover:bg-green-600 text-white p-4 rounded-xl font-bold transition-all flex flex-col items-center gap-2 group">
+                            <div className="grid grid-cols-2 gap-3">
+                                <button onClick={() => endClient(activeClientModal, 'standard')} className="bg-[#F4F7FA] hover:bg-[#48BB78] hover:text-white text-[#1A365D] p-4 rounded-xl font-bold transition-all flex flex-col items-center gap-2 group border border-[#E2E8F0] hover:border-[#48BB78]">
                                     <Check size={24} className="group-hover:scale-125 transition-transform" />
-                                    <span>Compra General</span>
+                                    <span className="text-sm">Compra General</span>
                                 </button>
-                                <button onClick={() => endClient(activeClientModal, 'jewelry')} className="bg-slate-700 hover:bg-amber-500 hover:text-black text-white p-4 rounded-xl font-bold transition-all flex flex-col items-center gap-2 group">
+                                <button onClick={() => endClient(activeClientModal, 'jewelry')} className="bg-[#F4F7FA] hover:bg-[#ECC94B] hover:text-black text-[#1A365D] p-4 rounded-xl font-bold transition-all flex flex-col items-center gap-2 group border border-[#E2E8F0] hover:border-[#ECC94B]">
                                     <Watch size={24} className="group-hover:scale-125 transition-transform" />
-                                    <span>Compra Joyería</span>
+                                    <span className="text-sm">Compra Joyería</span>
                                 </button>
-                                <button onClick={() => endClient(activeClientModal, 'recoverable')} className="bg-slate-700 hover:bg-blue-600 text-white p-4 rounded-xl font-bold transition-all flex flex-col items-center gap-2 group">
+                                <button onClick={() => endClient(activeClientModal, 'recoverable')} className="bg-[#F4F7FA] hover:bg-[#4299E1] hover:text-white text-[#1A365D] p-4 rounded-xl font-bold transition-all flex flex-col items-center gap-2 group border border-[#E2E8F0] hover:border-[#4299E1]">
                                     <RefreshCw size={24} className="group-hover:scale-125 transition-transform" />
-                                    <span>Recuperable</span>
+                                    <span className="text-sm">Recuperable</span>
                                 </button>
-                                <button onClick={() => endClient(activeClientModal, 'noDeal', '')} className="bg-slate-700 hover:bg-red-600 text-white p-4 rounded-xl font-bold transition-all flex flex-col items-center gap-2 group">
+                                <button onClick={() => endClient(activeClientModal, 'noDeal', '')} className="bg-[#F4F7FA] hover:bg-red-500 hover:text-white text-[#1A365D] p-4 rounded-xl font-bold transition-all flex flex-col items-center gap-2 group border border-[#E2E8F0] hover:border-red-400">
                                     <X size={24} className="group-hover:scale-125 transition-transform" />
-                                    <span>No Trato / Rechazo</span>
+                                    <span className="text-sm">No Trato / Rechazo</span>
                                 </button>
                             </div>
 
-                            <div className="mt-8 pt-4 border-t border-white/5 text-center">
-                                <button onClick={() => setActiveClientModal(null)} className="text-xs text-slate-500 hover:text-white underline">Ocultar (Seguir Crono)</button>
+                            <div className="mt-6 pt-4 border-t border-[#E2E8F0] text-center">
+                                <button onClick={() => setActiveClientModal(null)} className="text-xs text-[#A0AEC0] hover:text-[#1A365D] underline underline-offset-2 transition-colors">Ocultar (Seguir Crono)</button>
                             </div>
                         </div>
                     </div>
@@ -952,10 +973,10 @@ const Productivity = () => {
 
             {/* LOCATION BUTTONS DOCK (Footer) */}
             <div className="w-full flex justify-end shrink-0">
-                <div className="bg-[#0f172a]/90 backdrop-blur-md border border-orange-500/20 rounded-2xl p-3 pl-4 pr-3 shadow-[0_0_40px_-10px_rgba(249,115,22,0.1)] flex flex-col gap-3 group transition-all hover:border-orange-500/40">
+                <div className="bg-white border border-[#E2E8F0] rounded-xl p-3 pl-4 pr-3 flex flex-col gap-3 group transition-all hover:border-[#FF8C9D]/40" style={{ boxShadow: 'var(--shadow-card)' }}>
                     <div className="flex items-center gap-2 select-none">
-                        <div className="w-1.5 h-1.5 rounded-full bg-orange-500 shadow-[0_0_8px_currentColor] animate-pulse"></div>
-                        <span className="text-[10px] font-black text-orange-500 tracking-[0.2em] uppercase opacity-80 group-hover:opacity-100 transition-opacity">
+                        <div className="w-1.5 h-1.5 rounded-full bg-[#FF8C9D] animate-soft-pulse"></div>
+                        <span className="text-[10px] font-black text-[#FF8C9D] tracking-[0.2em] uppercase opacity-80 group-hover:opacity-100 transition-opacity">
                             Ubicaciones VR
                         </span>
                     </div>
@@ -964,7 +985,7 @@ const Productivity = () => {
                             <button
                                 key={cat}
                                 onClick={() => setActiveLocationCategory(cat)}
-                                className="h-10 px-3 bg-slate-800 hover:bg-orange-500/10 border border-white/5 hover:border-orange-500/50 rounded-lg transition-all text-[10px] font-bold text-slate-400 hover:text-orange-400 uppercase tracking-wider flex items-center gap-2 hover:scale-105 active:scale-95"
+                                className="h-9 px-3 bg-[#F4F7FA] hover:bg-[#fff0f2] border border-[#E2E8F0] hover:border-[#FF8C9D]/40 rounded-lg transition-all text-[10px] font-bold text-[#718096] hover:text-[#FF8C9D] uppercase tracking-wider flex items-center gap-2 hover:scale-105 active:scale-95"
                             >
                                 {cat}
                             </button>
@@ -994,7 +1015,7 @@ const ClientTimer = ({ startTime }) => {
     }, [startTime]);
 
     if (!startTime || isNaN(elapsed)) {
-        return <span className="text-6xl font-black font-mono text-white tracking-widest tabular-nums">00:00</span>;
+        return <span className="text-6xl font-black font-mono text-[#1A365D] tracking-widest tabular-nums">00:00</span>;
     }
 
     const seconds = Math.max(0, Math.floor(elapsed / 1000));
@@ -1002,7 +1023,7 @@ const ClientTimer = ({ startTime }) => {
     const s = seconds % 60;
 
     return (
-        <span className="text-6xl font-black font-mono text-white tracking-widest tabular-nums">
+        <span className="text-6xl font-black font-mono text-[#1A365D] tracking-widest tabular-nums">
             {m.toString().padStart(2, '0')}:{s.toString().padStart(2, '0')}
         </span>
     );

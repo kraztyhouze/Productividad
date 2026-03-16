@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,17 +6,44 @@
 
 @layer base {
     body {
-        font-family: 'Outfit', sans-serif;
-        @apply bg-slate-950 text-slate-50 antialiased;
-        background-image: radial-gradient(circle at 15% 50%, rgb(15, 23, 42) 0%, rgb(2, 6, 23) 100%);
+        font-family: 'Inter', sans-serif;
+        background-color: #F4F7FA;
+        color: #1A365D;
         min-height: 100vh;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+
+    * {
+        box-sizing: border-box;
     }
 }
 
-/* Custom Scrollbar */
+/* ─── CSS Variables / Design Tokens ─── */
+:root {
+    --color-bg: #F4F7FA;
+    --color-surface: #FFFFFF;
+    --color-border: #E2E8F0;
+    --color-text-primary: #1A365D;
+    --color-text-label: #718096;
+    --color-text-muted: #A0AEC0;
+    --color-accent: #FF8C9D;
+    --color-accent-dark: #e87589;
+    --color-accent-light: #fff0f2;
+    --color-success: #48BB78;
+    --color-warning: #ECC94B;
+    --color-info: #4299E1;
+    --radius-card: 12px;
+    --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.05);
+    --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.10);
+    --sidebar-width: 256px;
+    --sidebar-collapsed: 72px;
+}
+
+/* ─── Custom Scrollbar (light theme) ─── */
 ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -24,21 +51,62 @@
 }
 
 ::-webkit-scrollbar-thumb {
-    @apply bg-slate-700/50 rounded-full;
+    background: #CBD5E0;
+    border-radius: 99px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    @apply bg-slate-600;
+    background: #A0AEC0;
 }
 
+/* ─── Marquee animation ─── */
 @keyframes marquee {
-    0% { transform: translateX(100%); }
-    100% { transform: translateX(-100%); }
+    0% {
+        transform: translateX(100%);
+    }
+
+    100% {
+        transform: translateX(-100%);
+    }
 }
 
 .animate-marquee {
     animation: marquee 20s linear infinite;
     display: flex;
     white-space: nowrap;
-    width: 100%; /* Ensure start from full width */
+    width: 100%;
+}
+
+/* ─── Smooth Pulse for live indicators ─── */
+@keyframes soft-pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.animate-soft-pulse {
+    animation: soft-pulse 2s ease-in-out infinite;
+}
+
+/* ─── Fade-in utility ─── */
+@keyframes fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-in {
+    animation: fade-in 0.4s ease forwards;
 }

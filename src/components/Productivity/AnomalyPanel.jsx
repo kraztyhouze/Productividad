@@ -1,18 +1,17 @@
 import React, { useMemo, useState } from 'react';
 import { AlertTriangle, ChevronDown, ChevronRight, Skull, Zap, Clock, ShieldAlert, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const AnomalyPanel = ({ dailyStats, transactionLogs, employees, selectedDate, isManagerial }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [dismissedIds, setDismissedIds] = useState(new Set());
 
-    // 1. Analyze logs for specific session anomalies
     const sessionAnomalies = useMemo(() => {
         const anomalies = [];
         transactionLogs.forEach(log => {
             const start = new Date(log.start_time);
             const end = log.end_time ? new Date(log.end_time) : new Date();
-            // Ensure log belongs to selected date (start time)
             const logDate = start.toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
             if (logDate !== selectedDate) return;
 
@@ -22,9 +21,7 @@ const AnomalyPanel = ({ dailyStats, transactionLogs, employees, selectedDate, is
 
             if (durationMin > 90) {
                 anomalies.push({
-                    id: anomalyId,
-                    type: 'GHOST',
-                    severity: 'high',
+                    id: anomalyId, type: 'GHOST', severity: 'high',
                     text: `Sesión fantasma de ${empName} (${Math.round(durationMin)} min).`,
                     time: format(start, 'HH:mm')
                 });
@@ -33,9 +30,7 @@ const AnomalyPanel = ({ dailyStats, transactionLogs, employees, selectedDate, is
             const isSales = ['standard', 'jewelry', 'recoverable'].includes(log.type);
             if (isSales && durationMin < 3) {
                 anomalies.push({
-                    id: anomalyId,
-                    type: 'FLASH',
-                    severity: 'medium',
+                    id: anomalyId, type: 'FLASH', severity: 'medium',
                     text: `Venta ultrarrápida de ${empName} (< 3 min).`,
                     time: format(start, 'HH:mm')
                 });
@@ -44,7 +39,6 @@ const AnomalyPanel = ({ dailyStats, transactionLogs, employees, selectedDate, is
         return anomalies;
     }, [transactionLogs, selectedDate, employees]);
 
-    // 2. Analyze aggregated stats for productivity anomalies
     const statsAnomalies = useMemo(() => {
         const anomalies = [];
         Object.keys(dailyStats).forEach(empId => {
@@ -52,9 +46,7 @@ const AnomalyPanel = ({ dailyStats, transactionLogs, employees, selectedDate, is
             const hours = stat.totalSeconds / 3600;
             if (hours > 12) {
                 anomalies.push({
-                    id: `overwork-${empId}`,
-                    type: 'OVERWORK',
-                    severity: 'medium',
+                    id: `overwork-${empId}`, type: 'OVERWORK', severity: 'medium',
                     text: `${stat.name} lleva > 12 horas en turno.`,
                     time: 'Turno'
                 });
@@ -63,81 +55,87 @@ const AnomalyPanel = ({ dailyStats, transactionLogs, employees, selectedDate, is
         return anomalies;
     }, [dailyStats]);
 
-    // Filter dismissed anomalies
     const allAnomalies = [...sessionAnomalies, ...statsAnomalies].filter(a => !dismissedIds.has(a.id));
     const highSeverity = allAnomalies.filter(a => a.severity === 'high').length;
 
-    const handleDismiss = (anomalyId) => {
-        setDismissedIds(prev => new Set([...prev, anomalyId]));
-    };
-
-    const handleDismissAll = () => {
-        const allIds = allAnomalies.map(a => a.id);
-        setDismissedIds(prev => new Set([...prev, ...allIds]));
-    };
+    const handleDismiss = (anomalyId) => setDismissedIds(prev => new Set([...prev, anomalyId]));
+    const handleDismissAll = () => setDismissedIds(prev => new Set([...prev, ...allAnomalies.map(a => a.id)]));
 
     if (allAnomalies.length === 0) return null;
 
     return (
-        <div className={`mt-4 rounded-xl border transition-all overflow-hidden ${highSeverity > 0 ? 'bg-red-500/10 border-red-500/30' : 'bg-amber-500/10 border-amber-500/30'}`}>
+        <div className={`mt-6 rounded-[32px] border transition-all overflow-hidden shadow-sm ${highSeverity > 0 ? 'bg-red-50 border-red-100' : 'bg-[#FFFBEB] border-amber-100'}`}>
             <div
-                className="p-3 flex items-center justify-between cursor-pointer hover:bg-white/5"
+                className="px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-white/40 transition-colors"
                 onClick={() => setIsExpanded(!isExpanded)}
             >
-                <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${highSeverity > 0 ? 'bg-red-500 text-white animate-pulse' : 'bg-amber-500 text-white'}`}>
-                        <ShieldAlert size={18} />
+                <div className="flex items-center gap-4">
+                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shadow-sm ${highSeverity > 0 ? 'bg-red-500 text-white animate-pulse' : 'bg-amber-400 text-white'}`}>
+                        <ShieldAlert size={20} />
                     </div>
                     <div>
-                        <h4 className={`font-bold text-sm ${highSeverity > 0 ? 'text-red-400' : 'text-amber-400'}`}>
-                            Integridad de Datos Detectada
+                        <h4 className={`font-black text-sm uppercase tracking-tighter ${highSeverity > 0 ? 'text-red-700' : 'text-amber-700'}`}>
+                            Alertas de Integridad
                         </h4>
-                        <p className="text-[10px] text-slate-400">
+                        <p className={`text-[10px] font-bold uppercase tracking-widest ${highSeverity > 0 ? 'text-red-400' : 'text-amber-500'}`}>
                             {allAnomalies.length} incidencias ({highSeverity} críticas)
                         </p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4">
                     {isManagerial && isExpanded && (
                         <button
                             onClick={(e) => { e.stopPropagation(); handleDismissAll(); }}
-                            className="text-[10px] text-slate-400 hover:text-red-400 px-2 py-1 bg-slate-800/50 rounded border border-white/10 hover:border-red-500/30 transition-colors"
-                            title="Descartar todas las advertencias"
+                            className="text-[10px] font-black uppercase tracking-widest text-[#718096] whitespace-nowrap px-4 py-2 bg-white/60 hover:bg-white rounded-xl border border-white shadow-sm transition-all"
                         >
-                            Descartar Todo
+                            Limpiar Todo
                         </button>
                     )}
-                    {isExpanded ? <ChevronDown size={16} className="text-slate-500" /> : <ChevronRight size={16} className="text-slate-500" />}
+                    <div className="w-8 h-8 rounded-full bg-white/50 flex items-center justify-center">
+                        {isExpanded ? <ChevronDown size={18} className="#718096" /> : <ChevronRight size={18} className="#718096" />}
+                    </div>
                 </div>
             </div>
 
-            {isExpanded && (
-                <div className="bg-[#0f172a]/50 p-3 flex flex-col gap-2 max-h-40 overflow-y-auto custom-scrollbar">
-                    {allAnomalies.map((a) => (
-                        <div key={a.id} className="flex items-center gap-3 p-2 rounded hover:bg-white/5 border-b border-white/5 last:border-0">
-                            {a.type === 'GHOST' && <Skull size={14} className="text-indigo-400 shrink-0" />}
-                            {a.type === 'FLASH' && <Zap size={14} className="text-yellow-400 shrink-0" />}
-                            {a.type === 'OVERWORK' && <Clock size={14} className="text-slate-400 shrink-0" />}
+            <AnimatePresence>
+                {isExpanded && (
+                    <motion.div
+                        initial={{ height: 0 }}
+                        animate={{ height: 'auto' }}
+                        exit={{ height: 0 }}
+                        className="bg-white/40 backdrop-blur-sm border-t border-white/20"
+                    >
+                        <div className="p-4 flex flex-col gap-2 max-h-60 overflow-y-auto custom-scrollbar">
+                            {allAnomalies.map((a) => (
+                                <div key={a.id} className="flex items-center gap-4 p-4 rounded-2xl bg-white/60 border border-white shadow-sm hover:shadow-md transition-all group">
+                                    <div className="w-8 h-8 rounded-xl bg-[#F4F7FA] flex items-center justify-center shrink-0">
+                                        {a.type === 'GHOST' && <Skull size={16} className="text-red-400" />}
+                                        {a.type === 'FLASH' && <Zap size={16} className="text-amber-400" />}
+                                        {a.type === 'OVERWORK' && <Clock size={16} className="text-[#A0AEC0]" />}
+                                    </div>
 
-                            <div className="flex-1">
-                                <p className="text-xs text-slate-300 font-medium">{a.text}</p>
-                            </div>
-                            <span className="text-[9px] font-mono text-slate-500 bg-slate-900 px-1 py-0.5 rounded border border-white/5">
-                                {a.time}
-                            </span>
-                            {isManagerial && (
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); handleDismiss(a.id); }}
-                                    className="p-1 rounded hover:bg-red-500/20 text-slate-500 hover:text-red-400 transition-colors"
-                                    title="Descartar esta advertencia"
-                                >
-                                    <Trash2 size={12} />
-                                </button>
-                            )}
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs text-[#1A365D] font-bold uppercase tracking-tighter">{a.text}</p>
+                                    </div>
+
+                                    <span className="text-[10px] font-black text-[#A0AEC0] bg-white px-3 py-1 rounded-full border border-[#E2E8F0] shadow-sm font-mono">
+                                        {a.time}
+                                    </span>
+
+                                    {isManagerial && (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleDismiss(a.id); }}
+                                            className="w-8 h-8 flex items-center justify-center rounded-xl bg-white text-[#A0AEC0] hover:text-red-500 hover:shadow-lg transition-all opacity-0 group-hover:opacity-100 border border-[#E2E8F0]"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
                         </div>
-                    ))}
-                </div>
-            )}
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

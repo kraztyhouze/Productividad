@@ -62,114 +62,143 @@ const EmployeeModal = ({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 overflow-y-auto transition-all">
-            <div className="bg-[#1e293b]/90 rounded-3xl shadow-2xl w-full max-w-4xl my-4 border border-white/10 flex flex-col max-h-[90vh] backdrop-blur-xl">
-                <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/5 rounded-t-3xl shrink-0">
-                    <h2 className="text-xl font-bold text-white flex items-center gap-2">{editingEmployee ? 'Editar Ficha' : 'Nueva Ficha'}</h2>
-                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full text-slate-400 hover:text-white transition-colors"><X size={24} /></button>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#1A365D]/20 backdrop-blur-sm p-4 overflow-y-auto transition-all">
+            <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-4xl my-4 border border-[#E2E8F0] flex flex-col max-h-[90vh] overflow-hidden">
+                <div className="p-6 border-b border-[#F1F5F9] flex justify-between items-center bg-[#F8FAFC]">
+                    <h2 className="text-xl font-black text-[#1A365D] tracking-tight flex items-center gap-2">
+                        {editingEmployee ? 'Editar Ficha' : 'Nueva Ficha'}
+                    </h2>
+                    <button onClick={onClose} className="p-2 hover:bg-[#EDF2F7] rounded-full text-[#718096] transition-colors"><X size={24} /></button>
                 </div>
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
-                    <form id="employeeForm" onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
+                    <form id="employeeForm" onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                         <div className="space-y-6">
+                            <h3 className="text-xs font-black text-[#A0AEC0] uppercase tracking-widest">Información Personal</h3>
                             <div className="grid grid-cols-2 gap-4">
-                                <input required name="firstName" value={formData.firstName || ''} onChange={handleInputChange} className="input-field col-span-1 bg-[#0f172a]/50 border-white/10 rounded-lg p-2.5 text-slate-200 text-sm focus:border-pink-500 outline-none transition-colors" placeholder="Nombre" />
-                                <input required name="lastName" value={formData.lastName || ''} onChange={handleInputChange} className="input-field col-span-1 bg-[#0f172a]/50 border-white/10 rounded-lg p-2.5 text-slate-200 text-sm focus:border-pink-500 outline-none transition-colors" placeholder="Apellidos" />
-                                <div className="col-span-2 relative mt-4">
-                                    <label className="text-[10px] absolute -top-2 left-2 bg-[#1e293b] px-1 text-pink-400 font-bold z-10 rounded">Alias (Nombre Público)</label>
-                                    <input name="alias" value={formData.alias || ''} onChange={handleInputChange} className="input-field w-full bg-[#0f172a]/50 border-white/10 rounded-lg p-2.5 text-slate-200 text-sm border-pink-500/30 font-bold focus:border-pink-500 outline-none" placeholder="Ej: Juanma (Si vacío usa el Nombre)" />
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-[#718096] ml-1">Nombre</label>
+                                    <input required name="firstName" value={formData.firstName || ''} onChange={handleInputChange} className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 text-[#1A365D] text-sm focus:border-[#FF8C9D] outline-none transition-all placeholder:text-[#A0AEC0]" placeholder="Nombre" />
                                 </div>
-                                <input required name="email" value={formData.email || ''} onChange={handleInputChange} className="input-field col-span-2 bg-[#0f172a]/50 border-white/10 rounded-lg p-2.5 text-slate-200 text-sm focus:border-pink-500 outline-none" placeholder="Email" />
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-[#718096] ml-1">Apellidos</label>
+                                    <input required name="lastName" value={formData.lastName || ''} onChange={handleInputChange} className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 text-[#1A365D] text-sm focus:border-[#FF8C9D] outline-none transition-all placeholder:text-[#A0AEC0]" placeholder="Apellidos" />
+                                </div>
+                                <div className="col-span-2 space-y-1">
+                                    <label className="text-[10px] font-bold text-[#FF8C9D] ml-1 uppercase tracking-wider">Alias (Nombre Público)</label>
+                                    <input name="alias" value={formData.alias || ''} onChange={handleInputChange} className="w-full bg-[#FFF5F7] border border-[#FF8C9D]/30 rounded-xl p-3 text-[#1A365D] text-sm font-bold focus:border-[#FF8C9D] outline-none transition-all" placeholder="Ej: Juanma (Si vacío usa el Nombre)" />
+                                </div>
+                                <div className="col-span-2 space-y-1">
+                                    <label className="text-[10px] font-bold text-[#718096] ml-1">Email Corporativo</label>
+                                    <input required name="email" value={formData.email || ''} onChange={handleInputChange} className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 text-[#1A365D] text-sm focus:border-[#FF8C9D] outline-none transition-all" placeholder="Email" />
+                                </div>
                             </div>
 
-                            <div className="bg-slate-900/30 p-4 rounded-xl border border-white/5 space-y-4">
-                                <label className="text-xs font-bold text-slate-400 uppercase">Rol y Acceso</label>
-                                <select name="role" value={formData.role || ''} onChange={handleInputChange} className="w-full p-2.5 bg-[#0f172a]/50 border border-white/10 rounded-lg text-slate-200 text-sm outline-none focus:border-pink-500">
-                                    {roles.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
-                                </select>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <input required name="username" value={formData.username || ''} onChange={handleInputChange} className="w-full p-2 bg-[#0f172a]/50 border-white/10 rounded text-slate-200 text-sm outline-none focus:border-pink-500" placeholder="Usuario" />
-                                    <input required={!editingEmployee} type="password" autoComplete="new-password" name="password" value={formData.password || ''} onChange={handleInputChange} className="w-full p-2 bg-[#0f172a]/50 border-white/10 rounded text-slate-200 text-sm outline-none focus:border-pink-500" placeholder={editingEmployee ? "Contraseña (Dejar vacío para mantener)" : "Contraseña"} />
+                            <div className="bg-[#F8FAFC] p-6 rounded-2xl border border-[#E2E8F0] space-y-5">
+                                <h3 className="text-xs font-black text-[#A0AEC0] uppercase tracking-widest">Rol y Acceso</h3>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-[#718096] ml-1">Asignar Rol</label>
+                                    <select name="role" value={formData.role || ''} onChange={handleInputChange} className="w-full p-3 bg-white border border-[#E2E8F0] rounded-xl text-[#1A365D] text-sm outline-none focus:border-[#FF8C9D] transition-all cursor-pointer">
+                                        {roles.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+                                    </select>
                                 </div>
-                                <label className="flex items-center gap-3 cursor-pointer p-3 bg-pink-500/10 border border-pink-500/20 rounded-xl hover:bg-pink-500/20 transition-colors">
-                                    <input type="checkbox" name="isBuyer" checked={formData.isBuyer === true} onChange={handleInputChange} className="accent-pink-500 w-5 h-5" />
-                                    <span className="text-sm font-bold text-pink-100">Autorizado Compras</span>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-[#718096] ml-1">Usuario</label>
+                                        <input required name="username" value={formData.username || ''} onChange={handleInputChange} className="w-full p-3 bg-white border border-[#E2E8F0] rounded-xl text-[#1A365D] text-sm outline-none focus:border-[#FF8C9D] transition-all" placeholder="Usuario" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-[#718096] ml-1">Contraseña</label>
+                                        <input required={!editingEmployee} type="password" autoComplete="new-password" name="password" value={formData.password || ''} onChange={handleInputChange} className="w-full p-3 bg-white border border-[#E2E8F0] rounded-xl text-[#1A365D] text-sm outline-none focus:border-[#FF8C9D] transition-all" placeholder={editingEmployee ? "Sin cambios" : "••••••••"} />
+                                    </div>
+                                </div>
+                                <label className="flex items-center gap-3 cursor-pointer p-4 bg-white border border-[#FF8C9D]/20 rounded-2xl hover:border-[#FF8C9D]/50 transition-all shadow-sm group">
+                                    <input type="checkbox" name="isBuyer" checked={formData.isBuyer === true} onChange={handleInputChange} className="accent-[#FF8C9D] w-5 h-5 rounded-md" />
+                                    <span className="text-sm font-bold text-[#1A365D] group-hover:text-[#FF8C9D] transition-colors">Autorizado para Compras</span>
                                 </label>
                             </div>
                         </div>
 
                         {/* Right Side: Productivity Stats */}
-                        <div className="space-y-4">
-                            <h3 className="text-sm font-bold text-slate-400 uppercase">Estadísticas de Compras (Cerradas)</h3>
+                        <div className="space-y-6">
+                            <h3 className="text-xs font-black text-[#A0AEC0] uppercase tracking-widest">Rendimiento (Compras)</h3>
 
                             {/* Date Controls */}
-                            <div className="bg-slate-900/30 p-2 rounded-xl border border-white/5 flex gap-2">
-                                <div className="flex-1">
-                                    <label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Desde</label>
-                                    <input type="date" value={statsStart} onChange={e => setStatsStart(e.target.value)} className="w-full bg-[#0f172a]/50 border border-white/10 rounded-lg p-1 text-xs text-white focus:border-pink-500 outline-none" />
+                            <div className="bg-white p-2 rounded-2xl border border-[#E2E8F0] flex gap-2 shadow-sm">
+                                <div className="flex-1 space-y-1">
+                                    <label className="text-[9px] text-[#A0AEC0] font-black uppercase ml-2">Desde</label>
+                                    <input type="date" value={statsStart} onChange={e => setStatsStart(e.target.value)} className="w-full bg-[#F4F7FA] border-none rounded-xl p-2.5 text-xs text-[#1A365D] font-bold outline-none ring-1 ring-[#E2E8F0] focus:ring-[#FF8C9D] transition-all" />
                                 </div>
-                                <div className="flex-1">
-                                    <label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Hasta</label>
-                                    <input type="date" value={statsEnd} onChange={e => setStatsEnd(e.target.value)} className="w-full bg-[#0f172a]/50 border border-white/10 rounded-lg p-1 text-xs text-white focus:border-pink-500 outline-none" />
+                                <div className="flex-1 space-y-1">
+                                    <label className="text-[9px] text-[#A0AEC0] font-black uppercase ml-2">Hasta</label>
+                                    <input type="date" value={statsEnd} onChange={e => setStatsEnd(e.target.value)} className="w-full bg-[#F4F7FA] border-none rounded-xl p-2.5 text-xs text-[#1A365D] font-bold outline-none ring-1 ring-[#E2E8F0] focus:ring-[#FF8C9D] transition-all" />
                                 </div>
                             </div>
 
                             {/* Stats Display */}
                             {editingEmployee ? (
-                                <div className="bg-slate-900/30 p-4 rounded-xl border border-white/5 space-y-4">
+                                <div className="bg-[#F8FAFC] p-6 rounded-2xl border border-[#E2E8F0] space-y-6 shadow-inner">
                                     {(() => {
                                         const stats = getStats(editingEmployee.id, statsStart, statsEnd);
                                         return (
                                             <>
                                                 <div className="grid grid-cols-2 gap-4">
-                                                    <div className="bg-[#0f172a]/60 p-3 rounded-lg border border-white/5 text-center">
-                                                        <div className="text-2xl font-bold text-pink-400">{stats.totalGroups}</div>
-                                                        <div className="text-[10px] uppercase text-slate-500 font-bold">Total Grupos</div>
+                                                    <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] text-center shadow-sm">
+                                                        <div className="text-3xl font-black text-[#FF8C9D]">{stats.totalGroups}</div>
+                                                        <div className="text-[10px] uppercase text-[#A0AEC0] font-bold tracking-tighter">Total Grupos</div>
                                                     </div>
-                                                    <div className="bg-[#0f172a]/60 p-3 rounded-lg border border-white/5 text-center">
-                                                        <div className="text-2xl font-bold text-slate-200">{stats.gph}</div>
-                                                        <div className="text-[10px] uppercase text-slate-500 font-bold">Media G/H</div>
-                                                    </div>
-                                                </div>
-
-                                                <div className="pt-2 border-t border-white/5 grid grid-cols-3 gap-2 text-center">
-                                                    <div>
-                                                        <div className="text-sm font-mono text-purple-300">{stats.jewelry}</div>
-                                                        <div className="text-[9px] text-slate-500">Joyería</div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-sm font-mono text-blue-300">{stats.standard}</div>
-                                                        <div className="text-[9px] text-slate-500">General</div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-sm font-mono text-amber-300">{stats.recoverable}</div>
-                                                        <div className="text-[9px] text-slate-500">Recup.</div>
+                                                    <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] text-center shadow-sm">
+                                                        <div className="text-3xl font-black text-[#1A365D]">{stats.gph}</div>
+                                                        <div className="text-[10px] uppercase text-[#A0AEC0] font-bold tracking-tighter">Media G/H</div>
                                                     </div>
                                                 </div>
 
-                                                <div className="flex justify-between items-center pt-2 border-t border-white/5">
-                                                    <span className="text-xs text-slate-400">Días Trabajados</span>
-                                                    <span className="text-sm font-bold text-slate-200">{stats.activeDays}</span>
+                                                <div className="pt-2 grid grid-cols-3 gap-3 text-center">
+                                                    <div className="bg-[#FDF2F8] p-3 rounded-xl border border-[#FBCFE8]">
+                                                        <div className="text-base font-black text-[#BE185D]">{stats.jewelry}</div>
+                                                        <div className="text-[9px] font-bold text-[#DB2777] uppercase">Joyería</div>
+                                                    </div>
+                                                    <div className="bg-[#EFF6FF] p-3 rounded-xl border border-[#DBEAFE]">
+                                                        <div className="text-base font-black text-[#1D4ED8]">{stats.standard}</div>
+                                                        <div className="text-[9px] font-bold text-[#2563EB] uppercase">General</div>
+                                                    </div>
+                                                    <div className="bg-[#FFFBEB] p-3 rounded-xl border border-[#FEF3C7]">
+                                                        <div className="text-base font-black text-[#B45309]">{stats.recoverable}</div>
+                                                        <div className="text-[9px] font-bold text-[#D97706] uppercase">Recup.</div>
+                                                    </div>
                                                 </div>
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-xs text-slate-400">Total Horas</span>
-                                                    <span className="text-sm font-bold text-slate-200">{stats.totalHours}h</span>
+
+                                                <div className="space-y-3 pt-2">
+                                                    <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-[#E2E8F0]">
+                                                        <span className="text-xs font-bold text-[#718096]">Días Trabajados</span>
+                                                        <span className="text-sm font-black text-[#1A365D]">{stats.activeDays}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-[#E2E8F0]">
+                                                        <span className="text-xs font-bold text-[#718096]">Total Horas Acumuladas</span>
+                                                        <span className="text-sm font-black text-[#1A365D]">{stats.totalHours}h</span>
+                                                    </div>
                                                 </div>
                                             </>
                                         );
                                     })()}
                                 </div>
                             ) : (
-                                <div className="text-center py-8 text-slate-500 text-xs italic">
-                                    Guarda el empleado para ver estadísticas.
+                                <div className="text-center py-12 bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0] border-dashed">
+                                    <div className="text-3xl mb-2">👤</div>
+                                    <p className="text-xs font-bold text-[#A0AEC0] italic">
+                                        Guarda el empleado primero para<br/>poder visualizar sus estadísticas.
+                                    </p>
                                 </div>
                             )}
                         </div>
-
                     </form>
                 </div>
-                <div className="p-6 border-t border-white/5 bg-white/5 rounded-b-3xl shrink-0 flex justify-end gap-3">
-                    <button onClick={onClose} className="px-6 py-2 rounded-xl font-bold text-slate-400 hover:bg-white/5 hover:text-slate-200 transition-colors">Cancelar</button>
-                    <button type="submit" form="employeeForm" className="px-8 py-2 bg-pink-600 hover:bg-pink-500 text-white rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-pink-600/20 transition-all"><Save size={18} /> Guardar</button>
+                
+                <div className="p-6 border-t border-[#F1F5F9] bg-[#F8FAFC] flex justify-end gap-4 shrink-0">
+                    <button onClick={onClose} className="px-6 py-2.5 rounded-xl font-bold text-[#718096] hover:bg-[#EDF2F7] transition-all">Cancelar</button>
+                    <button type="submit" form="employeeForm" className="px-10 py-2.5 bg-[#FF8C9D] hover:bg-[#e87589] text-white rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-[#FF8C9D]/20 transition-all transform hover:-translate-y-0.5 active:translate-y-0">
+                        <Save size={18} /> Guardar Cambios
+                    </button>
                 </div>
             </div>
         </div>

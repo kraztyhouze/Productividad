@@ -1,0 +1,36 @@
+[2026-03-15T21:39:55.829Z] ERROR in GET /cash-control: column "created_at" does not exist
+error: column "created_at" does not exist
+    at C:\Users\Juanma\.gemini\antigravity\TikTak 2.1\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async file:///C:/Users/Juanma/.gemini/antigravity/TikTak%202.1/server/routes/gerencia.js:117:24
+
+[2026-03-15T21:39:55.960Z] ERROR in GET /cash-control: column "created_at" does not exist
+error: column "created_at" does not exist
+    at C:\Users\Juanma\.gemini\antigravity\TikTak 2.1\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async file:///C:/Users/Juanma/.gemini/antigravity/TikTak%202.1/server/routes/gerencia.js:117:24
+
+[2026-03-15T21:41:54.053Z] ERROR in GET /cash-control: column "created_at" does not exist
+error: column "created_at" does not exist
+    at C:\Users\Juanma\.gemini\antigravity\TikTak 2.1\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async file:///C:/Users/Juanma/.gemini/antigravity/TikTak%202.1/server/routes/gerencia.js:117:24
+
+[2026-03-15T21:41:54.187Z] ERROR in GET /cash-control: column "created_at" does not exist
+error: column "created_at" does not exist
+    at C:\Users\Juanma\.gemini\antigravity\TikTak 2.1\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async file:///C:/Users/Juanma/.gemini/antigravity/TikTak%202.1/server/routes/gerencia.js:117:24
+
+[2026-03-15T21:42:07.540Z] ERROR in GET /cash-control: column "created_at" does not exist
+error: column "created_at" does not exist
+    at C:\Users\Juanma\.gemini\antigravity\TikTak 2.1\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async file:///C:/Users/Juanma/.gemini/antigravity/TikTak%202.1/server/routes/gerencia.js:117:24
+
+[2026-03-15T21:42:07.694Z] ERROR in GET /cash-control: column "created_at" does not exist
+error: column "created_at" does not exist
+    at C:\Users\Juanma\.gemini\antigravity\TikTak 2.1\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async file:///C:/Users/Juanma/.gemini/antigravity/TikTak%202.1/server/routes/gerencia.js:117:24
+

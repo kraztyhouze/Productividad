@@ -17,6 +17,7 @@ import Market from './pages/Market';
 import MobileDiagnostics from './pages/MobileDiagnostics';
 import LaptopDiagnostics from './pages/LaptopDiagnostics';
 import LaptopRemoteTest from './pages/LaptopRemoteTest';
+import Gerencia from './pages/Gerencia';
 
 // Componente para proteger rutas que requieren Tienda seleccionada
 const RequireStore = () => {
@@ -69,6 +70,7 @@ function App() {
                                             <Route path="productivity" element={<Productivity />} />
                                             <Route path="reports" element={<Reports />} />
                                             <Route path="market" element={<Market />} />
+                                            <Route path="gerencia" element={<Gerencia />} />
                                         </Route>
                                     </Route>
                                 </Route>

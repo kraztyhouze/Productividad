@@ -2,12 +2,33 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth, ROLES } from '../context/AuthContext';
 import { useTeam } from '../context/TeamContext';
-import { Users, ShoppingBag, LogOut, LayoutGrid, FileText, Search, Download } from 'lucide-react';
+import { Users, ShoppingBag, LogOut, LayoutGrid, FileText, Search, Download, ChevronLeft, ChevronRight, Briefcase } from 'lucide-react';
+
+const NAV_ITEMS = [
+    {
+        section: null,
+        items: [
+            { to: '/', label: 'Dashboard', icon: LayoutGrid, roles: [ROLES.MANAGER, ROLES.RESPONSIBLE, 'VIEW_ONLY'] },
+        ]
+    },
+    {
+        section: 'Gestión',
+        items: [
+            { to: '/team', label: 'Equipo', icon: Users, roles: [ROLES.MANAGER, ROLES.RESPONSIBLE] },
+            { to: '/reports', label: 'Informes', icon: FileText, roles: [ROLES.MANAGER, ROLES.RESPONSIBLE] },
+            { to: '/productivity', label: 'Productividad', icon: ShoppingBag, roles: null }, // all roles
+            { to: '/market', label: 'Mercado', icon: Search, roles: null },
+            { to: '/gerencia', label: 'Gerencia', icon: Briefcase, roles: [ROLES.MANAGER] },
+        ]
+    }
+];
 
 const Sidebar = ({ expanded, setExpanded }) => {
     const { user, logout } = useAuth();
     const { getDisplayName } = useTeam();
     const navigate = useNavigate();
+
+
 
     const handleLogout = () => {
         logout();
@@ -15,12 +36,11 @@ const Sidebar = ({ expanded, setExpanded }) => {
     };
 
     const handleBackup = async () => {
-        if (!confirm("¿Descargar copia de seguridad completa de la base de datos?")) return;
+        if (!confirm('¿Descargar copia de seguridad completa de la base de datos?')) return;
         try {
             const res = await fetch('/api/admin/backup');
-            if (!res.ok) throw new Error("Error en backup");
+            if (!res.ok) throw new Error('Error en backup');
             const data = await res.json();
-
             const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -31,91 +51,149 @@ const Sidebar = ({ expanded, setExpanded }) => {
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
         } catch (e) {
-            alert("Error al descargar backup: " + e.message);
+            alert('Error al descargar backup: ' + e.message);
         }
     };
 
-    return (
-        <aside className={`${expanded ? 'w-64' : 'w-20'} fixed h-screen z-40 bg-slate-950/50 backdrop-blur-xl border-r border-slate-800/50 flex flex-col transition-all duration-300`}>
-            {/* Header / Logo */}
-            <div className="h-24 flex items-center justify-between px-4 border-b border-slate-800/50 relative overflow-hidden group">
-                <div className="absolute inset-0 bg-pink-600/10 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"></div>
+    const canSee = (roles) => {
+        if (!roles) return true;
+        return roles.includes(user?.role);
+    };
 
-                <div className={`flex items-center gap-3 transition-all duration-300 ${!expanded ? 'justify-center w-full' : ''}`}>
-                    {/* Logo Image */}
-                    <img src="/logo_tiktak.jpg" alt="TikTak" className="h-10 w-auto object-contain shadow-lg shadow-pink-500/20 shrink-0" />
-                    <span className={`font-extrabold text-2xl tracking-tight text-white transition-opacity duration-300 ${expanded ? 'opacity-100' : 'opacity-0 hidden'}`} style={{ fontFamily: '"Varela Round", sans-serif' }}>
+    const initials = (getDisplayName(user) || user?.name || 'U')
+        .split(' ')
+        .map(w => w[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2);
+
+    return (
+        <aside
+            className="fixed top-0 left-0 h-screen z-40 flex flex-col bg-white border-r border-[#E2E8F0] transition-all duration-300 overflow-hidden"
+            style={{ width: expanded ? 'var(--sidebar-width)' : 'var(--sidebar-collapsed)' }}
+        >
+            {/* ── Logo / Header ── */}
+            <div className="h-[72px] flex items-center px-4 border-b border-[#E2E8F0] relative shrink-0">
+                <div className={`flex items-center gap-3 overflow-hidden ${!expanded ? 'justify-center w-full' : ''}`}>
+                    <img
+                        src="/logo_tiktak.jpg"
+                        alt="TikTak"
+                        className="h-9 w-auto object-contain rounded-lg shrink-0"
+                    />
+                    <span
+                        className={`font-extrabold text-xl tracking-tight text-[#1A365D] whitespace-nowrap transition-all duration-300 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0'}`}
+                        style={{ fontFamily: '"Inter", sans-serif' }}
+                    >
                         TikTak
                     </span>
                 </div>
 
-                <button onClick={() => setExpanded(!expanded)} className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-white/10 rounded-lg text-slate-500 hover:text-white transition-all ${expanded ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-                    <LayoutGrid size={16} className="rotate-90" />
-                </button>
-                {/* Floating toggle for collapsed state */}
+                {/* Collapse toggle */}
+                {expanded && (
+                    <button
+                        onClick={() => setExpanded(false)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-[#A0AEC0] hover:text-[#1A365D] hover:bg-[#F4F7FA] transition-all"
+                        title="Colapsar"
+                        id="sidebar-collapse-btn"
+                    >
+                        <ChevronLeft size={16} />
+                    </button>
+                )}
                 {!expanded && (
-                    <button onClick={() => setExpanded(true)} className="absolute inset-0 z-20 w-full h-full cursor-pointer opacity-0" title="Expandir"></button>
+                    <button
+                        onClick={() => setExpanded(true)}
+                        className="absolute inset-0 z-10 w-full h-full cursor-pointer opacity-0"
+                        title="Expandir"
+                        id="sidebar-expand-btn"
+                    />
                 )}
             </div>
 
-            {/* Navigation Links */}
-            <nav className="flex-1 py-8 px-3 space-y-2 overflow-y-auto custom-scrollbar">
+            {/* ── Navigation ── */}
+            <nav className="flex-1 py-5 px-3 space-y-1 overflow-y-auto overflow-x-hidden">
+                {NAV_ITEMS.map((group, gi) => (
+                    <div key={gi}>
+                        {/* Section label */}
+                        {group.section && expanded && (
+                            <p className="px-3 pt-4 pb-1 text-[10px] font-bold text-[#A0AEC0] uppercase tracking-widest select-none">
+                                {group.section}
+                            </p>
+                        )}
+                        {group.section && !expanded && <div className="my-3 mx-3 border-t border-[#E2E8F0]" />}
 
-                {user?.role !== ROLES.KIOSK && (
-                    <NavLink to="/" className={({ isActive }) => `flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 group ${isActive ? 'bg-pink-600 shadow-lg shadow-pink-500/20 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'} ${!expanded ? 'justify-center' : ''}`}>
-                        <LayoutGrid size={20} className="shrink-0 group-hover:scale-110 transition-transform" />
-                        <span className={`font-bold text-sm transition-opacity duration-300 ${expanded ? 'opacity-100' : 'opacity-0 hidden'}`}>Dashboard</span>
-                    </NavLink>
-                )}
+                        {group.items.filter(item => canSee(item.roles)).map(item => (
+                            <NavLink
+                                key={item.to}
+                                to={item.to}
+                                end={item.to === '/'}
+                                id={`nav-${item.label.toLowerCase()}`}
+                                className={({ isActive }) =>
+                                    `relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group
+                                    ${!expanded ? 'justify-center' : ''}
+                                    ${isActive
+                                        ? 'bg-[#fff0f2] text-[#FF8C9D]'
+                                        : 'text-[#718096] hover:bg-[#F4F7FA] hover:text-[#1A365D]'
+                                    }`
+                                }
+                            >
+                                {({ isActive }) => (
+                                    <>
+                                        {/* Active accent bar */}
+                                        {isActive && (
+                                            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 bg-[#FF8C9D] rounded-r-full" />
+                                        )}
+                                        <item.icon
+                                            size={20}
+                                            className={`shrink-0 transition-transform ${isActive ? 'text-[#FF8C9D]' : 'text-[#A0AEC0] group-hover:text-[#1A365D]'}`}
+                                        />
+                                        {expanded && (
+                                            <span className={`text-sm font-semibold whitespace-nowrap ${isActive ? 'text-[#FF8C9D]' : ''}`}>
+                                                {item.label}
+                                            </span>
+                                        )}
+                                    </>
+                                )}
+                            </NavLink>
+                        ))}
+                    </div>
+                ))}
 
-                <p className={`px-3 text-xs font-bold text-slate-500 uppercase tracking-widest mt-6 mb-2 transition-opacity duration-300 ${expanded ? 'opacity-100' : 'opacity-0 hidden'}`}>Gestión</p>
-
-                {(user?.role === ROLES.MANAGER || user?.role === ROLES.RESPONSIBLE) && (
-                    <>
-                        <NavLink to="/team" className={({ isActive }) => `flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 group ${isActive ? 'bg-rose-600 shadow-lg shadow-rose-500/20 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'} ${!expanded ? 'justify-center' : ''}`}>
-                            <Users size={20} className="shrink-0 group-hover:scale-110 transition-transform" />
-                            <span className={`font-bold text-sm transition-opacity duration-300 ${expanded ? 'opacity-100' : 'opacity-0 hidden'}`}>Equipo</span>
-                        </NavLink>
-
-                        <NavLink to="/reports" className={({ isActive }) => `flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 group ${isActive ? 'bg-fuchsia-600 shadow-lg shadow-fuchsia-500/20 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'} ${!expanded ? 'justify-center' : ''}`}>
-                            <FileText size={20} className="shrink-0 group-hover:scale-110 transition-transform" />
-                            <span className={`font-bold text-sm transition-opacity duration-300 ${expanded ? 'opacity-100' : 'opacity-0 hidden'}`}>Informes</span>
-                        </NavLink>
-                    </>
-                )}
-
-                <NavLink to="/productivity" className={({ isActive }) => `flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 group ${isActive ? 'bg-emerald-600 shadow-lg shadow-emerald-500/20 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'} ${!expanded ? 'justify-center' : ''}`}>
-                    <ShoppingBag size={20} className="shrink-0 group-hover:scale-110 transition-transform" />
-                    <span className={`font-bold text-sm transition-opacity duration-300 ${expanded ? 'opacity-100' : 'opacity-0 hidden'}`}>Productividad</span>
-                </NavLink>
-
-                <NavLink to="/market" className={({ isActive }) => `flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 group ${isActive ? 'bg-amber-600 shadow-lg shadow-amber-500/20 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'} ${!expanded ? 'justify-center' : ''}`}>
-                    <Search size={20} className="shrink-0 group-hover:scale-110 transition-transform" />
-                    <span className={`font-bold text-sm transition-opacity duration-300 ${expanded ? 'opacity-100' : 'opacity-0 hidden'}`}>Mercado</span>
-                </NavLink>
-
+                {/* Backup — Manager only */}
                 {user?.role === ROLES.MANAGER && (
-                    <button onClick={handleBackup} className={`w-full flex items-center gap-3 px-3 py-3 mt-4 rounded-xl text-slate-500 hover:bg-slate-800 hover:text-blue-400 transition-all duration-300 group ${!expanded ? 'justify-center' : ''}`}>
-                        <Download size={20} className="shrink-0 group-hover:scale-110 transition-transform" />
-                        <span className={`font-bold text-sm transition-opacity duration-300 ${expanded ? 'opacity-100' : 'opacity-0 hidden'}`}>Backup DB</span>
+                    <button
+                        onClick={handleBackup}
+                        id="sidebar-backup-btn"
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 mt-2 rounded-lg text-[#A0AEC0] hover:bg-[#F4F7FA] hover:text-[#4299E1] transition-all group ${!expanded ? 'justify-center' : ''}`}
+                    >
+                        <Download size={20} className="shrink-0" />
+                        {expanded && <span className="text-sm font-semibold">Backup DB</span>}
                     </button>
                 )}
             </nav>
 
-            {/* Footer / User Profile */}
-            <div className="p-4 border-t border-slate-800/50">
-                <div className={`bg-slate-900/50 rounded-xl p-3 flex items-center gap-3 border border-slate-800 mb-3 ${!expanded ? 'justify-center' : ''}`}>
-                    <div className="w-9 h-9 rounded-lg bg-gradient-to-tr from-pink-500 to-rose-600 flex items-center justify-center text-white font-bold text-sm shadow-md shrink-0">
-                        {user?.avatar || user?.name?.[0]?.toUpperCase() || 'U'}
+            {/* ── Footer / User ── */}
+            <div className="border-t border-[#E2E8F0] p-3 shrink-0">
+                {/* User card */}
+                <div className={`flex items-center gap-3 p-3 rounded-lg bg-[#F4F7FA] mb-2 overflow-hidden ${!expanded ? 'justify-center' : ''}`}>
+                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#FF8C9D] to-[#e87589] flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm">
+                        {initials}
                     </div>
-                    <div className={`overflow-hidden transition-all duration-300 ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0 hidden'}`}>
-                        <p className="text-sm font-bold text-slate-100 truncate">{getDisplayName(user) || 'Usuario'}</p>
-                        <p className="text-xs text-slate-500 truncate">{user?.role || 'Invitado'}</p>
-                    </div>
+                    {expanded && (
+                        <div className="overflow-hidden">
+                            <p className="text-sm font-bold text-[#1A365D] truncate">{getDisplayName(user) || 'Usuario'}</p>
+                            <p className="text-xs text-[#A0AEC0] truncate">{user?.role || 'Invitado'}</p>
+                        </div>
+                    )}
                 </div>
-                <button onClick={handleLogout} className={`w-full flex items-center gap-3 p-3 rounded-xl text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-colors ${!expanded ? 'justify-center' : ''}`}>
+
+                {/* Logout */}
+                <button
+                    onClick={handleLogout}
+                    id="sidebar-logout-btn"
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#A0AEC0] hover:bg-red-50 hover:text-red-500 transition-colors ${!expanded ? 'justify-center' : ''}`}
+                >
                     <LogOut size={18} />
-                    <span className={`font-bold text-sm transition-opacity duration-300 ${expanded ? 'opacity-100' : 'opacity-0 hidden'}`}>Salir</span>
+                    {expanded && <span className="text-sm font-semibold">Salir</span>}
                 </button>
             </div>
         </aside>

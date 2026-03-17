@@ -54,12 +54,30 @@ import {
     CartesianGrid, 
     Tooltip, 
     ResponsiveContainer, 
-    Cell
+    Cell,
+    PieChart,
+    Pie
 } from 'recharts';
 
 // --- CONSTANTS ---
 const BILLS = [500, 200, 100, 50, 20, 10, 5];
 const COINS = [2, 1, 0.50, 0.20, 0.10, 0.05, 0.02, 0.01];
+
+const GOLDSMITH_CATEGORIES = [
+    '18k', '18k con piedra', '14k', '14k con piedra', 
+    '9k', '9k con piedra', 'Plata 925', 'Plata 925 con piedra'
+];
+
+const CATEGORY_COLORS = {
+    '18k': '#FFD700',
+    '18k con piedra': '#FFC107',
+    '14k': '#FFA000',
+    '14k con piedra': '#FF8F00',
+    '9k': '#FF6F00',
+    '9k con piedra': '#E65100',
+    'Plata 925': '#B0BEC5',
+    'Plata 925 con piedra': '#90A4AE'
+};
 
 // --- HELPERS ---
 const formatPrice = (p) => Number(p || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -67,6 +85,31 @@ const formatWeight = (w) => Number(w || 0).toLocaleString('es-ES', { minimumFrac
 const getEmpName = (e) => {
     if (!e) return '---';
     return e.alias || `${e.firstName} ${e.lastName || ''}`.trim() || e.username;
+};
+
+const compressImage = (file, maxWidth = 800) => {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const scale = maxWidth / img.width;
+                if (scale < 1) {
+                    canvas.width = maxWidth;
+                    canvas.height = img.height * scale;
+                } else {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                }
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                resolve(canvas.toDataURL('image/jpeg', 0.7)); // 0.7 quality
+            };
+        };
+    });
 };
 
 // --- MAIN PAGE ---
@@ -80,6 +123,8 @@ const Gerencia = () => {
     const [cashHistory, setCashHistory] = useState([]);
     const [batteries, setBatteries] = useState([]);
     const [employees, setEmployees] = useState([]);
+    const [inventory, setInventory] = useState([]);
+    const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(false);
 
     const [modal, setModal] = useState({ type: null, data: null });
@@ -88,20 +133,23 @@ const Gerencia = () => {
         setLoading(true);
         try {
             const h = { 'x-store-id': currentStore };
-            const [tRes, pRes, mRes, cRes, bRes] = await Promise.all([
+            const [tRes, pRes, mRes, cRes, bRes, iRes, oRes] = await Promise.all([
                 fetch('/api/tasks', { headers: h }),
                 fetch('/api/gerencia/goldsmith/partners', { headers: h }),
                 fetch('/api/gerencia/goldsmith/movements', { headers: h }),
                 fetch('/api/gerencia/cash-control', { headers: h }),
-                fetch('/api/task-batteries', { headers: h })
+                fetch('/api/task-batteries', { headers: h }),
+                fetch('/api/gerencia/goldsmith/inventory', { headers: h }),
+                fetch('/api/gerencia/goldsmith/orders', { headers: h })
             ]);
             
-            // Defensive parsing to prevent React crashes if API fails
             if (tRes.ok) setTasks(await tRes.json());
             if (pRes.ok) setPartners(await pRes.json());
             if (mRes.ok) setMovements(await mRes.json());
             if (cRes.ok) setCashHistory(await cRes.json());
             if (bRes.ok) setBatteries(await bRes.json());
+            if (iRes.ok) setInventory(await iRes.json());
+            if (oRes.ok) setOrders(await oRes.json());
             
             const eRes = await fetch('/api/employees', { headers: h });
             if (eRes.ok) setEmployees(await eRes.json());
@@ -114,6 +162,51 @@ const Gerencia = () => {
     };
 
     useEffect(() => { loadData(); }, [currentStore]);
+
+    // --- NOTIFICATIONS SYSTEM ---
+    useEffect(() => {
+        if (!("Notification" in window)) return;
+        
+        const requestPermission = async () => {
+            const permission = await Notification.requestPermission();
+            if (permission === "granted") {
+                console.log("Notificaciones autorizadas.");
+            }
+        };
+
+        if (Notification.permission === "default") {
+            requestPermission();
+        }
+
+        // Scheduler: check every minute
+        const interval = setInterval(() => {
+            const now = new Date();
+            tasks.forEach(task => {
+                if (task.status === 'Hecha' || !task.time) return;
+                
+                const taskDate = parseISO(task.date);
+                const [h, m] = task.time.split(':');
+                taskDate.setHours(parseInt(h), parseInt(m), 0);
+                
+                const diffMinutes = Math.floor((taskDate - now) / 60000);
+                
+                if (diffMinutes === 15) {
+                    new Notification("TikTak Agenda: Próxima Tarea", {
+                        body: `${task.title} - Comienza en 15 min.`,
+                        icon: '/logo192.png' // Assuming there's a logo
+                    });
+                }
+            });
+        }, 60000);
+
+        return () => clearInterval(interval);
+    }, [tasks]);
+
+    const sendImmediateNotification = (title, body) => {
+        if (Notification.permission === "granted") {
+            new Notification(title, { body, icon: '/logo192.png' });
+        }
+    };
 
     if (user?.role !== ROLES.MANAGER) {
         return (
@@ -141,7 +234,13 @@ const Gerencia = () => {
             method: 'POST', headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore },
             body: JSON.stringify(movData)
         });
-        if (res.ok) { setModal({ type: null, data: null }); loadData(); }
+        if (res.ok) { 
+            setModal({ type: null, data: null }); 
+            loadData(); 
+            if (movData.type === 'Recepción' && movData.debt_added > 0) {
+                sendImmediateNotification("Nueva Deuda de Oro", `Se ha registrado una deuda de ${movData.debt_added}g.`);
+            }
+        }
         else { const err = await res.json(); alert('Error: ' + (err.error || 'Server error')); }
     };
 
@@ -178,6 +277,24 @@ const Gerencia = () => {
             method: 'DELETE', headers: { 'x-store-id': currentStore } 
         });
         if (res.ok) loadData();
+    };
+
+    const handleSaveOrder = async (oData) => {
+        const res = await fetch('/api/gerencia/goldsmith/orders', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore },
+            body: JSON.stringify(oData)
+        });
+        if (res.ok) { setModal({ type: null, data: null }); loadData(); }
+        else { const err = await res.json(); alert('Error: ' + (err.error || 'Server error')); }
+    };
+
+    const handleReceiveOrder = async (id, data) => {
+        const res = await fetch(`/api/gerencia/goldsmith/orders/${id}/receive`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore },
+            body: JSON.stringify(data)
+        });
+        if (res.ok) { setModal({ type: null, data: null }); loadData(); }
+        else { const err = await res.json(); alert('Error: ' + (err.error || 'Server error')); }
     };
 
     const handleSaveCash = async (cashData) => {
@@ -247,11 +364,13 @@ const Gerencia = () => {
             </div>
 
             <div className="min-h-[70vh]">
-                {activeTab === 'summary' && <GerenciaDashboard tasks={tasks} partners={partners} movements={movements} cashHistory={cashHistory} />}
+                {activeTab === 'summary' && <GerenciaDashboard tasks={tasks} partners={partners} movements={movements} cashHistory={cashHistory} inventory={inventory} orders={orders} />}
                 {activeTab === 'tasks' && (
                     <TasksView 
                         tasks={tasks} 
                         batteries={batteries}
+                        employees={employees}
+                        partners={partners}
                         onEdit={(t) => setModal({ type: 'task', data: t })} 
                         onAdd={() => setModal({ type: 'task', data: null })} 
                         onAddBattery={() => setModal({ type: 'battery', data: null })}
@@ -261,7 +380,22 @@ const Gerencia = () => {
                         currentStore={currentStore} 
                     />
                 )}
-                {activeTab === 'jewelry' && <JewelryView partners={partners} movements={movements} onAddPartner={() => setModal({ type: null, data: null })} onEditPartner={(p) => setModal({ type: 'partner', data: p })} onDeletePartner={handleDeletePartner} onAddMovement={(type) => setModal({ type: 'movement', data: type })} onDeleteMovement={handleDeleteMovement} onRefine={(m) => setModal({ type: 'refine', data: m })} />}
+                {activeTab === 'jewelry' && (
+                    <JewelryView 
+                        inventory={inventory}
+                        orders={orders}
+                        partners={partners} 
+                        movements={movements} 
+                        onAddPartner={() => setModal({ type: 'partner', data: null })} 
+                        onEditPartner={(p) => setModal({ type: 'partner', data: p })} 
+                        onDeletePartner={handleDeletePartner} 
+                        onAddMovement={(type) => setModal({ type: 'movement', data: type })} 
+                        onDeleteMovement={handleDeleteMovement} 
+                        onRefine={(m) => setModal({ type: 'refine', data: m })}
+                        onAddOrder={() => setModal({ type: 'order', data: null })}
+                        onReceiveOrder={(o) => setModal({ type: 'order_receive', data: o })}
+                    />
+                )}
                 {activeTab === 'cash' && <CashView history={Array.isArray(cashHistory) ? cashHistory : []} employees={employees} onSave={handleSaveCash} user={user} />}
             </div>
 
@@ -294,13 +428,21 @@ const Gerencia = () => {
             <GlobalModal isOpen={modal.type === 'battery_item_check'} onClose={() => setModal({ type: null, data: null })} title="Confirmar Tarea Realizada">
                 <BatteryItemCheckForm item={modal.data} onConfirm={handleToggleBatteryItem} onCancel={() => setModal({ type: null, data: null })} />
             </GlobalModal>
+
+            <GlobalModal isOpen={modal.type === 'order'} onClose={() => setModal({ type: null, data: null })} title="Lanzar Nuevo Pedido">
+                <OrderForm partners={partners} onSave={handleSaveOrder} onCancel={() => setModal({ type: null, data: null })} />
+            </GlobalModal>
+
+            <GlobalModal isOpen={modal.type === 'order_receive'} onClose={() => setModal({ type: null, data: null })} title="Confirmar Recepción de Pedido">
+                <OrderClosureModal order={modal.data} onConfirm={handleReceiveOrder} onCancel={() => setModal({ type: null, data: null })} />
+            </GlobalModal>
         </div>
     );
 };
 
 // --- SUB-COMPONENTS/VIEWS ---
 
-const GerenciaDashboard = ({ tasks, partners, movements, cashHistory }) => {
+const GerenciaDashboard = ({ tasks, partners, movements, cashHistory, inventory, orders }) => {
     const safeHistory = Array.isArray(cashHistory) ? cashHistory : [];
     const safeMovements = Array.isArray(movements) ? movements : [];
     const safeTasks = Array.isArray(tasks) ? tasks : [];
@@ -333,8 +475,75 @@ const GerenciaDashboard = ({ tasks, partners, movements, cashHistory }) => {
         return months;
     }, [safeMovements]);
 
+    const donutData = (Array.isArray(inventory) ? inventory : []).map(item => ({
+        name: item.category,
+        value: Number(item.total_weight)
+    })).filter(d => d.value > 0);
+
+    const transitOrderWeight = (Array.isArray(orders) ? orders : []).filter(o => o.status === 'Pedido Lanzado').reduce((acc, o) => acc + Number(o.est_weight), 0);
+    const inOpsWeight = safeMovements.filter(m => m.status === 'Pendiente').reduce((acc, m) => acc + Number(m.weight), 0);
+
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* Strategic Jewelry Insights */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="bg-[#1A365D] p-8 rounded-[40px] text-white flex gap-6 items-center shadow-2xl relative overflow-hidden">
+                    <div className="flex-1 z-10">
+                        <h4 className="text-[9px] font-black text-blue-300 uppercase tracking-widest mb-2">Distribución Metal</h4>
+                        <div className="h-28 w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie data={donutData} cx="50%" cy="50%" innerRadius={35} outerRadius={45} paddingAngle={2} dataKey="value">
+                                        {donutData.map((entry, index) => <Cell key={`cell-${index}`} fill={CATEGORY_COLORS[entry.name] || '#FFF'} />)}
+                                    </Pie>
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                    <div className="w-1/2 space-y-1.5 z-10">
+                         {donutData.slice(0, 3).map(d => (
+                            <div key={d.name} className="flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[d.name] }} />
+                                <span className="text-[7px] font-black uppercase text-blue-100 truncate">{d.name}</span>
+                                <span className="text-[8px] font-black text-blue-300 ml-auto">{d.value}g</span>
+                            </div>
+                        ))}
+                    </div>
+                    <Layers className="absolute -bottom-6 -right-6 text-white/5 w-32 h-32" />
+                </div>
+
+                <div className="bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm flex flex-col justify-center">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        Oro Flotante (Tránsito) <TrendingUp size={14} className="text-blue-500" />
+                    </h4>
+                    <div className="space-y-3">
+                        <div className="flex justify-between items-end">
+                            <span className="text-[9px] font-black text-slate-300 uppercase">Pedidos Lanzados</span>
+                            <span className="text-xl font-black text-[#1A365D]">{transitOrderWeight.toFixed(2)} gr</span>
+                        </div>
+                        <div className="flex justify-between items-end">
+                            <span className="text-[9px] font-black text-slate-300 uppercase">En Fundiciones</span>
+                            <span className="text-xl font-black text-blue-400">{inOpsWeight.toFixed(2)} gr</span>
+                        </div>
+                        <div className="pt-3 border-t border-dashed border-slate-100 flex justify-between items-center text-[#FF8C9D]">
+                            <span className="text-[9px] font-black uppercase">Total Exterior</span>
+                            <span className="text-sm font-black">{(transitOrderWeight + inOpsWeight).toFixed(2)} gr</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm flex flex-col justify-center">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Control de Pedidos</h4>
+                    <div className="flex items-center gap-6">
+                        <div className="p-5 bg-blue-50 text-blue-500 rounded-3xl"><Package size={28}/></div>
+                        <div>
+                            <p className="text-3xl font-black text-[#1A365D]">{(Array.isArray(orders) ? orders : []).filter(o => o.status === 'Pedido Lanzado').length}</p>
+                            <p className="text-xs text-[#A0AEC0] font-bold uppercase tracking-tighter">Entradas Pendientes</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div className="bg-white p-6 rounded-[32px] border border-[#E2E8F0] shadow-sm flex flex-col justify-between h-40">
                     <div className="flex justify-between items-start"><div className="p-3 bg-blue-50 text-blue-500 rounded-2xl"><CheckCircle2 size={24}/></div><span className="text-[10px] font-black text-[#A0AEC0] uppercase tracking-widest">Agenda</span></div>
@@ -371,11 +580,97 @@ const GerenciaDashboard = ({ tasks, partners, movements, cashHistory }) => {
     );
 };
 
-const TasksView = ({ tasks, batteries, onEdit, onAdd, onAddBattery, onCheckBattery, onDeleteBattery, loadData, currentStore }) => {
+const AccountStatusWidget = ({ partners }) => {
+    const totalDebt = (partners || []).reduce((acc, p) => acc + Number(p.debt_grams || 0), 0);
+    const [expanded, setExpanded] = useState(false);
+
+    return (
+        <div className="fixed bottom-8 right-8 z-[50] flex flex-col items-end gap-3">
+            {expanded && (
+                <div className="bg-white p-6 rounded-[32px] shadow-2xl border border-[#E2E8F0] w-80 mb-2 animate-in slide-in-from-bottom-4 duration-300">
+                    <h4 className="text-[10px] font-black text-[#A0AEC0] uppercase tracking-widest mb-4">Liquidaciones Pendientes</h4>
+                    <div className="max-h-60 overflow-y-auto pr-2 custom-scrollbar space-y-3">
+                        {partners.filter(p => Number(p.debt_grams) > 0).map(p => (
+                            <div key={p.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-2xl">
+                                <span className="text-[10px] font-black text-[#1A365D] uppercase truncate w-2/3">{p.name}</span>
+                                <span className="text-[10px] font-black text-[#FF8C9D]">{Number(p.debt_grams).toFixed(2)}g</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+            <button 
+                onClick={() => setExpanded(!expanded)}
+                className="bg-[#1A365D] text-white p-6 rounded-full shadow-2xl shadow-blue-900/40 border-4 border-white flex flex-col items-center justify-center hover:scale-110 active:scale-95 transition-all"
+            >
+                <span className="text-[8px] font-black uppercase tracking-widest opacity-60">Deuda Oro</span>
+                <span className="text-xl font-black">{totalDebt.toFixed(2)}g</span>
+            </button>
+        </div>
+    );
+};
+
+const DailyTimelineView = ({ tasks, employees, onEdit, onToggleStatus }) => {
+    const hours = Array.from({ length: 24 }, (_, i) => `${i.toString().padStart(2, '0')}:00`);
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const todayTasks = tasks.filter(t => t.date === today);
+
+    return (
+        <div className="bg-white rounded-[40px] border border-[#E2E8F0] shadow-sm overflow-hidden text-sm animate-in fade-in duration-500">
+            <div className="overflow-x-auto">
+                <div className="min-w-[1000px]">
+                    <div className="grid grid-cols-[100px_repeat(auto-fill,minmax(200px,1fr))] border-b border-[#F4F7FA]">
+                        <div className="p-6 bg-slate-50 border-r border-[#E2E8F0]"></div>
+                        {employees.map(e => (
+                            <div key={e.id} className="p-6 font-black text-[#1A365D] uppercase tracking-tighter text-center bg-slate-50 border-r border-[#E2E8F0]">
+                                {getEmpName(e)}
+                            </div>
+                        ))}
+                    </div>
+                    <div className="max-h-[600px] overflow-y-auto custom-scrollbar">
+                        {hours.map(hour => (
+                            <div key={hour} className="grid grid-cols-[100px_repeat(auto-fill,minmax(200px,1fr))] border-b border-dashed border-[#F4F7FA] min-h-[80px]">
+                                <div className="p-4 bg-slate-50/50 border-r border-[#E2E8F0] flex items-center justify-center font-black text-[10px] text-slate-400">
+                                    {hour}
+                                </div>
+                                {employees.map(emp => {
+                                    const empName = getEmpName(emp);
+                                    const task = todayTasks.find(t => t.assigned_to === empName && (t.time || '09:00').startsWith(hour.substring(0, 2)));
+                                    return (
+                                        <div key={emp.id} className="p-2 border-r border-[#F4F7FA] relative flex items-center justify-center">
+                                            {task && (
+                                                <button 
+                                                    onClick={() => onEdit(task)}
+                                                    className={`w-full p-3 rounded-2xl text-[9px] font-black uppercase transition-all hover:scale-[1.02] shadow-sm ${
+                                                        task.status === 'Hecha' ? 'bg-green-50 text-green-500 border border-green-100' :
+                                                        task.priority === 'Alta' ? 'bg-red-50 text-red-500 border border-red-100 shadow-red-100' :
+                                                        'bg-blue-50 text-[#1A365D] border border-blue-100 shadow-blue-50'
+                                                    }`}
+                                                >
+                                                    <div className="flex justify-between items-start mb-1">
+                                                        <span>{task.time || '--:--'}</span>
+                                                        <div className={`w-1.5 h-1.5 rounded-full ${task.status === 'Hecha' ? 'bg-green-500' : task.priority === 'Alta' ? 'bg-red-500' : 'bg-blue-500'}`} />
+                                                    </div>
+                                                    <div className="truncate">{task.title}</div>
+                                                </button>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const TasksView = ({ tasks, batteries, onEdit, onAdd, onAddBattery, onCheckBattery, onDeleteBattery, loadData, currentStore, employees }) => {
     const safeTasks = Array.isArray(tasks) ? tasks : [];
     const [month, setMonth] = useState(new Date());
     const [selectedTask, setSelectedTask] = useState(null);
-    const [view, setView] = useState('calendar'); // 'calendar' or 'list'
+    const [view, setView] = useState('calendar'); // 'calendar', 'list', 'daily'
 
     const startDate = startOfWeek(startOfMonth(month), { weekStartsOn: 1 });
     const endDate = endOfWeek(endOfMonth(month), { weekStartsOn: 1 });
@@ -512,6 +807,12 @@ const TasksView = ({ tasks, batteries, onEdit, onAdd, onAddBattery, onCheckBatte
                             >
                                 Lista
                             </button>
+                            <button 
+                                onClick={() => setView('daily')}
+                                className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${view === 'daily' ? 'bg-[#1A365D] text-white' : 'text-slate-400 hover:bg-slate-50'}`}
+                            >
+                                Diaria
+                            </button>
                         </div>
                         <div className="flex gap-2">
                             <button 
@@ -615,6 +916,7 @@ const TasksView = ({ tasks, batteries, onEdit, onAdd, onAddBattery, onCheckBatte
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
                                             <span className={`text-[8px] font-black px-2 py-0.5 rounded-md uppercase ${t.priority === 'Alta' ? 'bg-red-100 text-red-500' : 'bg-blue-100 text-[#1A365D]'}`}>{t.priority}</span>
+                                            {t.category && <span className="text-[8px] font-black px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 uppercase">{t.category}</span>}
                                             {t.recurring && <span className="text-[8px] font-black px-2 py-0.5 rounded-md bg-coral-50 text-[#FF8C9D] flex items-center gap-1 uppercase"><Clock size={8}/> {t.isVirtual ? 'Proyectada' : 'Periódica'}</span>}
                                         </div>
                                         <h4 className="text-sm font-black text-[#1A365D] uppercase truncate">{t.title}</h4>
@@ -633,6 +935,15 @@ const TasksView = ({ tasks, batteries, onEdit, onAdd, onAddBattery, onCheckBatte
                         )}
                     </div>
                 )}
+
+                {view === 'daily' && (
+                    <DailyTimelineView 
+                        tasks={allTasks} 
+                        employees={employees} 
+                        onEdit={onEdit} 
+                        onToggleStatus={toggleStatus} 
+                    />
+                )}
             </div>
 
             {/* Side Panel: Task Details & Batteries */}
@@ -643,7 +954,12 @@ const TasksView = ({ tasks, batteries, onEdit, onAdd, onAddBattery, onCheckBatte
                              <div className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest ${selectedTask.status === 'Hecha' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-[#FF8C9D]/20 text-[#FF8C9D] border border-[#FF8C9D]/30'}`}>
                                 {selectedTask.isVirtual ? 'Programada' : selectedTask.status}
                              </div>
-                             <button onClick={() => setSelectedTask(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/50"><X size={20}/></button>
+                             {selectedTask.category && (
+                                 <div className="px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-blue-500/20 text-blue-300 border border-blue-500/30 ml-2">
+                                     {selectedTask.category}
+                                 </div>
+                             )}
+                             <button onClick={() => setSelectedTask(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/50 ml-auto"><X size={20}/></button>
                         </div>
                         <div className="space-y-4">
                             <h3 className="text-xl font-black uppercase tracking-tighter leading-tight">{selectedTask.title}</h3>
@@ -695,41 +1011,201 @@ const TasksView = ({ tasks, batteries, onEdit, onAdd, onAddBattery, onCheckBatte
                     </div>
                 </div>
             </div>
+            <AccountStatusWidget partners={partners} />
         </div>
     );
 };
 
-const JewelryView = ({ partners, movements, onAddPartner, onEditPartner, onDeletePartner, onAddMovement, onDeleteMovement, onRefine }) => {
+const GoldsmithInventoryPanel = ({ inventory }) => {
+    return (
+        <div className="bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm">
+            <h3 className="text-xs font-black text-[#1A365D] uppercase tracking-widest mb-6 flex items-center gap-2">
+                Matriz de Agrupaciones (Inventario Real) <Layers size={16} className="text-[#FF8C9D]"/>
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {inventory.map(item => {
+                    const avgCost = item.total_weight > 0 ? item.total_cost / item.total_weight : 0;
+                    const isLow = Number(item.total_weight) < Number(item.restock_threshold);
+                    return (
+                        <div key={item.id} className={`p-5 rounded-[32px] border-2 transition-all ${isLow ? 'bg-orange-50 border-orange-200' : 'bg-[#F8F9FB] border-slate-100 hover:bg-white hover:shadow-lg'}`}>
+                            <div className="flex justify-between items-start mb-1">
+                                <p className="text-[10px] font-black text-[#1A365D] uppercase tracking-tighter">{item.category}</p>
+                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[item.category] || '#CCC' }} />
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-sm font-black text-[#1A365D]">{Number(item.total_weight).toFixed(2)} gr</p>
+                                <div className="flex flex-col gap-0.5 mt-2">
+                                    <span className="text-[8px] font-bold text-slate-400 uppercase">Coste: {formatPrice(item.total_cost)}€</span>
+                                    <span className="text-[8px] font-black text-[#1A365D] uppercase bg-blue-50 px-2 py-0.5 rounded-md w-fit">{avgCost.toFixed(2)}€/g</span>
+                                </div>
+                            </div>
+                            {isLow && <p className="text-[7px] font-black text-orange-600 uppercase mt-2 flex items-center gap-1"><AlertCircle size={8}/> REPOSICIÓN</p>}
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
+const GoldsmithOrdersPanel = ({ orders, onReceive }) => {
+    return (
+        <div className="bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm">
+            <h3 className="text-xs font-black text-[#1A365D] uppercase tracking-widest mb-6 flex items-center gap-2">
+                Pedidos en Tránsito <Clock size={16} className="text-[#FF8C9D]"/>
+            </h3>
+            <div className="space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+                {orders.filter(o => o.status === 'Pedido Lanzado').length === 0 ? (
+                    <div className="p-8 bg-slate-50 rounded-3xl text-center border-2 border-dashed border-slate-100 italic text-[10px] text-slate-400">No hay pedidos pendientes de recepción.</div>
+                ) : (
+                    orders.filter(o => o.status === 'Pedido Lanzado').map(o => (
+                        <div key={o.id} className="p-5 bg-blue-50/50 rounded-[32px] border border-blue-100 flex items-center justify-between group hover:bg-white hover:shadow-lg transition-all">
+                            <div>
+                                <p className="text-[10px] font-black text-[#1A365D] uppercase">{o.partner_name}</p>
+                                <p className="text-[8px] font-bold text-blue-400 uppercase">{o.category} | Est: {o.est_weight}g</p>
+                                <p className="text-[7px] font-bold text-slate-400 uppercase mt-1">Lanzado: {format(parseISO(o.order_date), 'dd/MM/yyyy')}</p>
+                            </div>
+                            <button 
+                                onClick={() => onReceive(o)} 
+                                className="bg-[#1A365D] text-white text-[9px] font-black px-5 py-2.5 rounded-xl hover:scale-105 active:scale-95 transition-all uppercase shadow-lg shadow-blue-900/10"
+                            >
+                                Recibido
+                            </button>
+                        </div>
+                    ))
+                )}
+            </div>
+        </div>
+    );
+};
+
+const JewelryView = ({ inventory, orders, partners, movements, onAddPartner, onEditPartner, onDeletePartner, onAddMovement, onDeleteMovement, onRefine, onAddOrder, onReceiveOrder }) => {
     const [viewMode, setViewMode] = useState('ops'); // 'ops' or 'report'
     const safeMovements = Array.isArray(movements) ? movements : [];
     const safePartners = Array.isArray(partners) ? partners : [];
+    const safeInventory = Array.isArray(inventory) ? inventory : [];
+    const safeOrders = Array.isArray(orders) ? orders : [];
+
+    const transitWeight = safeOrders.filter(o => o.status === 'Pedido Lanzado').reduce((acc, o) => acc + Number(o.est_weight), 0);
+    const inOpsWeight = safeMovements.filter(m => m.status === 'Pendiente').reduce((acc, m) => acc + Number(m.weight), 0);
+    
+    const lastSmelting = safeMovements.find(m => m.type === 'Fundición' && m.status === 'Completado');
+    const smeltingHistory = safeMovements.filter(m => m.type === 'Fundición' && m.status === 'Completado').slice(0, 5);
+
+    const donutData = safeInventory.map(item => ({
+        name: item.category,
+        value: Number(item.total_weight)
+    })).filter(d => d.value > 0);
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
+            {/* Dashboard Header Widgets */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-[#1A365D] p-8 rounded-[40px] text-white flex gap-6 items-center shadow-2xl">
+                    <div className="flex-1">
+                        <h4 className="text-[9px] font-black text-blue-300 uppercase tracking-widest mb-1">Stock por Agrupación</h4>
+                        <div className="h-40 w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={donutData}
+                                        cx="50%" cy="50%"
+                                        innerRadius={40}
+                                        outerRadius={60}
+                                        paddingAngle={5}
+                                        dataKey="value"
+                                    >
+                                        {donutData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={CATEGORY_COLORS[entry.name] || '#FFF'} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                    <div className="w-1/3 space-y-2">
+                        {donutData.slice(0, 4).map(d => (
+                            <div key={d.name} className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[d.name] }} />
+                                <span className="text-[8px] font-black uppercase text-blue-100 truncate">{d.name}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm flex flex-col justify-center">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        Oro en Tránsito <TrendingUp size={14} className="text-blue-500" />
+                    </h4>
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-end">
+                            <span className="text-[9px] font-black text-slate-300 uppercase">Pedidos Lanzados</span>
+                            <span className="text-xl font-black text-[#1A365D]">{transitWeight.toFixed(2)} gr</span>
+                        </div>
+                        <div className="flex justify-between items-end">
+                            <span className="text-[9px] font-black text-slate-300 uppercase">En Fundiciones</span>
+                            <span className="text-xl font-black text-blue-500">{inOpsWeight.toFixed(2)} gr</span>
+                        </div>
+                        <div className="pt-4 border-t border-dashed border-slate-100 flex justify-between items-center">
+                            <span className="text-[10px] font-black text-[#1A365D] uppercase">Total Flotante</span>
+                            <span className="text-sm font-black text-[#FF8C9D]">{(transitWeight + inOpsWeight).toFixed(2)} gr</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-green-50 p-8 rounded-[40px] border border-green-100 shadow-sm flex flex-col justify-center">
+                    <h4 className="text-[10px] font-black text-green-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        Margen Real (Últ. Fundición) <BarChart3 size={14} className="text-green-500" />
+                    </h4>
+                    {lastSmelting ? (
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-end">
+                                <span className="text-[9px] font-black text-green-600/50 uppercase">Coste Adquisición</span>
+                                <span className="text-xs font-black text-green-900">{formatPrice(lastSmelting.acquisition_cost)}€</span>
+                            </div>
+                            <div className="flex justify-between items-end">
+                                <span className="text-[9px] font-black text-green-600/50 uppercase">Importe Recibido</span>
+                                <span className="text-xs font-black text-green-900">{formatPrice(lastSmelting.received_amount)}€</span>
+                            </div>
+                            <div className="pt-4 border-t border-dashed border-green-200 flex justify-between items-center">
+                                <span className="text-[10px] font-black text-green-700 uppercase">Beneficio Neto</span>
+                                <span className="text-xl font-black text-green-600">+{formatPrice(lastSmelting.received_amount - lastSmelting.acquisition_cost)}€</span>
+                            </div>
+                        </div>
+                    ) : (
+                        <p className="text-xs font-bold text-green-400 italic">No hay fundiciones cerradas aún.</p>
+                    )}
+                </div>
+            </div>
+
             <div className="flex justify-between items-center bg-white p-2 rounded-[32px] border border-[#E2E8F0] w-fit mx-auto lg:mx-0">
                 <button onClick={() => setViewMode('ops')} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all ${viewMode === 'ops' ? 'bg-[#1A365D] text-white shadow-lg' : 'text-[#A0AEC0] hover:text-[#1A365D]'}`}>Operativa</button>
                 <button onClick={() => setViewMode('report')} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all ${viewMode === 'report' ? 'bg-[#1A365D] text-white shadow-lg' : 'text-[#A0AEC0] hover:text-[#1A365D]'}`}>Reporte Detallado</button>
             </div>
 
             {viewMode === 'ops' ? (
-                <div className="flex flex-col lg:flex-row gap-8">
-                    <div className="flex-1 space-y-6">
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                            <h2 className="text-2xl font-black text-[#1A365D] tracking-tighter uppercase">Registro de Movimientos</h2>
-                            <div className="flex flex-wrap gap-2">
-                                <button onClick={() => onAddMovement('Recepción')} className="bg-amber-50 text-amber-600 px-6 py-3 rounded-2xl font-black text-[10px] uppercase hover:bg-amber-100 transition-all">Recibir Oro</button>
-                                <button onClick={() => onAddMovement('Envío')} className="bg-blue-50 text-blue-600 px-6 py-3 rounded-2xl font-black text-[10px] uppercase hover:bg-blue-100 transition-all">Enviar a Joyero</button>
-                                <button onClick={() => onAddMovement('Fundición')} className="bg-[#FF8C9D] text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-coral-100 hover:scale-[1.02] active:scale-95 transition-all">Fundición</button>
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    {/* Left Column (Inventory & Orders) */}
+                    <div className="lg:col-span-8 space-y-8">
+                        <GoldsmithInventoryPanel inventory={safeInventory} />
+                        
+                        <div className="bg-white rounded-[40px] border border-[#E2E8F0] shadow-sm overflow-hidden">
+                            <div className="p-8 pb-4 flex justify-between items-center">
+                                <h2 className="text-xl font-black text-[#1A365D] tracking-tighter uppercase">Registro de Movimientos</h2>
+                                <div className="flex flex-wrap gap-2">
+                                    <button onClick={() => onAddMovement('Recepción')} className="bg-amber-50 text-amber-600 px-6 py-3 rounded-2xl font-black text-[10px] uppercase hover:bg-amber-100 transition-all">Recibir Oro</button>
+                                    <button onClick={() => onAddMovement('Envío')} className="bg-blue-50 text-blue-600 px-6 py-3 rounded-2xl font-black text-[10px] uppercase hover:bg-blue-100 transition-all">Enviar Joyero</button>
+                                    <button onClick={() => onAddMovement('Fundición')} className="bg-[#FF8C9D] text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-coral-100 hover:scale-[1.02] active:scale-95 transition-all">Fundición</button>
+                                </div>
                             </div>
-                        </div>
-
-                        <div className="bg-white rounded-[40px] border border-[#E2E8F0] shadow-sm overflow-hidden text-sm">
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left uppercase text-[10px] font-bold min-w-[700px]">
                                     <thead className="bg-[#F4F7FA] font-black text-[#A0AEC0] tracking-widest border-b">
                                         <tr>
                                             <th className="p-5 pl-10">Fecha</th>
                                             <th className="p-5">Tipo</th>
+                                            <th className="p-5">Agrupación</th>
                                             <th className="p-5">Socio</th>
                                             <th className="p-5">Peso</th>
                                             <th className="p-5">Estado</th>
@@ -737,47 +1213,57 @@ const JewelryView = ({ partners, movements, onAddPartner, onEditPartner, onDelet
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {safeMovements.length === 0 ? (
-                                            <tr><td colSpan="6" className="p-10 text-center text-slate-400 italic">No hay movimientos registrados.</td></tr>
-                                        ) : (
-                                            safeMovements.map(m => (
-                                                <tr key={m.id} className="hover:bg-slate-50 transition-colors group">
-                                                    <td className="p-5 pl-10 font-bold text-[#1A365D]">{format(parseISO(m.date), 'dd/MM/yyyy')}</td>
-                                                    <td className="p-5">
-                                                        <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase ${m.type === 'Envío' ? 'bg-blue-100 text-blue-600' : m.type === 'Recepción' ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'}`}>
-                                                            {m.type}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-5 font-black text-slate-600">{m.partner_name}</td>
-                                                    <td className="p-5 font-mono text-[#1A365D] font-black">{m.weight} gr</td>
-                                                    <td className="p-5">
-                                                        <span className={`text-[9px] font-black ${m.status?.includes('Pendiente') ? 'text-coral-400 animate-pulse' : 'text-green-500'}`}>
-                                                            {m.status}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-5 text-right pr-10">
-                                                        <div className="flex items-center justify-end gap-3">
-                                                            {m.status?.includes('Pendiente') && (
-                                                                <button onClick={() => onRefine(m)} className="bg-[#1A365D] text-white text-[9px] font-black px-4 py-2 rounded-xl hover:scale-105 transition-all">REFINAR</button>
-                                                            )}
-                                                            <button 
-                                                                onClick={() => onDeleteMovement(m.id)}
-                                                                className="text-slate-300 hover:text-red-400 p-2 opacity-0 group-hover:opacity-100 transition-all"
-                                                            >
-                                                                <Trash2 size={16}/>
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        )}
+                                        {safeMovements.slice(0, 15).map(m => (
+                                            <tr key={m.id} className="hover:bg-slate-50 transition-colors group">
+                                                <td className="p-5 pl-10 font-bold text-[#1A365D]">{format(parseISO(m.date), 'dd/MM/yyyy')}</td>
+                                                <td className="p-5">
+                                                    <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase ${m.type === 'Envío' ? 'bg-blue-100 text-blue-600' : m.type === 'Recepción' ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'}`}>
+                                                        {m.type}
+                                                    </span>
+                                                </td>
+                                                <td className="p-5">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[m.inventory_category] || '#CCC' }} />
+                                                        <span className="text-[10px] font-black text-slate-500">{m.inventory_category || 'N/A'}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="p-5 font-black text-slate-600">{m.partner_name}</td>
+                                                <td className="p-5 font-mono text-[#1A365D] font-black">{m.weight} gr</td>
+                                                <td className="p-5">
+                                                    <span className={`text-[9px] font-black ${m.status?.includes('Pendiente') ? 'text-coral-400 animate-pulse' : 'text-green-500'}`}>
+                                                        {m.status}
+                                                    </span>
+                                                </td>
+                                                <td className="p-5 text-right pr-10">
+                                                    <div className="flex items-center justify-end gap-3">
+                                                        {m.status?.includes('Pendiente') && (
+                                                            <button onClick={() => onRefine(m)} className="bg-[#1A365D] text-white text-[9px] font-black px-4 py-2 rounded-xl hover:scale-105 transition-all">REFINAR</button>
+                                                        )}
+                                                        <button 
+                                                            onClick={() => onDeleteMovement(m.id)}
+                                                            className="text-slate-300 hover:text-red-400 p-2 opacity-0 group-hover:opacity-100 transition-all"
+                                                        >
+                                                            <Trash2 size={16}/>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
                                     </tbody>
                                 </table>
                             </div>
                         </div>
                     </div>
 
-                    <div className="w-full lg:w-96 space-y-6">
+                    {/* Right Column (Orders & Partners) */}
+                    <div className="lg:col-span-4 space-y-8">
+                        <div className="flex flex-col gap-4">
+                            <button onClick={() => onAddOrder()} className="w-full bg-[#1A365D] text-white py-5 rounded-[32px] font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-900/10 hover:scale-[1.01] transition-all flex items-center justify-center gap-3">
+                                <PlusCircle size={20}/> LANZAR NUEVO PEDIDO
+                            </button>
+                            <GoldsmithOrdersPanel orders={safeOrders} onReceive={onReceiveOrder} />
+                        </div>
+
                         <div className="bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm">
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="text-xs font-black text-[#1A365D] uppercase tracking-widest flex items-center gap-2">
@@ -785,48 +1271,47 @@ const JewelryView = ({ partners, movements, onAddPartner, onEditPartner, onDelet
                                 </h3>
                                 <button onClick={onAddPartner} className="text-[9px] font-black text-[#FF8C9D] bg-coral-50 px-3 py-1.5 rounded-lg hover:bg-coral-100 transition-all uppercase">Añadir</button>
                             </div>
-                            <div className="space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
-                                {safePartners.length === 0 ? (
-                                    <p className="text-[10px] text-slate-400 italic text-center py-4">No tienes socios registrados.</p>
-                                ) : (
-                                    safePartners.map(p => (
-                                        <div key={p.id} className="p-5 bg-[#F8F9FB] rounded-[32px] border border-slate-100 group transition-all hover:bg-white hover:shadow-lg hover:shadow-slate-200/50">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <div>
-                                                    <p className="text-[10px] font-black text-[#1A365D] uppercase tracking-tighter">{p.name}</p>
-                                                    <p className="text-[8px] font-bold text-slate-400 mt-0.5">{p.email || 'Sin email'} | {p.phone || 'Sin tlf'}</p>
-                                                </div>
-                                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                                                    <button onClick={() => onEditPartner(p)} className="p-1.5 text-slate-400 hover:text-blue-500"><Edit3 size={12}/></button>
-                                                    <button onClick={() => onDeletePartner(p.id)} className="p-1.5 text-slate-400 hover:text-red-500"><Trash2 size={12}/></button>
-                                                </div>
+                            <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+                                {safePartners.map(p => (
+                                    <div key={p.id} className="p-5 bg-[#F8F9FB] rounded-[32px] border border-slate-100 group transition-all hover:bg-white hover:shadow-lg">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div>
+                                                <p className="text-[10px] font-black text-[#1A365D] uppercase tracking-tighter">{p.name}</p>
+                                                <p className="text-[8px] font-bold text-slate-400 mt-0.5">{p.phone || 'Sin tlf'}</p>
                                             </div>
-                                            <div className="flex justify-between items-center mt-3 pt-3 border-t border-dashed border-slate-200">
-                                                <div className="flex flex-col">
-                                                    <span className="text-[8px] font-black text-slate-300 uppercase tracking-tighter">Deuda en {p.debt_type || '18k'}</span>
-                                                    {p.debt_formula && p.debt_formula !== 'x' && (
-                                                        <span className="text-[7px] font-bold text-blue-400 uppercase">Fórmula: {p.debt_formula}</span>
-                                                    )}
-                                                </div>
-                                                <span className={`text-[12px] font-black ${Number(p.debt_grams) > 0 ? 'text-[#FF8C9D]' : 'text-green-500'}`}>{Number(p.debt_grams).toFixed(2)}g</span>
+                                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                                <button onClick={() => onEditPartner(p)} className="p-1.5 text-slate-400 hover:text-blue-500"><Edit3 size={12}/></button>
+                                                <button onClick={() => onDeletePartner(p.id)} className="p-1.5 text-slate-400 hover:text-red-500"><Trash2 size={12}/></button>
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-between items-center mt-3 pt-3 border-t border-dashed border-slate-200">
+                                            <span className="text-[8px] font-black text-slate-300 uppercase tracking-tighter">Deuda en {p.debt_type}</span>
+                                            <span className={`text-[12px] font-black ${Number(p.debt_grams) > 0 ? 'text-[#FF8C9D]' : 'text-green-500'}`}>{Number(p.debt_grams).toFixed(2)}g</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="bg-[#F8F9FB] p-8 rounded-[40px] border border-slate-100">
+                            <h4 className="text-[10px] font-black text-[#1A365D] uppercase tracking-widest mb-4">Historial de Afinaje</h4>
+                            <div className="space-y-3">
+                                {smeltingHistory.length === 0 ? (
+                                    <p className="text-[9px] text-slate-400 italic">No hay historial de fundiciones.</p>
+                                ) : (
+                                    smeltingHistory.map(m => (
+                                        <div key={m.id} className="flex justify-between items-center p-3 bg-white rounded-2xl border border-slate-50">
+                                            <div>
+                                                <p className="text-[9px] font-black text-[#1A365D]">{format(parseISO(m.date), 'dd/MM/yy')}</p>
+                                                <p className="text-[8px] font-bold text-slate-400">{m.weight}g Enviados</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-[10px] font-black text-green-500">{(m.refining_percentage || 0)}%</p>
+                                                <p className="text-[8px] font-bold text-slate-400">Afinado</p>
                                             </div>
                                         </div>
                                     ))
                                 )}
-                            </div>
-                        </div>
-
-                        <div className="bg-[#1A365D] p-8 rounded-[40px] text-white space-y-4">
-                            <h4 className="text-[9px] font-black text-blue-300 uppercase tracking-widest">Resumen de Stocks</h4>
-                            <div className="space-y-3">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-xs font-bold text-blue-100 opacity-60">En Joyeros (Exterior)</span>
-                                    <span className="text-sm font-black text-[#FF8C9D]">{safePartners.reduce((acc, p) => acc + Number(p.debt_grams || 0), 0)} gr</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-xs font-bold text-blue-100 opacity-60">Lotes Pendientes</span>
-                                    <span className="text-sm font-black">{safeMovements.filter(m => m.status?.includes('Pendiente')).length}</span>
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -1191,11 +1676,13 @@ const TaskForm = ({ initialData, employees, onSave, onCancel, onDelete }) => {
     const [data, setData] = useState(initialData || { 
         title: '', 
         date: format(new Date(), 'yyyy-MM-dd'), 
+        time: '09:00',
         priority: 'Media', 
         periodicity: 'Manual', 
         recurring: false, 
         assigned_to: '', 
         description: '',
+        category: 'General',
         recurring_interval: 1,
         recurring_type: 'simple',
         recurring_days: [],
@@ -1266,6 +1753,35 @@ const TaskForm = ({ initialData, employees, onSave, onCancel, onDelete }) => {
                             />
                         </div>
                     </div>
+                    <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-2 tracking-widest">Hora</label>
+                        <div className="relative">
+                            <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <input 
+                                type="time" 
+                                className="w-full bg-[#F4F7FA] border-none rounded-2xl p-4 pl-12 font-bold text-[#1A365D] text-xs" 
+                                value={data.time} 
+                                onChange={e => setData({...data, time: e.target.value})}
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-2 tracking-widest">Categoría</label>
+                        <select 
+                            className="w-full bg-[#F4F7FA] border-none rounded-2xl p-4 font-bold text-[#1A365D] appearance-none cursor-pointer text-xs" 
+                            value={data.category} 
+                            onChange={e => setData({...data, category: e.target.value})}
+                        >
+                            <option value="General">General</option>
+                            <option value="Limpieza">Limpieza</option>
+                            <option value="Inventario">Inventario</option>
+                            <option value="Joyería / Finanzas">Joyería / Finanzas</option>
+                            <option value="Administración">Administración</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div>
                         <label className="text-[10px] font-black text-slate-400 uppercase block mb-2 tracking-widest">Prioridad</label>
                         <select 
@@ -1469,8 +1985,27 @@ const MovementForm = ({ type: movType, partners, onSave, onCancel }) => {
         debt_added: 0, 
         is_debt_adjustment: false, 
         total_cost: 0,
-        debt_impact_override: '' // User can manually override what's added/subtracted
+        debt_impact_override: '', // User can manually override what's added/subtracted
+        notes: '',
+        image_url: '',
+        inventory_category: ''
     });
+    
+    const [uploading, setUploading] = useState(false);
+
+    const handleFileChange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        setUploading(true);
+        try {
+            const compressed = await compressImage(file);
+            setData({ ...data, image_url: compressed });
+        } catch (error) {
+            console.error("Error compressing image:", error);
+        } finally {
+            setUploading(false);
+        }
+    };
     
     const partner = safePartners.find(p => p.id.toString() === data.partner_id.toString());
     const totalW = lines.reduce((a, l) => a + Number(l.weight || 0), 0);
@@ -1492,9 +2027,33 @@ const MovementForm = ({ type: movType, partners, onSave, onCancel }) => {
     return (
         <form onSubmit={(e) => { e.preventDefault(); onSave({...data, type: movType, weight: totalW, cost: totalC, karats_data: lines, status: movType === 'Fundición' ? 'Pendiente' : 'Completado', debt_added: movType === 'Recepción' ? debtImpact : 0, weight: movType === 'Envío' && data.is_debt_adjustment ? debtImpact : totalW }); }} className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
-                <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Joyero</label><select required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold" value={data.partner_id} onChange={e => setData({...data, partner_id: e.target.value})}><option value="">Socio...</option>{safePartners.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+                <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Joyero / Socio</label><select required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold" value={data.partner_id} onChange={e => setData({...data, partner_id: e.target.value})}><option value="">Socio...</option>{safePartners.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
                 <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Fecha</label><input type="date" required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold" value={data.date} onChange={e => setData({...data, date: e.target.value})}/></div>
             </div>
+
+            {(movType === 'Envío' || movType === 'Fundición' || movType === 'Recepción') && (
+                <div className="bg-white p-6 rounded-3xl border border-slate-100">
+                    <label className="text-[10px] font-black text-slate-400 uppercase block mb-2 tracking-widest">
+                        {movType === 'Recepción' ? 'Clasificar Entrada en Inventario' : 'Seleccionar Origen del Oro (Inventario)'}
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                        {GOLDSMITH_CATEGORIES.map(cat => (
+                            <button 
+                                key={cat}
+                                type="button"
+                                onClick={() => setData({...data, inventory_category: cat})}
+                                className={`p-3 rounded-2xl text-[9px] font-black uppercase transition-all flex items-center justify-between border-2 ${data.inventory_category === cat ? 'bg-[#1A365D] text-white border-[#1A365D]' : 'bg-slate-50 text-slate-400 border-transparent hover:border-slate-200'}`}
+                            >
+                                <span>{cat}</span>
+                                {data.inventory_category === cat && <CheckCircle2 size={12}/>}
+                            </button>
+                        ))}
+                    </div>
+                    {!data.inventory_category && (movType === 'Envío' || movType === 'Fundición') && (
+                        <p className="text-[8px] text-red-400 font-black uppercase mt-2">* ES OBLIGATORIO SELECCIONAR UNA AGRUPACIÓN PARA DETRAER STOCK</p>
+                    )}
+                </div>
+            )}
             
             <div className="bg-slate-50 p-6 rounded-3xl space-y-4">
                 <div className="flex justify-between items-center"><h4 className="text-[10px] font-black text-slate-400 uppercase">Detalle Pesos</h4><button type="button" onClick={() => setLines([...lines, { karat: '18k', type: 'Oro', weight: '', cost_gr: '' }])} className="text-[#FF8C9D] font-black text-[10px]">+ AÑADIR FILA</button></div>
@@ -1559,8 +2118,53 @@ const MovementForm = ({ type: movType, partners, onSave, onCancel }) => {
                     )}
                 </div>
             )}
+
+            <div className="bg-white p-6 rounded-3xl border border-slate-100 space-y-4">
+                <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Notas del Envío / Recepción</label>
+                    <textarea 
+                        className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold text-xs resize-none" 
+                        rows={3} 
+                        placeholder="Observaciones adicionales, detalles específicos..."
+                        value={data.notes}
+                        onChange={e => setData({...data, notes: e.target.value})}
+                    />
+                </div>
+                
+                <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Adjuntar Foto</label>
+                        <div className="relative">
+                            <input 
+                                type="file" 
+                                accept="image/*"
+                                onChange={handleFileChange}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                            />
+                            <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl p-4 flex items-center justify-center gap-2 group hover:border-[#FF8C9D] transition-all">
+                                <Plus size={16} className="text-slate-400 group-hover:text-[#FF8C9D]" />
+                                <span className="text-[10px] font-black text-slate-400 group-hover:text-[#FF8C9D] uppercase">
+                                    {uploading ? 'Comprimiendo...' : data.image_url ? 'Imagen Seleccionada' : 'Seleccionar Imagen'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    {data.image_url && (
+                        <div className="w-16 h-16 rounded-xl overflow-hidden border border-slate-200 relative group">
+                            <img src={data.image_url} alt="Envío" className="w-full h-full object-cover" />
+                            <button 
+                                type="button" 
+                                onClick={() => setData({...data, image_url: ''})}
+                                className="absolute inset-0 bg-red-500/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
             
-            <button type="submit" className="w-full py-5 bg-[#1A365D] text-white rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl hover:scale-[1.01] transition-all">PROCESAR MOVIMIENTO</button>
+            <button type="submit" disabled={uploading} className="w-full py-5 bg-[#1A365D] text-white rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl hover:scale-[1.01] transition-all disabled:opacity-50">PROCESAR MOVIMIENTO</button>
         </form>
     );
 };
@@ -1574,6 +2178,77 @@ const RefineForm = ({ movement, onSave, onCancel }) => {
             <div><label className="text-[10px] font-black text-slate-400 block mb-1 uppercase">Afinaje Resultante (%)</label><input type="number" step="0.1" required className="w-full bg-slate-50 rounded-2xl p-4 text-center font-black" value={ref} onChange={e => setRef(e.target.value)}/></div>
             <div><label className="text-[10px] font-black text-slate-400 block mb-1 uppercase">Importe Final (€)</label><input type="number" step="0.01" required className="w-full bg-slate-50 rounded-2xl p-4 text-center font-black text-green-600" value={rec} onChange={e => setRec(e.target.value)}/></div>
             <button type="submit" className="w-full py-5 bg-[#FF8C9D] text-white rounded-3xl font-black text-xs uppercase shadow-xl hover:scale-[1.02] transition-all">FINALIZAR Y ARCHIVAR</button>
+        </form>
+    );
+};
+
+const OrderForm = ({ partners, onSave, onCancel }) => {
+    const [data, setData] = useState({
+        partner_id: '',
+        category: '18k',
+        est_weight: '',
+        order_date: format(new Date(), 'yyyy-MM-dd')
+    });
+
+    return (
+        <form onSubmit={(e) => { e.preventDefault(); onSave(data); }} className="space-y-6">
+            <div className="grid grid-cols-1 gap-6">
+                <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Joyero / Proveedor</label>
+                    <select required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold" value={data.partner_id} onChange={e => setData({...data, partner_id: e.target.value})}>
+                        <option value="">Seleccionar...</option>
+                        {partners.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                </div>
+                <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Categoría del Producto</label>
+                    <select className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold" value={data.category} onChange={e => setData({...data, category: e.target.value})}>
+                        {GOLDSMITH_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    </select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Gramos Estimados</label>
+                        <input type="number" step="0.01" required className="w-full bg-slate-50 border-none rounded-xl p-4 font-black" value={data.est_weight} onChange={e => setData({...data, est_weight: e.target.value})}/>
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Fecha Estimada</label>
+                        <input type="date" required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold" value={data.order_date} onChange={e => setData({...data, order_date: e.target.value})}/>
+                    </div>
+                </div>
+            </div>
+            <button type="submit" className="w-full py-5 bg-[#1A365D] text-white rounded-3xl font-black text-xs uppercase shadow-xl hover:scale-[1.02] transition-all">LANZAR PEDIDO</button>
+        </form>
+    );
+};
+
+const OrderClosureModal = ({ order, onConfirm, onCancel }) => {
+    const [weight, setWeight] = useState('');
+    const [cost, setCost] = useState('');
+    const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+
+    return (
+        <form onSubmit={(e) => { e.preventDefault(); onConfirm(order.id, { real_weight: weight, total_cost: cost, receive_date: date }); }} className="space-y-6">
+            <div className="text-center p-6 bg-blue-50 rounded-3xl mb-4">
+                <p className="text-[10px] font-black text-blue-400 uppercase mb-2">Pedido en curso</p>
+                <h4 className="text-lg font-black text-[#1A365D] uppercase">{order.partner_name} | {order.category}</h4>
+                <p className="text-xs font-bold text-blue-300 mt-1">Estimado: {order.est_weight}g</p>
+            </div>
+            <div className="grid grid-cols-1 gap-6">
+                <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Peso Real Recibido (gr)</label>
+                    <input type="number" step="0.01" required autoFocus className="w-full bg-slate-50 border-none rounded-xl p-4 font-black text-xl text-center" value={weight} onChange={e => setWeight(e.target.value)}/>
+                </div>
+                <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Importe Final (€)</label>
+                    <input type="number" step="0.01" required className="w-full bg-slate-50 border-none rounded-xl p-4 font-black text-xl text-center text-green-600" value={cost} onChange={e => setCost(e.target.value)}/>
+                </div>
+                <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Fecha de Recepción</label>
+                    <input type="date" required className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold" value={date} onChange={e => setDate(e.target.value)}/>
+                </div>
+            </div>
+            <button type="submit" className="w-full py-5 bg-green-500 text-white rounded-3xl font-black text-xs uppercase shadow-xl hover:scale-[1.02] transition-all">CONFIRMAR RECEPCIÓN Y AJUSTAR STOCK</button>
         </form>
     );
 };

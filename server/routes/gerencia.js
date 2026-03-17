@@ -63,6 +63,123 @@ router.delete('/goldsmith/partners/:id', async (req, res) => {
     }
 });
 
+// --- GOLDSMITH INVENTORY (Agrupaciones) ---
+router.get('/goldsmith/inventory', async (req, res) => {
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    try {
+        const result = await pool.query('SELECT * FROM goldsmith_inventory WHERE store_id = $1 ORDER BY id ASC', [storeId]);
+        res.json(result.rows);
+    } catch (err) {
+        logError(err, 'GET /goldsmith/inventory');
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.put('/goldsmith/inventory/threshold', async (req, res) => {
+    const { category, threshold } = req.body;
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    try {
+        await pool.query('UPDATE goldsmith_inventory SET restock_threshold = $1 WHERE category = $2 AND store_id = $3', [threshold, category, storeId]);
+        res.json({ success: true });
+    } catch (err) {
+        logError(err, 'PUT /goldsmith/inventory/threshold');
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- GOLDSMITH ORDERS ---
+router.get('/goldsmith/orders', async (req, res) => {
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    try {
+        const result = await pool.query(`
+            SELECT o.*, p.name as partner_name 
+            FROM goldsmith_orders o 
+            JOIN goldsmith_partners p ON o.partner_id = p.id 
+            WHERE o.store_id = $1 
+            ORDER BY o.created_at DESC`, [storeId]);
+        res.json(result.rows);
+    } catch (err) {
+        logError(err, 'GET /goldsmith/orders');
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/goldsmith/orders', async (req, res) => {
+    const { partner_id, category, est_weight, order_date } = req.body;
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        
+        const result = await client.query(
+            `INSERT INTO goldsmith_orders (partner_id, category, est_weight, order_date, store_id) 
+             VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+            [partner_id, category, est_weight, order_date, storeId]
+        );
+
+        const partnerRes = await client.query('SELECT name FROM goldsmith_partners WHERE id = $1', [partner_id]);
+        const partnerName = partnerRes.rows[0]?.name || 'Socio';
+
+        // Automatic Task
+        await client.query(
+            `INSERT INTO tasks (title, date, priority, status, description, category, store_id) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [`Esperando pedido de ${partnerName}`, order_date, 'Media', 'Pendiente', `Pedido de ${est_weight}g de ${category}.`, 'Joyería / Finanzas', storeId]
+        );
+
+        await client.query('COMMIT');
+        res.json(result.rows[0]);
+    } catch (err) {
+        await client.query('ROLLBACK');
+        logError(err, 'POST /goldsmith/orders');
+        res.status(500).json({ error: err.message });
+    } finally {
+        client.release();
+    }
+});
+
+router.put('/goldsmith/orders/:id/receive', async (req, res) => {
+    const { id } = req.params;
+    const { real_weight, total_cost, receive_date } = req.body;
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        
+        const orderRes = await client.query('SELECT * FROM goldsmith_orders WHERE id = $1', [id]);
+        if (orderRes.rows.length === 0) throw new Error('Pedido no encontrado.');
+        const order = orderRes.rows[0];
+
+        // Update Order
+        await client.query(
+            `UPDATE goldsmith_orders SET real_weight = $1, total_cost = $2, receive_date = $3, status = 'Recibido' 
+             WHERE id = $4`,
+            [real_weight, total_cost, receive_date, id]
+        );
+
+        // Update Inventory
+        await client.query(
+            `UPDATE goldsmith_inventory SET total_weight = total_weight + $1, total_cost = total_cost + $2 
+             WHERE category = $3 AND store_id = $4`,
+            [real_weight, total_cost, order.category, order.store_id]
+        );
+
+        // Update Partner Debt
+        await client.query(
+            `UPDATE goldsmith_partners SET debt_grams = debt_grams + $1 WHERE id = $2`,
+            [real_weight, order.partner_id]
+        );
+
+        await client.query('COMMIT');
+        res.json({ success: true });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        logError(err, 'PUT /goldsmith/orders/:id/receive');
+        res.status(500).json({ error: err.message });
+    } finally {
+        client.release();
+    }
+});
+
 // --- GOLDSMITH MOVEMENTS ---
 router.get('/goldsmith/movements', async (req, res) => {
     const storeId = req.headers['x-store-id'] || 'store_1';
@@ -87,7 +204,8 @@ router.post('/goldsmith/movements', async (req, res) => {
         const { 
             partner_id, type, weight, cost, date, 
             acquisition_cost, refining_percentage, received_amount,
-            karats_data, status, is_debt_adjustment, debt_added 
+            karats_data, status, is_debt_adjustment, debt_added,
+            notes, image_url, inventory_category
         } = req.body;
         const storeId = req.headers['x-store-id'] || 'store_1';
 
@@ -99,17 +217,75 @@ router.post('/goldsmith/movements', async (req, res) => {
             `INSERT INTO goldsmith_movements (
                 partner_id, type, weight, cost, date, store_id,
                 acquisition_cost, refining_percentage, received_amount,
-                karats_data, status, is_debt_adjustment
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+                karats_data, status, is_debt_adjustment,
+                notes, image_url, inventory_category
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *`,
             [
                 partner_id, type, weight || 0, (type === 'Fundición' ? cost : cost) || 0, date, storeId,
                 (type === 'Fundición' ? cost : acquisition_cost) || 0, refining_percentage || 0, received_amount || 0,
-                JSON.stringify(karats_data || []), status || 'Completado', !!is_debt_adjustment
+                JSON.stringify(karats_data || []), status || 'Completado', !!is_debt_adjustment,
+                notes || '', image_url || '', inventory_category || null
             ]
         );
 
+        // Inventory Logic
+        if (inventory_category) {
+            if (type === 'Recepción') {
+                // If it's a purchase, add to stock. 
+                // We use 'cost' as the acquisition cost for the inventory.
+                await client.query(
+                    `UPDATE goldsmith_inventory SET total_weight = total_weight + $1, total_cost = total_cost + $2 
+                     WHERE category = $3 AND store_id = $4`,
+                    [weight, cost, inventory_category, storeId]
+                );
+            } else if (type === 'Envío' || type === 'Fundición') {
+                // Deduct from stock. We also deduct a proportional cost to keep avg accurate.
+                // To do this strictly, we'd need the current avg price.
+                const invRes = await client.query('SELECT total_weight, total_cost FROM goldsmith_inventory WHERE category = $1 AND store_id = $2', [inventory_category, storeId]);
+                const inv = invRes.rows[0];
+                if (inv && inv.total_weight > 0) {
+                    const avgCost = inv.total_cost / inv.total_weight;
+                    const costToDeduct = weight * avgCost;
+                    await client.query(
+                        `UPDATE goldsmith_inventory SET total_weight = GREATEST(0, total_weight - $1), 
+                         total_cost = GREATEST(0, total_cost - $2) 
+                         WHERE category = $3 AND store_id = $4`,
+                        [weight, costToDeduct, inventory_category, storeId]
+                    );
+                } else {
+                    await client.query(
+                        `UPDATE goldsmith_inventory SET total_weight = GREATEST(0, total_weight - $1) 
+                         WHERE category = $2 AND store_id = $3`,
+                        [weight, inventory_category, storeId]
+                    );
+                }
+            }
+        }
+
+        const movementId = result.rows[0].id;
+
         if (type === 'Recepción' && debt_added > 0) {
+            const partnerRes = await client.query('SELECT name FROM goldsmith_partners WHERE id = $1', [partner_id]);
+            const partnerName = partnerRes.rows[0]?.name || 'Socio';
+            
             await client.query('UPDATE goldsmith_partners SET debt_grams = debt_grams + $1 WHERE id = $2', [debt_added, partner_id]);
+            
+            // Automatic Task Creation
+            await client.query(
+                `INSERT INTO tasks (
+                    title, date, priority, status, description, category, ref_id, store_id
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                [
+                    `Liquidación de deuda: ${partnerName}`,
+                    date,
+                    'Alta',
+                    'Pendiente',
+                    `Deuda generada por recepción de oro (${debt_added}g).`,
+                    'Joyería / Finanzas',
+                    `jewelry_${movementId}`,
+                    storeId
+                ]
+            );
         }
         if (is_debt_adjustment && weight > 0) {
             await client.query('UPDATE goldsmith_partners SET debt_grams = GREATEST(0, debt_grams - $1) WHERE id = $2', [weight, partner_id]);

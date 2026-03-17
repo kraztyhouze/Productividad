@@ -157,6 +157,45 @@ export const initDb = async () => {
             );
         `);
 
+        // Goldsmith Inventory (Agrupaciones)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS goldsmith_inventory (
+                id SERIAL PRIMARY KEY,
+                category TEXT NOT NULL,
+                total_weight NUMERIC DEFAULT 0,
+                total_cost NUMERIC DEFAULT 0,
+                store_id TEXT DEFAULT 'store_1',
+                UNIQUE(category, store_id)
+            );
+        `);
+
+        // Initialize standard categories
+        const stdCategories = ['18k', '18k con piedra', '14k', '14k con piedra', '9k', '9k con piedra', 'Plata 925', 'Plata 925 con piedra'];
+        for (const cat of stdCategories) {
+            await client.query(`
+                INSERT INTO goldsmith_inventory (category, store_id) 
+                VALUES ($1, 'store_1') 
+                ON CONFLICT (category, store_id) DO NOTHING
+            `, [cat]);
+        }
+
+        // Goldsmith Orders
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS goldsmith_orders (
+                id SERIAL PRIMARY KEY,
+                partner_id INTEGER REFERENCES goldsmith_partners(id) ON DELETE CASCADE,
+                category TEXT NOT NULL,
+                est_weight NUMERIC DEFAULT 0,
+                real_weight NUMERIC DEFAULT 0,
+                total_cost NUMERIC DEFAULT 0,
+                status TEXT DEFAULT 'Pedido Lanzado',
+                order_date TEXT NOT NULL,
+                receive_date TEXT,
+                store_id TEXT DEFAULT 'store_1',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
         // Migrations / Alters (Safe to run multiple times)
         const alters = [
             "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recurring_days JSONB DEFAULT '[]';",
@@ -184,7 +223,14 @@ export const initDb = async () => {
             "ALTER TABLE cash_control_logs ADD COLUMN IF NOT EXISTS responsible_1 TEXT;",
             "ALTER TABLE cash_control_logs ADD COLUMN IF NOT EXISTS responsible_2 TEXT;",
             "ALTER TABLE goldsmith_partners ADD COLUMN IF NOT EXISTS debt_type TEXT DEFAULT '18k';",
-            "ALTER TABLE goldsmith_partners ADD COLUMN IF NOT EXISTS debt_formula TEXT;"
+            "ALTER TABLE goldsmith_partners ADD COLUMN IF NOT EXISTS debt_formula TEXT;",
+            "ALTER TABLE goldsmith_movements ADD COLUMN IF NOT EXISTS notes TEXT;",
+            "ALTER TABLE goldsmith_movements ADD COLUMN IF NOT EXISTS image_url TEXT;",
+            "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS ref_id TEXT;",
+            "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS category TEXT;",
+            "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS time TEXT;",
+            "ALTER TABLE goldsmith_movements ADD COLUMN IF NOT EXISTS inventory_category TEXT;",
+            "ALTER TABLE goldsmith_inventory ADD COLUMN IF NOT EXISTS restock_threshold NUMERIC DEFAULT 100;"
         ];
         for (const sql of alters) {
             try { await client.query(sql); } catch (e) { /* ignore already exists */ }

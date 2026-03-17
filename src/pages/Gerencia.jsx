@@ -591,6 +591,29 @@ const Gerencia = () => {
         if (res.ok) loadData();
     };
 
+    const handlePostponeBattery = (battery) => {
+        // Prepare new data based on expired battery
+        const pendingItems = (battery.items || []).filter(i => !i.is_done).map(i => i.description);
+        
+        // Calculate new dates (next month)
+        const oldStart = parseISO(battery.start_date);
+        const oldEnd = parseISO(battery.end_date);
+        const diffMs = oldEnd - oldStart;
+        
+        const newStart = addDays(oldEnd, 1);
+        const newEnd = new Date(newStart.getTime() + diffMs);
+
+        setModal({
+            type: 'battery',
+            data: {
+                title: `${battery.title} (Renovada)`,
+                start_date: format(newStart, 'yyyy-MM-dd'),
+                end_date: format(newEnd, 'yyyy-MM-dd'),
+                items: pendingItems.length > 0 ? pendingItems : ['', '', '']
+            }
+        });
+    };
+
     const handleToggleBatteryItem = async (itemId, isDone, completedBy) => {
         const res = await fetch(`/api/task-batteries/items/${itemId}`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore },
@@ -672,6 +695,7 @@ const Gerencia = () => {
                         onDeleteBatteryItem={handleDeleteBatteryItem}
                         onCheckBattery={(item) => setModal({ type: 'battery_item_check', data: item })}
                         onDeleteBattery={handleDeleteBattery}
+                        onPostponeBattery={handlePostponeBattery}
                         loadData={loadData} 
                         currentStore={currentStore} 
                     />
@@ -1062,7 +1086,7 @@ const DailyTimelineView = ({ tasks, employees, onEdit, onToggleStatus }) => {
     );
 };
 
-const TasksView = ({ tasks, batteries, onEdit, onAdd, onAddBattery, onEditBattery, onAddBatteryItem, onDeleteBatteryItem, onCheckBattery, onDeleteBattery, loadData, currentStore, employees, partners }) => {
+const TasksView = ({ tasks, batteries, onEdit, onAdd, onAddBattery, onEditBattery, onAddBatteryItem, onDeleteBatteryItem, onCheckBattery, onDeleteBattery, onPostponeBattery, loadData, currentStore, employees, partners }) => {
     const safeTasks = Array.isArray(tasks) ? tasks : [];
     const [month, setMonth] = useState(new Date());
     const [selectedTask, setSelectedTask] = useState(null);
@@ -1406,6 +1430,7 @@ const TasksView = ({ tasks, batteries, onEdit, onAdd, onAddBattery, onEditBatter
                             onAddItem={onAddBatteryItem}
                             onDeleteItem={onDeleteBatteryItem}
                             onDelete={onDeleteBattery} 
+                            onPostpone={onPostponeBattery}
                         />
                     </div>
                 </div>
@@ -3128,7 +3153,7 @@ const OrderClosureModal = ({ order, onConfirm, onCancel }) => {
 };
 
 
-const BatteriesView = ({ batteries, onAdd, onCheck, onDelete, onEdit, onAddItem, onDeleteItem, hideHeader, isCompact }) => {
+const BatteriesView = ({ batteries, onAdd, onCheck, onDelete, onEdit, onAddItem, onDeleteItem, onPostpone, hideHeader, isCompact }) => {
     const safeBatteries = Array.isArray(batteries) ? batteries : [];
 
     return (
@@ -3184,14 +3209,23 @@ const BatteriesView = ({ batteries, onAdd, onCheck, onDelete, onEdit, onAddItem,
                                             </div>
                                             <h3 className="text-xl font-black text-[#1A365D] uppercase tracking-tighter mb-2">{b.title}</h3>
                                             <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                                <div className="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-full">
-                                                    <CalendarIcon size={12} className="text-[#FF8C9D]"/>
+                                                <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${new Date() > parseISO(b.end_date) ? 'bg-red-50 text-red-400' : 'bg-slate-50 text-[#FF8C9D]'}`}>
+                                                    <CalendarIcon size={12}/>
                                                     {format(parseISO(b.start_date), 'dd/MM')} — {format(parseISO(b.end_date), 'dd/MM')}
+                                                    {new Date() > parseISO(b.end_date) && <span className="ml-1 font-black underline animate-pulse">EXPIRADA</span>}
                                                 </div>
                                             </div>
                                         </div>
                                         
                                         <div className="p-8 space-y-4 flex-1 bg-slate-50/30">
+                                            {new Date() > parseISO(b.end_date) && progress < 100 && (
+                                                <button 
+                                                    onClick={() => onPostpone(b)}
+                                                    className="w-full py-4 bg-[#FF8C9D] text-white rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-coral-100 hover:scale-[1.02] transition-all flex items-center justify-center gap-2 mb-4"
+                                                >
+                                                    <Clock size={16}/> POSPONER / RENOVAR BATERÍA
+                                                </button>
+                                            )}
                                             <div className="flex justify-between items-end mb-2">
                                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Progreso ({done}/{total})</span>
                                                 <span className={`text-xs font-black ${progress === 100 ? 'text-green-500' : 'text-[#1A365D]'}`}>

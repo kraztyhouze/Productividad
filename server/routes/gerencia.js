@@ -87,6 +87,54 @@ router.put('/goldsmith/inventory/threshold', async (req, res) => {
     }
 });
 
+router.put('/goldsmith/inventory/adjust', async (req, res) => {
+    const { mode, category, targetCategory, weight, cost } = req.body;
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        
+        if (mode === 'direct') {
+            await client.query(
+                'UPDATE goldsmith_inventory SET total_weight = $1, total_cost = $2 WHERE category = $3 AND store_id = $4',
+                [weight, cost, category, storeId]
+            );
+        } else if (mode === 'transfer') {
+            // Get source stats to calculate proportional cost
+            const sourceRes = await client.query('SELECT total_weight, total_cost FROM goldsmith_inventory WHERE category = $1 AND store_id = $2', [category, storeId]);
+            const source = sourceRes.rows[0];
+            
+            if (!source || Number(source.total_weight) < Number(weight)) {
+                throw new Error('Stock insuficiente para la transferencia.');
+            }
+
+            const avgCost = Number(source.total_weight) > 0 ? Number(source.total_cost) / Number(source.total_weight) : 0;
+            const costToTransfer = Number(weight) * avgCost;
+
+            // Deduct from source
+            await client.query(
+                'UPDATE goldsmith_inventory SET total_weight = total_weight - $1, total_cost = total_cost - $2 WHERE category = $3 AND store_id = $4',
+                [weight, costToTransfer, category, storeId]
+            );
+
+            // Add to target
+            await client.query(
+                'UPDATE goldsmith_inventory SET total_weight = total_weight + $1, total_cost = total_cost + $2 WHERE category = $3 AND store_id = $4',
+                [weight, costToTransfer, targetCategory, storeId]
+            );
+        }
+
+        await client.query('COMMIT');
+        res.json({ success: true });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        logError(err, 'PUT /goldsmith/inventory/adjust');
+        res.status(500).json({ error: err.message });
+    } finally {
+        client.release();
+    }
+});
+
 // --- GOLDSMITH ORDERS ---
 router.get('/goldsmith/orders', async (req, res) => {
     const storeId = req.headers['x-store-id'] || 'store_1';

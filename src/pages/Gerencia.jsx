@@ -299,6 +299,15 @@ const Gerencia = () => {
         else { const err = await res.json(); alert('Error: ' + (err.error || 'Server error')); }
     };
 
+    const handleAdjustInventory = async (adjustData) => {
+        const res = await fetch('/api/gerencia/goldsmith/inventory/adjust', {
+            method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore },
+            body: JSON.stringify(adjustData)
+        });
+        if (res.ok) { setModal({ type: null, data: null }); loadData(); }
+        else { const err = await res.json(); alert('Error: ' + (err.error || 'Server error')); }
+    };
+
     const handleSaveCash = async (cashData) => {
         const res = await fetch('/api/gerencia/cash-control', {
             method: 'POST', headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore },
@@ -396,6 +405,7 @@ const Gerencia = () => {
                         onRefine={(m) => setModal({ type: 'refine', data: m })}
                         onAddOrder={() => setModal({ type: 'order', data: null })}
                         onReceiveOrder={(o) => setModal({ type: 'order_receive', data: o })}
+                        onAdjustInventory={(cat) => setModal({ type: 'inventory_adjust', data: cat })}
                     />
                 )}
                 {activeTab === 'cash' && <CashView history={Array.isArray(cashHistory) ? cashHistory : []} employees={employees} onSave={handleSaveCash} user={user} />}
@@ -437,6 +447,10 @@ const Gerencia = () => {
 
             <GlobalModal isOpen={modal.type === 'order_receive'} onClose={() => setModal({ type: null, data: null })} title="Confirmar Recepción de Pedido">
                 <OrderClosureModal order={modal.data} onConfirm={handleReceiveOrder} onCancel={() => setModal({ type: null, data: null })} />
+            </GlobalModal>
+
+            <GlobalModal isOpen={modal.type === 'inventory_adjust'} onClose={() => setModal({ type: null, data: null })} title="Ajuste / Transferencia de Inventario">
+                <InventoryAdjustmentModal initialCategory={modal.data} onSave={handleAdjustInventory} onCancel={() => setModal({ type: null, data: null })} />
             </GlobalModal>
         </div>
     );
@@ -1018,30 +1032,102 @@ const TasksView = ({ tasks, batteries, onEdit, onAdd, onAddBattery, onCheckBatte
     );
 };
 
-const GoldsmithInventoryPanel = ({ inventory }) => {
+const InventoryAdjustmentModal = ({ initialCategory, onSave, onCancel }) => {
+    const [mode, setMode] = useState('direct'); // 'direct' or 'transfer'
+    const [data, setData] = useState({
+        category: initialCategory || GOLDSMITH_CATEGORIES[0],
+        targetCategory: GOLDSMITH_CATEGORIES[1],
+        weight: '',
+        cost: ''
+    });
+
+    return (
+        <form onSubmit={(e) => { e.preventDefault(); onSave({ mode, ...data }); }} className="space-y-6">
+            <div className="flex bg-slate-50 p-1.5 rounded-2xl mb-6">
+                <button type="button" onClick={() => setMode('direct')} className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase transition-all ${mode === 'direct' ? 'bg-white text-[#1A365D] shadow-sm' : 'text-slate-400'}`}>Ajuste Directo</button>
+                <button type="button" onClick={() => setMode('transfer')} className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase transition-all ${mode === 'transfer' ? 'bg-white text-[#1A365D] shadow-sm' : 'text-slate-400'}`}>Transferencia</button>
+            </div>
+
+            <div className="space-y-6">
+                <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase block mb-2">{mode === 'transfer' ? 'Desde Agrupación' : 'Seleccionar Agrupación'}</label>
+                    <select className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold" value={data.category} onChange={e => setData({...data, category: e.target.value})}>
+                        {GOLDSMITH_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    </select>
+                </div>
+
+                {mode === 'transfer' && (
+                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Hacia Agrupación</label>
+                        <select className="w-full bg-slate-50 border-none rounded-xl p-4 font-bold" value={data.targetCategory} onChange={e => setData({...data, targetCategory: e.target.value})}>
+                            {GOLDSMITH_CATEGORIES.filter(c => c !== data.category).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                        </select>
+                    </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-2">{mode === 'transfer' ? 'Peso a Mover (g)' : 'Peso Total (g)'}</label>
+                        <input type="number" step="0.01" required className="w-full bg-slate-50 border-none rounded-xl p-4 font-black text-center" value={data.weight} onChange={e => setData({...data, weight: e.target.value})}/>
+                        {mode === 'direct' && <p className="text-[8px] text-slate-400 mt-1 italic">Sobreescribe el peso actual.</p>}
+                    </div>
+                    {mode === 'direct' && (
+                        <div>
+                            <label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Coste Total (€)</label>
+                            <input type="number" step="0.01" required className="w-full bg-slate-50 border-none rounded-xl p-4 font-black text-center text-green-600" value={data.cost} onChange={e => setData({...data, cost: e.target.value})}/>
+                            <p className="text-[8px] text-slate-400 mt-1 italic">Sobreescribe el costo actual.</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            <button type="submit" className="w-full py-5 bg-[#1A365D] text-white rounded-3xl font-black text-xs uppercase shadow-xl hover:scale-[1.02] transition-all">
+                {mode === 'transfer' ? 'EJECUTAR TRANSFERENCIA' : 'ACTUALIZAR VALORES'}
+            </button>
+        </form>
+    );
+};
+
+const GoldsmithInventoryPanel = ({ inventory, onAdjust }) => {
     return (
         <div className="bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm">
-            <h3 className="text-xs font-black text-[#1A365D] uppercase tracking-widest mb-6 flex items-center gap-2">
-                Matriz de Agrupaciones (Inventario Real) <Layers size={16} className="text-[#FF8C9D]"/>
-            </h3>
+            <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xs font-black text-[#1A365D] uppercase tracking-widest flex items-center gap-2">
+                    Matriz de Agrupaciones (Inventario Real) <Layers size={16} className="text-[#FF8C9D]"/>
+                </h3>
+                <button 
+                    onClick={() => onAdjust()} 
+                    className="text-[9px] font-black text-slate-400 px-4 py-2 bg-slate-50 rounded-xl hover:bg-slate-100 transition-all uppercase"
+                >
+                    Ajuste General
+                </button>
+            </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {inventory.map(item => {
                     const avgCost = item.total_weight > 0 ? item.total_cost / item.total_weight : 0;
                     const isLow = Number(item.total_weight) < Number(item.restock_threshold);
                     return (
-                        <div key={item.id} className={`p-5 rounded-[32px] border-2 transition-all ${isLow ? 'bg-orange-50 border-orange-200' : 'bg-[#F8F9FB] border-slate-100 hover:bg-white hover:shadow-lg'}`}>
-                            <div className="flex justify-between items-start mb-1">
+                        <div key={item.id} className={`p-5 rounded-[32px] border-2 transition-all group relative overflow-hidden ${isLow ? 'bg-orange-50 border-orange-200' : 'bg-[#F8F9FB] border-slate-100 hover:bg-white hover:shadow-lg'}`}>
+                            <div className="flex justify-between items-start mb-1 z-10 relative">
                                 <p className="text-[10px] font-black text-[#1A365D] uppercase tracking-tighter">{item.category}</p>
                                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[item.category] || '#CCC' }} />
                             </div>
-                            <div className="space-y-1">
+                            <div className="space-y-1 z-10 relative">
                                 <p className="text-sm font-black text-[#1A365D]">{Number(item.total_weight).toFixed(2)} gr</p>
                                 <div className="flex flex-col gap-0.5 mt-2">
                                     <span className="text-[8px] font-bold text-slate-400 uppercase">Coste: {formatPrice(item.total_cost)}€</span>
                                     <span className="text-[8px] font-black text-[#1A365D] uppercase bg-blue-50 px-2 py-0.5 rounded-md w-fit">{avgCost.toFixed(2)}€/g</span>
                                 </div>
                             </div>
-                            {isLow && <p className="text-[7px] font-black text-orange-600 uppercase mt-2 flex items-center gap-1"><AlertCircle size={8}/> REPOSICIÓN</p>}
+                            {isLow && <p className="text-[7px] font-black text-orange-600 uppercase mt-2 flex items-center gap-1 z-10 relative"><AlertCircle size={8}/> REPOSICIÓN</p>}
+                            
+                            <button 
+                                onClick={() => onAdjust(item.category)}
+                                className="absolute inset-0 bg-[#1A365D]/80 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-20"
+                            >
+                                <Edit3 size={16} className="mb-1" />
+                                <span className="text-[8px] font-black uppercase">Ajustar</span>
+                            </button>
                         </div>
                     );
                 })}
@@ -1081,7 +1167,7 @@ const GoldsmithOrdersPanel = ({ orders, onReceive }) => {
     );
 };
 
-const JewelryView = ({ inventory, orders, partners, movements, onAddPartner, onEditPartner, onDeletePartner, onAddMovement, onDeleteMovement, onRefine, onAddOrder, onReceiveOrder }) => {
+const JewelryView = ({ inventory, orders, partners, movements, onAddPartner, onEditPartner, onDeletePartner, onAddMovement, onDeleteMovement, onRefine, onAddOrder, onReceiveOrder, onAdjustInventory }) => {
     const [viewMode, setViewMode] = useState('ops'); // 'ops' or 'report'
     const safeMovements = Array.isArray(movements) ? movements : [];
     const safePartners = Array.isArray(partners) ? partners : [];
@@ -1190,7 +1276,7 @@ const JewelryView = ({ inventory, orders, partners, movements, onAddPartner, onE
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                     {/* Left Column (Inventory & Orders) */}
                     <div className="lg:col-span-8 space-y-8">
-                        <GoldsmithInventoryPanel inventory={safeInventory} />
+                        <GoldsmithInventoryPanel inventory={safeInventory} onAdjust={onAdjustInventory} />
                         
                         <div className="bg-white rounded-[40px] border border-[#E2E8F0] shadow-sm overflow-hidden">
                             <div className="p-8 pb-4 flex justify-between items-center">

@@ -34,25 +34,19 @@ git commit -m "$commitMessage"
 Write-Host ""
 Write-Host "4️⃣ Sincronizando ramas y subiendo a la nube..." -ForegroundColor Yellow
 
-# Push a master
-Write-Host "-> Guardando tu código en 'master'..." -ForegroundColor Gray
-git push origin master
+# Push a main
+Write-Host "-> Guardando tu código en 'main'..." -ForegroundColor Gray
+git push origin main
 
 # Sincronizar render
 Write-Host "-> Enviando el código a la web (rama 'render')..." -ForegroundColor Gray
 git checkout render
-git merge master
+git merge main
 git push origin render
 
-# Sincronizar main
-Write-Host "-> Guardando copia de seguridad (rama 'main')..." -ForegroundColor Gray
-git checkout main
-git merge master
-git push origin main
-
-# Volver a master
+# Volver a main
 Write-Host "-> Devolviéndote a tu rama de trabajo..." -ForegroundColor Gray
-git checkout master
+git checkout main
 
 Write-Host ""
 Write-Host "======================================" -ForegroundColor Cyan

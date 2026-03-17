@@ -147,7 +147,6 @@ const downloadWeeklyPDF = (batteries) => {
         
         // --- CONFIG & STYLES ---
         const primaryColor = [26, 54, 93]; // #1A365D
-        const accentColor = [255, 140, 157]; // #FF8C9D
         
         // Header Background
         doc.setFillColor(248, 249, 251);
@@ -172,12 +171,14 @@ const downloadWeeklyPDF = (batteries) => {
         
         let yPos = 50;
         
-        if (!batteries || batteries.length === 0) {
+        if (!Array.isArray(batteries) || batteries.length === 0) {
             doc.setFontSize(12);
             doc.setTextColor(180);
             doc.text('No hay baterías de tareas registradas para este periodo.', 14, 70);
         } else {
             batteries.forEach((b, index) => {
+                if (!b) return;
+
                 // Check page space
                 if (yPos > 240) {
                     doc.addPage();
@@ -191,21 +192,33 @@ const downloadWeeklyPDF = (batteries) => {
                 doc.setFontSize(11);
                 doc.setTextColor(255);
                 doc.setFont('helvetica', 'bold');
-                doc.text(`${index + 1}. ${b.title.toUpperCase()}`, 18, yPos + 6.5);
+                doc.text(`${index + 1}. ${(b.title || 'SIN TÍTULO').toUpperCase()}`, 18, yPos + 6.5);
                 
                 doc.setFontSize(8);
                 doc.setTextColor(120);
                 doc.setFont('helvetica', 'normal');
-                const periodText = `Periodo: ${format(parseISO(b.start_date), 'dd/MM/yyyy')} al ${format(parseISO(b.end_date), 'dd/MM/yyyy')}`;
+                
+                let periodText = 'Periodo: Sin definir';
+                try {
+                    if (b.start_date && b.end_date) {
+                        periodText = `Periodo: ${format(parseISO(b.start_date), 'dd/MM/yyyy')} al ${format(parseISO(b.end_date), 'dd/MM/yyyy')}`;
+                    }
+                } catch(e) { 
+                    console.warn("Date error", e);
+                }
                 doc.text(periodText, 14, yPos + 15);
                 
                 const tableData = (b.items || []).map(item => [
-                    item.description.toUpperCase(),
-                    item.is_done ? 'FINALIZADA' : 'PENDIENTE',
+                    (item.description || '').toUpperCase(),
+                    (item.is_done ? 'FINALIZADA' : 'PENDIENTE').toUpperCase(),
                     (item.completed_by || 'POR ASIGNAR').toUpperCase(),
                     '[       ]'
                 ]);
                 
+                if (typeof doc.autoTable !== 'function') {
+                    throw new Error("El generador de tablas (autoTable) no está disponible. Contacta con soporte.");
+                }
+
                 doc.autoTable({
                     startY: yPos + 18,
                     head: [['DESCRIPCIÓN DE LA TAREA / OBJETIVO', 'ESTADO', 'FIRMA/RESPONSABLE', 'CHECK']],
@@ -230,7 +243,6 @@ const downloadWeeklyPDF = (batteries) => {
                         3: { cellWidth: 22, halign: 'center' }
                     },
                     didDrawPage: (data) => {
-                        // Footer on each page
                         doc.setFontSize(7);
                         doc.setTextColor(200);
                         doc.text(`Página ${doc.internal.getNumberOfPages()}`, 196, 285, { align: 'right' });
@@ -238,14 +250,18 @@ const downloadWeeklyPDF = (batteries) => {
                     }
                 });
                 
-                yPos = doc.lastAutoTable.finalY + 20;
+                if (doc.lastAutoTable && doc.lastAutoTable.finalY) {
+                    yPos = doc.lastAutoTable.finalY + 20;
+                } else {
+                    yPos += 50;
+                }
             });
         }
         
         doc.save(`TikTak_Baterias_${today.replace(/\//g, '-')}.pdf`);
     } catch (error) {
         console.error("Critical error generating PDF:", error);
-        alert("Error al generar el PDF. Verifica la consola para más detalles.");
+        alert(`Error al generar el PDF: ${error.message}`);
     }
 };
 

@@ -58,8 +58,14 @@ import {
     ResponsiveContainer, 
     Cell,
     PieChart,
-    Pie
+    Pie,
+    LineChart,
+    Line,
+    AreaChart,
+    Area
 } from 'recharts';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 // --- CONSTANTS ---
 const BILLS = [500, 200, 100, 50, 20, 10, 5];
@@ -112,6 +118,63 @@ const compressImage = (file, maxWidth = 800) => {
             };
         };
     });
+};
+
+const downloadWeeklyPDF = (batteries) => {
+    const doc = new jsPDF();
+    const today = format(new Date(), 'dd/MM/yyyy');
+    
+    // Header
+    doc.setFontSize(22);
+    doc.setTextColor(26, 54, 93); // #1A365D
+    doc.text('TIKTAK - BATERÍAS DE TAREAS', 14, 22);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(150);
+    doc.text(`Fecha de generación: ${today} | Control Semanal`, 14, 30);
+    
+    let yPos = 40;
+    
+    batteries.forEach((b, index) => {
+        if (yPos > 240) {
+            doc.addPage();
+            yPos = 20;
+        }
+        
+        doc.setFontSize(12);
+        doc.setTextColor(26, 54, 93);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${index + 1}. ${b.title.toUpperCase()}`, 14, yPos);
+        doc.setFontSize(8);
+        doc.setTextColor(100);
+        doc.text(`Periodo: ${format(parseISO(b.start_date), 'dd/MM')} al ${format(parseISO(b.end_date), 'dd/MM')}`, 14, yPos + 5);
+        
+        const tableData = (b.items || []).map(item => [
+            item.description,
+            item.is_done ? 'HECHA' : 'PENDIENTE',
+            item.completed_by || '---',
+            '[  ]'
+        ]);
+        
+        doc.autoTable({
+            startY: yPos + 8,
+            head: [['Tarea / Descripción', 'Estado', 'Empleado', 'Check Manual']],
+            body: tableData,
+            theme: 'grid',
+            headStyles: { fillColor: [26, 54, 93], fontSize: 8, fontStyle: 'bold' },
+            bodyStyles: { fontSize: 8 },
+            columnStyles: {
+                0: { cellWidth: 100 },
+                1: { cellWidth: 25 },
+                2: { cellWidth: 35 },
+                3: { cellWidth: 20, halign: 'center' }
+            }
+        });
+        
+        yPos = doc.lastAutoTable.finalY + 15;
+    });
+    
+    doc.save(`TikTak_Baterias_${today.replace(/\//g, '-')}.pdf`);
 };
 
 // --- MAIN PAGE ---
@@ -481,15 +544,39 @@ const GerenciaDashboard = ({ tasks, partners, movements, cashHistory, inventory,
         const months = [];
         for (let i = 5; i >= 0; i--) {
             const d = subMonths(new Date(), i);
-            months.push({ name: format(d, 'MMM', { locale: es }), monthKey: format(d, 'yyyy-MM'), margin: 0 });
+            months.push({ 
+                name: format(d, 'MMM', { locale: es }), 
+                monthKey: format(d, 'yyyy-MM'), 
+                margin: 0,
+                cash: 0,
+                goldIn: 0,
+                goldOut: 0
+            });
         }
+        
         smeltingMoves.forEach(m => {
             const mKey = m.date.substring(0, 7);
             const dataPoint = months.find(d => d.monthKey === mKey);
             if (dataPoint) dataPoint.margin += (Number(m.received_amount) - Number(m.acquisition_cost));
         });
+
+        safeHistory.forEach(h => {
+            const mKey = h.date.substring(0, 7);
+            const dataPoint = months.find(d => d.monthKey === mKey);
+            if (dataPoint) dataPoint.cash = Number(h.total || 0);
+        });
+
+        safeMovements.forEach(m => {
+            const mKey = m.date.substring(0, 7);
+            const dataPoint = months.find(d => d.monthKey === mKey);
+            if (dataPoint) {
+                if (m.type === 'Recepción' || m.type === 'Ajuste+') dataPoint.goldIn += Number(m.weight || 0);
+                if (m.type === 'Envío' || m.type === 'Fundición' || m.type === 'Ajuste-') dataPoint.goldOut += Number(m.weight || 0);
+            }
+        });
+
         return months;
-    }, [safeMovements]);
+    }, [safeMovements, safeHistory]);
 
     const donutData = (Array.isArray(inventory) ? inventory : []).map(item => ({
         name: item.category,
@@ -578,12 +665,74 @@ const GerenciaDashboard = ({ tasks, partners, movements, cashHistory, inventory,
                     <div><p className="text-3xl font-black text-[#FF8C9D]">+{formatPrice(lastSmeltMargin)} €</p><p className="text-xs text-[#A0AEC0] font-bold">Realizado</p></div>
                 </div>
             </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm">
+                    <div className="flex justify-between items-center mb-8">
+                        <div>
+                            <h3 className="text-sm font-black text-[#1A365D] uppercase tracking-tighter">Evolución de Caja (Arqueos)</h3>
+                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">Tendencia de fondos acumulados</p>
+                        </div>
+                        <div className="bg-green-50 text-green-600 px-3 py-1 rounded-lg text-[9px] font-black uppercase">Tendencia Estable</div>
+                    </div>
+                    <div className="h-[250px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={chartData}>
+                                <defs>
+                                    <linearGradient id="colorCash" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#10B981" stopOpacity={0.1}/>
+                                        <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F0F0F0" />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#A0AEC0'}} />
+                                <YAxis hide domain={['auto', 'auto']} />
+                                <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', fontWeight: 800 }} />
+                                <Area type="monotone" dataKey="cash" stroke="#10B981" strokeWidth={3} fillOpacity={1} fill="url(#colorCash)" />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                <div className="bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm">
+                    <div className="flex justify-between items-center mb-8">
+                        <div>
+                            <h3 className="text-sm font-black text-[#1A365D] uppercase tracking-tighter">Flujos de Metal (Mensual)</h3>
+                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">Entradas vs Salidas de Oro/Plata</p>
+                        </div>
+                        <div className="flex gap-4">
+                            <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-400"/><span className="text-[8px] font-black uppercase text-slate-400">IN</span></div>
+                            <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-coral-400"/><span className="text-[8px] font-black uppercase text-slate-400">OUT</span></div>
+                        </div>
+                    </div>
+                    <div className="h-[250px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chartData} barGap={4}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F0F0F0" />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#A0AEC0'}} />
+                                <YAxis hide />
+                                <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', fontWeight: 800 }} />
+                                <Bar dataKey="goldIn" fill="#60A5FA" radius={[4, 4, 0, 0]} barSize={10} />
+                                <Bar dataKey="goldOut" fill="#FF8C9D" radius={[4, 4, 0, 0]} barSize={10} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm">
-                    <h3 className="text-lg font-black text-[#1A365D] tracking-tighter mb-8">RENDIMIENTO HISTÓRICO</h3>
+                    <h3 className="text-lg font-black text-[#1A365D] tracking-tighter mb-8 lowercase">Margen de Afinaje (Realizado)</h3>
                     <div className="h-[300px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F0F0F0" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#A0AEC0'}} dy={10} /><YAxis hide /><Tooltip cursor={{fill: '#F8F9FB'}} contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', fontWeight: 800 }} /><Bar dataKey="margin" radius={[10, 10, 10, 10]} barSize={40}>{chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.margin > 0 ? '#FF8C9D' : '#E2E8F0'} />)}</Bar></BarChart>
+                            <BarChart data={chartData}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F0F0F0" />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#A0AEC0'}} dy={10} />
+                                <YAxis hide />
+                                <Tooltip cursor={{fill: '#F8F9FB'}} contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', fontWeight: 800 }} />
+                                <Bar dataKey="margin" radius={[10, 10, 10, 10]} barSize={40}>
+                                    {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.margin > 0 ? '#FF8C9D' : '#E2E8F0'} />)}
+                                </Bar>
+                            </BarChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
@@ -1405,13 +1554,13 @@ const JewelryView = ({ inventory, orders, partners, movements, onAddPartner, onE
                     </div>
                 </div>
             ) : (
-                <JewelryReport movements={safeMovements} partners={safePartners} />
+                <JewelryReport movements={safeMovements} partners={safePartners} inventory={safeInventory} />
             )}
         </div>
     );
 };
 
-const JewelryReport = ({ movements, partners }) => {
+const JewelryReport = ({ movements, partners, inventory }) => {
     const [filterPartner, setFilterPartner] = useState('all');
     
     const filteredMovements = useMemo(() => {
@@ -1444,7 +1593,7 @@ const JewelryReport = ({ movements, partners }) => {
     const totalStats = useMemo(() => {
         const res = { totalWeight: 0, totalCost: 0, receivedVal: 0, benefit: 0 };
         filteredMovements.forEach(m => {
-            if (m.type === 'Envío') res.totalWeight += Number(m.weight || 0);
+            if (m.type === 'Envío' || m.type === 'Fundición') res.totalWeight += Number(m.weight || 0);
             else if (m.type === 'Fundición' && m.status === 'Completado') {
                 const cost = Number(m.acquisition_cost || 0);
                 const received = Number(m.received_amount || 0);
@@ -1455,6 +1604,47 @@ const JewelryReport = ({ movements, partners }) => {
         });
         return res;
     }, [filteredMovements]);
+
+    // STOCK SUMMARY LOGIC
+    const stockSummary = useMemo(() => {
+        const summary = {};
+        GOLDSMITH_CATEGORIES.forEach(cat => {
+            summary[cat] = { in: 0, out: 0, current: 0, value: 0 };
+        });
+
+        // 1. Current Snapshot
+        Object.values(inventory || {}).forEach(item => {
+            if (summary[item.category]) {
+                summary[item.category].current = Number(item.total_weight || 0);
+                summary[item.category].value = Number(item.total_cost || 0);
+            }
+        });
+
+        // 2. Flows from Movements
+        movements.forEach(m => {
+            if (!m.inventory_category || !summary[m.inventory_category]) return;
+            const w = Number(m.weight || 0);
+            if (m.type === 'Recepción' || m.type === 'Ajuste+') {
+                summary[m.inventory_category].in += w;
+            } else if (m.type === 'Envío' || m.type === 'Fundición' || m.type === 'Ajuste-') {
+                summary[m.inventory_category].out += w;
+            }
+        });
+
+        return summary;
+    }, [inventory, movements]);
+
+    const partnerStats = useMemo(() => {
+        if (filterPartner === 'all') return null;
+        const p = partners.find(p => p.id.toString() === filterPartner);
+        if (!p) return null;
+
+        const pMoves = movements.filter(m => m.partner_id.toString() === filterPartner);
+        const sent = pMoves.filter(m => m.type === 'Envío').reduce((a, b) => a + Number(b.weight), 0);
+        const received = pMoves.filter(m => m.type === 'Recepción').reduce((a, b) => a + Number(b.weight), 0);
+
+        return { ...p, sent, received };
+    }, [filterPartner, partners, movements]);
 
     return (
         <div className="space-y-8 animate-in zoom-in duration-300">
@@ -1499,6 +1689,91 @@ const JewelryReport = ({ movements, partners }) => {
                 </div>
             </div>
 
+            {/* 1. STOCK SUMMARY TABLE */}
+            <div className="bg-white rounded-[40px] border border-[#E2E8F0] shadow-sm overflow-hidden">
+                <div className="p-8 border-b border-[#F4F7FA] bg-slate-50/50 flex justify-between items-center">
+                    <h4 className="text-xs font-black text-[#1A365D] uppercase tracking-widest flex items-center gap-2">
+                        Estado de Inventario (Real vs Flujos) <Package size={16} className="text-[#FF8C9D]"/>
+                    </h4>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left uppercase text-[9px] font-bold">
+                        <thead className="bg-white text-slate-400 border-b">
+                            <tr>
+                                <th className="p-6">Categoría</th>
+                                <th className="p-6 text-right">Peso Inicial*</th>
+                                <th className="p-6 text-right text-green-500">Entradas (+)</th>
+                                <th className="p-6 text-right text-[#FF8C9D]">Salidas (-)</th>
+                                <th className="p-6 text-right text-[#1A365D]">Stock Actual</th>
+                                <th className="p-6 text-right">Valorización (€)</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {GOLDSMITH_CATEGORIES.map(cat => {
+                                const s = stockSummary[cat];
+                                const initial = s.current - s.in + s.out;
+                                return ( initial > 0 || s.current > 0 || s.in > 0 || s.out > 0) && (
+                                    <tr key={cat} className="hover:bg-slate-50 transition-colors">
+                                        <td className="p-6">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[cat] }} />
+                                                <span className="font-black text-[#1A365D]">{cat}</span>
+                                            </div>
+                                        </td>
+                                        <td className="p-6 text-right text-slate-300">{initial.toFixed(2)}g</td>
+                                        <td className="p-6 text-right text-green-600 font-black">+{s.in.toFixed(2)}g</td>
+                                        <td className="p-6 text-right text-coral-400 font-black">-{s.out.toFixed(2)}g</td>
+                                        <td className="p-6 text-right font-black text-[#1A365D] bg-slate-50/50">{s.current.toFixed(2)}g</td>
+                                        <td className="p-6 text-right font-black text-[#1A365D]">{formatPrice(s.value)}€</td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                    <div className="p-4 bg-slate-100/50 text-[8px] text-slate-400 text-center font-black uppercase">
+                        * El Peso inicial se calcula retroactivamente basándose en el stock actual y los movimientos registrados.
+                    </div>
+                </div>
+            </div>
+
+            {/* 2. PARTNER DRILL-DOWN (If filtered) */}
+            {partnerStats && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in slide-in-from-top-4 duration-500">
+                    <div className="bg-white p-10 rounded-[40px] border border-[#E2E8F0] shadow-sm flex flex-col justify-center gap-6">
+                        <div className="flex items-center gap-6">
+                            <div className="w-20 h-20 bg-[#1A365D] text-white rounded-[32px] flex items-center justify-center font-black text-2xl uppercase shadow-xl shadow-blue-900/20">
+                                {partnerStats.name.substring(0, 2)}
+                            </div>
+                            <div>
+                                <h3 className="text-2xl font-black text-[#1A365D] tracking-tighter uppercase">{partnerStats.name}</h3>
+                                <p className="text-[10px] font-black text-[#FF8C9D] uppercase tracking-widest mt-1">Ficha Individual de Socio</p>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-slate-50 p-6 rounded-3xl">
+                                <span className="text-[8px] font-black text-slate-300 uppercase block mb-1">Gramos Enviados</span>
+                                <p className="text-xl font-black text-[#1A365D]">{partnerStats.sent.toFixed(2)}g</p>
+                            </div>
+                            <div className="bg-slate-50 p-6 rounded-3xl">
+                                <span className="text-[8px] font-black text-slate-300 uppercase block mb-1">Gramos Recibidos</span>
+                                <p className="text-xl font-black text-[#1A365D]">{partnerStats.received.toFixed(2)}g</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="bg-[#FF8C9D] p-10 rounded-[40px] shadow-2xl text-white relative overflow-hidden flex flex-col justify-center">
+                        <div className="relative z-10">
+                            <span className="text-[10px] font-black text-white/60 uppercase tracking-[0.2em] block mb-2">Estado de Deuda Actual</span>
+                            <h4 className="text-5xl font-black tracking-tighter">{Number(partnerStats.debt_grams).toFixed(2)}<span className="text-lg ml-1 opacity-70">gr</span></h4>
+                            <p className="text-xs font-bold mt-4 uppercase tracking-widest opacity-80 flex items-center gap-2">
+                                <Lock size={14}/> Referencia Base: Oro {partnerStats.debt_type}
+                            </p>
+                        </div>
+                        <Euro className="absolute -bottom-8 -right-8 text-white/10 w-48 h-48 rotate-12" />
+                    </div>
+                </div>
+            )}
+
             {Object.keys(groupedByMonth).map(month => (
                 <div key={month} className="bg-white rounded-[40px] border border-[#E2E8F0] shadow-sm overflow-hidden">
                     <div className="p-8 border-b border-[#F4F7FA] bg-slate-50/50 flex justify-between items-center">
@@ -1537,7 +1812,7 @@ const JewelryReport = ({ movements, partners }) => {
                                         <tr key={m.id} className="hover:bg-slate-50 transition-colors">
                                             <td className="p-4 font-black">{format(parseISO(m.date), 'dd/MM/yy')}</td>
                                             <td className="p-4">
-                                                <span className={`px-2 py-1 rounded-lg text-[8px] font-black ${m.type === 'Envío' ? 'bg-blue-50 text-blue-500' : 'bg-green-50 text-green-500'}`}>
+                                                <span className={`px-2 py-1 rounded-lg text-[8px] font-black ${m.type === 'Envío' ? 'bg-blue-50 text-blue-500' : m.type === 'Recepción' ? 'bg-amber-50 text-amber-500' : 'bg-green-50 text-green-500'}`}>
                                                     {m.type}
                                                 </span>
                                             </td>
@@ -1581,8 +1856,22 @@ const CashView = ({ history, onSave, employees, user }) => {
         observations: '',
         responsible_1: '',
         responsible_2: '',
-        is_closed: false
+        is_closed: false,
+        details: { bills: {}, coins: {}, others: 0 }
     });
+
+    const [counts, setCounts] = useState({
+        bills: BILLS.reduce((acc, b) => ({ ...acc, [b]: '' }), {}),
+        coins: COINS.reduce((acc, c) => ({ ...acc, [c]: '' }), {}),
+        others: ''
+    });
+
+    useEffect(() => {
+        const total = Object.entries(counts.bills).reduce((acc, [val, qty]) => acc + (Number(val) * Number(qty || 0)), 0) +
+                      Object.entries(counts.coins).reduce((acc, [val, qty]) => acc + (Number(val) * Number(qty || 0)), 0) +
+                      Number(counts.others || 0);
+        setData(prev => ({ ...prev, real_total: total, details: counts }));
+    }, [counts]);
 
     useEffect(() => {
         const log = safeHistory.find(l => l.date === localDate);
@@ -1617,7 +1906,8 @@ const CashView = ({ history, onSave, employees, user }) => {
             total: data.real_total,
             is_closed: isClosing,
             closed_at: isClosing ? new Date().toISOString() : null,
-            closed_by: user.username
+            closed_by: user.username,
+            metadata: JSON.stringify(data.details)
         });
     };
 
@@ -1734,13 +2024,13 @@ const CashView = ({ history, onSave, employees, user }) => {
                                 onClick={() => handleSave(false)} 
                                 className="flex-1 bg-white border-2 border-slate-100 py-5 rounded-[32px] font-black text-[11px] uppercase tracking-widest hover:bg-slate-50 transition-all"
                             >
-                                Guardar Borrador
+                                <Save size={16} className="inline mr-2"/> Guardar Borrador
                             </button>
                             <button 
-                                onClick={() => handleSave(true)} 
+                                onClick={() => confirm('¿Cerrar caja definitivamente?') && handleSave(true)} 
                                 className="flex-1 bg-[#1A365D] text-white py-5 rounded-[32px] font-black text-[11px] uppercase tracking-widest shadow-xl shadow-blue-900/20 hover:scale-[1.02] active:scale-95 transition-all"
                             >
-                                Cerrar y Firmar Caja
+                                <Lock size={16} className="inline mr-2"/> Cerrar y Firmar Caja
                             </button>
                         </div>
                     ) : (
@@ -1752,6 +2042,131 @@ const CashView = ({ history, onSave, employees, user }) => {
                             </div>
                         </div>
                     )}
+                </div>
+
+                {/* Calculadora de Fondos */}
+                <div className="bg-white p-10 rounded-[40px] border border-[#E2E8F0] shadow-sm">
+                    <h3 className="text-xs font-black text-[#1A365D] uppercase tracking-widest mb-8 flex items-center gap-2">
+                        Calculadora de Fondos <Euro size={16} className="text-[#FF8C9D]"/>
+                    </h3>
+                    <div className="grid grid-cols-2 gap-10">
+                        <div className="space-y-4">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b pb-2">Billetes</p>
+                            {BILLS.map(b => (
+                                <div key={b} className="flex items-center gap-3 group">
+                                    <span className="w-10 text-[10px] font-black text-slate-400">{b}€</span>
+                                    <input 
+                                        type="number" min="0" 
+                                        disabled={data.is_closed}
+                                        placeholder="Qty"
+                                        className="flex-1 bg-slate-50 border-none rounded-xl p-3 font-black text-[#1A365D] text-sm focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all" 
+                                        value={counts.bills[b]} 
+                                        onChange={e => setCounts({...counts, bills: {...counts.bills, [b]: e.target.value}})}
+                                    />
+                                    <span className="text-[10px] font-black text-slate-300 w-16 text-right">{(Number(counts.bills[b] || 0) * b).toFixed(2)}€</span>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="space-y-4">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b pb-2">Monedas</p>
+                            <div className="grid grid-cols-1 gap-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                                {COINS.map(c => (
+                                    <div key={c} className="flex items-center gap-3">
+                                        <span className="w-10 text-[10px] font-black text-slate-400">{c < 1 ? (c*100).toFixed(0)+'c' : c+'€'}</span>
+                                        <input 
+                                            type="number" min="0" 
+                                            disabled={data.is_closed}
+                                            placeholder="Qty"
+                                            className="flex-1 bg-slate-50 border-none rounded-xl p-3 font-black text-[#1A365D] text-sm focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all" 
+                                            value={counts.coins[c]} 
+                                            onChange={e => setCounts({...counts, coins: {...counts.coins, [c]: e.target.value}})}
+                                        />
+                                        <span className="text-[10px] font-black text-slate-300 w-16 text-right">{(Number(counts.coins[c] || 0) * c).toFixed(2)}€</span>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="pt-4 mt-4 border-t border-dashed">
+                                <label className="text-[9px] font-black text-slate-400 uppercase block mb-2">Otros / Vales / Tarjetas</label>
+                                <input 
+                                    type="number" step="0.01" 
+                                    disabled={data.is_closed}
+                                    placeholder="Importe extra..."
+                                    className="w-full bg-slate-100 border-none rounded-2xl p-4 font-black text-xl text-[#1A365D]" 
+                                    value={counts.others} 
+                                    onChange={e => setCounts({...counts, others: e.target.value})}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Historial de Auditoría (Audit Trail) */}
+            <div className="bg-white rounded-[40px] border border-[#E2E8F0] shadow-sm overflow-hidden">
+                <div className="p-8 border-b border-[#F4F7FA] flex justify-between items-center bg-slate-50/50">
+                    <div>
+                        <h3 className="text-xs font-black text-[#1A365D] uppercase tracking-widest flex items-center gap-2">
+                            Registro de Auditoría <BarChart3 size={16} className="text-blue-500"/>
+                        </h3>
+                        <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">Histórico de cierres y arqueos</p>
+                    </div>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead className="bg-[#F8F9FB] text-[9px] font-black text-slate-400 uppercase tracking-widest border-b">
+                            <tr>
+                                <th className="p-6">Fecha</th>
+                                <th className="p-6">Responsable</th>
+                                <th className="p-6 text-right">Teórico</th>
+                                <th className="p-6 text-right">Real</th>
+                                <th className="p-6 text-right">Diferencia</th>
+                                <th className="p-6">Incidencias</th>
+                                <th className="p-6 text-center">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-[10px] font-bold">
+                            {safeHistory.length === 0 ? (
+                                <tr><td colSpan="7" className="p-10 text-center text-slate-300 uppercase italic">No hay registros históricos</td></tr>
+                            ) : (
+                                safeHistory.map(h => {
+                                    const diffVal = Number(h.total || 0) - Number(h.expected_total || 0);
+                                    const hasIncidence = h.observations && h.observations.trim().length > 0;
+                                    const hasDiff = diffVal !== 0;
+                                    
+                                    return (
+                                        <tr key={h.id} className={`hover:bg-slate-50 transition-colors ${hasDiff || hasIncidence ? 'bg-coral-50/5' : ''}`}>
+                                            <td className="p-6 font-black text-[#1A365D]">{format(parseISO(h.date), 'dd/MM/yyyy')}</td>
+                                            <td className="p-6 text-slate-500">{h.responsible_1}</td>
+                                            <td className="p-6 text-right text-slate-400">{formatPrice(h.expected_total)}€</td>
+                                            <td className="p-6 text-right font-black text-[#1A365D] tracking-tighter text-xs">{formatPrice(h.total)}€</td>
+                                            <td className={`p-6 text-right font-black ${diffVal === 0 ? 'text-slate-200' : diffVal > 0 ? 'text-green-500' : 'text-[#FF8C9D]'}`}>
+                                                {diffVal > 0 ? '+' : ''}{diffVal.toFixed(2)}€
+                                            </td>
+                                            <td className="p-6">
+                                                <div className="flex items-center gap-2">
+                                                    {(hasDiff || hasIncidence) ? (
+                                                        <>
+                                                            <AlertCircle size={14} className="text-[#FF8C9D] shrink-0" />
+                                                            <span className="text-slate-400 truncate max-w-[150px] italic">{h.observations || 'Descuadre detectado'}</span>
+                                                        </>
+                                                    ) : (
+                                                        <span className="text-green-500/30">Sin incidencias</span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="p-6 text-center whitespace-nowrap">
+                                                {h.is_closed ? (
+                                                    <span className="bg-green-100 text-green-600 px-3 py-1.5 rounded-xl text-[8px] font-black uppercase shadow-sm">Cerrado</span>
+                                                ) : (
+                                                    <span className="bg-amber-100 text-amber-600 px-3 py-1.5 rounded-xl text-[8px] font-black uppercase shadow-sm">Abierto</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -2355,12 +2770,20 @@ const BatteriesView = ({ batteries, onAdd, onCheck, onDelete, hideHeader, isComp
                         </h2>
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Gestión de objetivos por periodos</p>
                     </div>
-                    <button 
-                        onClick={onAdd} 
-                        className="bg-[#1A365D] text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-blue-900/10 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2"
-                    >
-                        <Plus size={16} /> NUEVA BATERÍA
-                    </button>
+                    <div className="flex gap-4">
+                        <button 
+                            onClick={() => downloadWeeklyPDF(safeBatteries)}
+                            className="bg-white border-2 border-slate-100 text-[#1A365D] px-6 py-4 rounded-2xl font-black text-[10px] uppercase hover:bg-slate-50 transition-all flex items-center gap-2"
+                        >
+                            <CalendarIcon size={16} /> DESCARGAR PDF SEMANAL
+                        </button>
+                        <button 
+                            onClick={onAdd} 
+                            className="bg-[#1A365D] text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-blue-900/10 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2"
+                        >
+                            <Plus size={16} /> NUEVA BATERÍA
+                        </button>
+                    </div>
                 </div>
             )}
 

@@ -27,7 +27,9 @@ import {
     CheckCircle2,
     Layers,
     X,
-    Info
+    Info,
+    Package,
+    Camera
 } from 'lucide-react';
 import { 
     format, 
@@ -2485,7 +2487,6 @@ const BatteryItemCheckForm = ({ item, onConfirm, onCancel }) => {
     );
 };
 
-export default Gerencia;
 
 // --- GLOBAL MODAL COMPONENT (using Portals to avoid clipping) ---
 const GlobalModal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-xl' }) => {
@@ -2510,3 +2511,5 @@ const GlobalModal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-xl' }
         document.body
     );
 };
+
+export default Gerencia;

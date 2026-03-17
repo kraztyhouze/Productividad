@@ -95,19 +95,55 @@ router.put('/items/:itemId', async (req, res) => {
     }
 });
 
-// PUT update battery metadata
+// PUT update battery metadata and sync items
 router.put('/:id', async (req, res) => {
     const { id } = req.params;
-    const { title, start_date, end_date } = req.body;
+    const { title, start_date, end_date, items } = req.body;
+    const client = await pool.connect();
     try {
-        const result = await pool.query(
-            'UPDATE task_batteries SET title = $1, start_date = $2, end_date = $3 WHERE id = $4 RETURNING *',
+        await client.query('BEGIN');
+        
+        await client.query(
+            'UPDATE task_batteries SET title = $1, start_date = $2, end_date = $3 WHERE id = $4',
             [title, start_date, end_date, id]
         );
-        res.json(result.rows[0]);
+        
+        if (Array.isArray(items)) {
+            // Simple sync: get existing items
+            const existingRes = await client.query('SELECT description FROM battery_items WHERE battery_id = $1', [id]);
+            const existingDescs = existingRes.rows.map(r => r.description);
+            
+            // Add new ones
+            for (const itemDesc of items) {
+                if (!existingDescs.includes(itemDesc)) {
+                    await client.query(
+                        'INSERT INTO battery_items (battery_id, description) VALUES ($1, $2)',
+                        [id, itemDesc]
+                    );
+                }
+            }
+            
+            // Delete removed ones (only if they are NOT done, to preserve history)
+            // Or better, just delete if not in the new list and let the user decide.
+            // Requirement says "añadir y/o modificar tareas", so we'll delete those not in list.
+            for (const oldDesc of existingDescs) {
+                if (!items.includes(oldDesc)) {
+                    await client.query(
+                        'DELETE FROM battery_items WHERE battery_id = $1 AND description = $2 AND is_done = false',
+                        [id, oldDesc]
+                    );
+                }
+            }
+        }
+        
+        await client.query('COMMIT');
+        res.json({ success: true });
     } catch (err) {
+        await client.query('ROLLBACK');
         logError(err, `PUT /api/task-batteries/${id}`);
         res.status(500).json({ error: err.message });
+    } finally {
+        client.release();
     }
 });
 

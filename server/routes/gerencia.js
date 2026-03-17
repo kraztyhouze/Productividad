@@ -352,11 +352,11 @@ router.post('/goldsmith/movements', async (req, res) => {
 
 router.put('/goldsmith/movements/:id', async (req, res) => {
     const { id } = req.params;
-    const { status, refining_percentage, received_amount } = req.body;
+    const { status, refining_percentage, received_amount, acquisition_cost } = req.body;
     try {
         const result = await pool.query(
-            'UPDATE goldsmith_movements SET status=$1, refining_percentage=$2, received_amount=$3 WHERE id=$4 RETURNING *',
-            [status, refining_percentage, received_amount, id]
+            'UPDATE goldsmith_movements SET status=$1, refining_percentage=$2, received_amount=$3, acquisition_cost=COALESCE($4, acquisition_cost) WHERE id=$5 RETURNING *',
+            [status, refining_percentage, received_amount, acquisition_cost, id]
         );
         res.json(result.rows[0]);
     } catch (err) { 

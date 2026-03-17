@@ -141,61 +141,219 @@ const downloadCSV = (data, filename) => {
 };
 
 const downloadWeeklyPDF = (batteries) => {
-    const doc = new jsPDF();
-    const today = format(new Date(), 'dd/MM/yyyy');
-    
-    // Header
-    doc.setFontSize(22);
-    doc.setTextColor(26, 54, 93); // #1A365D
-    doc.text('TIKTAK - BATERÍAS DE TAREAS', 14, 22);
-    
-    doc.setFontSize(10);
-    doc.setTextColor(150);
-    doc.text(`Fecha de generación: ${today} | Control Semanal`, 14, 30);
-    
-    let yPos = 40;
-    
-    batteries.forEach((b, index) => {
-        if (yPos > 240) {
-            doc.addPage();
-            yPos = 20;
+    try {
+        const doc = new jsPDF();
+        const today = format(new Date(), 'dd/MM/yyyy');
+        
+        // --- CONFIG & STYLES ---
+        const primaryColor = [26, 54, 93]; // #1A365D
+        const accentColor = [255, 140, 157]; // #FF8C9D
+        
+        // Header Background
+        doc.setFillColor(248, 249, 251);
+        doc.rect(0, 0, 210, 40, 'F');
+        
+        // Title
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(24);
+        doc.setTextColor(...primaryColor);
+        doc.text('TIKTAK', 14, 22);
+        
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+        doc.setFont('helvetica', 'normal');
+        doc.text('SUITE DE GESTIÓN DE PRODUCTIVIDAD', 14, 28);
+        
+        // Right side header info
+        doc.setFontSize(9);
+        doc.setTextColor(150);
+        doc.text(`Generado: ${today}`, 196, 20, { align: 'right' });
+        doc.text('CONTROL OPERATIVO SEMANAL', 196, 25, { align: 'right' });
+        
+        let yPos = 50;
+        
+        if (!batteries || batteries.length === 0) {
+            doc.setFontSize(12);
+            doc.setTextColor(180);
+            doc.text('No hay baterías de tareas registradas para este periodo.', 14, 70);
+        } else {
+            batteries.forEach((b, index) => {
+                // Check page space
+                if (yPos > 240) {
+                    doc.addPage();
+                    yPos = 20;
+                }
+                
+                // Battery Title Block
+                doc.setFillColor(...primaryColor);
+                doc.rect(14, yPos, 182, 10, 'F');
+                
+                doc.setFontSize(11);
+                doc.setTextColor(255);
+                doc.setFont('helvetica', 'bold');
+                doc.text(`${index + 1}. ${b.title.toUpperCase()}`, 18, yPos + 6.5);
+                
+                doc.setFontSize(8);
+                doc.setTextColor(120);
+                doc.setFont('helvetica', 'normal');
+                const periodText = `Periodo: ${format(parseISO(b.start_date), 'dd/MM/yyyy')} al ${format(parseISO(b.end_date), 'dd/MM/yyyy')}`;
+                doc.text(periodText, 14, yPos + 15);
+                
+                const tableData = (b.items || []).map(item => [
+                    item.description.toUpperCase(),
+                    item.is_done ? 'FINALIZADA' : 'PENDIENTE',
+                    (item.completed_by || 'POR ASIGNAR').toUpperCase(),
+                    '[       ]'
+                ]);
+                
+                doc.autoTable({
+                    startY: yPos + 18,
+                    head: [['DESCRIPCIÓN DE LA TAREA / OBJETIVO', 'ESTADO', 'FIRMA/RESPONSABLE', 'CHECK']],
+                    body: tableData,
+                    theme: 'striped',
+                    headStyles: { 
+                        fillColor: [60, 80, 110], 
+                        fontSize: 8, 
+                        fontStyle: 'bold',
+                        halign: 'left',
+                        cellPadding: 4
+                    },
+                    bodyStyles: { 
+                        fontSize: 8,
+                        textColor: 50,
+                        cellPadding: 3
+                    },
+                    columnStyles: {
+                        0: { cellWidth: 95 },
+                        1: { cellWidth: 25, halign: 'center' },
+                        2: { cellWidth: 40 },
+                        3: { cellWidth: 22, halign: 'center' }
+                    },
+                    didDrawPage: (data) => {
+                        // Footer on each page
+                        doc.setFontSize(7);
+                        doc.setTextColor(200);
+                        doc.text(`Página ${doc.internal.getNumberOfPages()}`, 196, 285, { align: 'right' });
+                        doc.text('TikTak Suite - Informe Confidencial de Gerencia', 14, 285);
+                    }
+                });
+                
+                yPos = doc.lastAutoTable.finalY + 20;
+            });
         }
         
-        doc.setFontSize(12);
-        doc.setTextColor(26, 54, 93);
+        doc.save(`TikTak_Baterias_${today.replace(/\//g, '-')}.pdf`);
+    } catch (error) {
+        console.error("Critical error generating PDF:", error);
+        alert("Error al generar el PDF. Verifica la consola para más detalles.");
+    }
+};
+
+const downloadCashPDF = (history) => {
+    try {
+        const doc = new jsPDF();
+        const today = format(new Date(), 'dd/MM/yyyy');
+        
+        // Header Setup
+        doc.setFillColor(26, 52, 92);
+        doc.rect(0, 0, 210, 45, 'F');
+        
+        doc.setFontSize(26);
+        doc.setTextColor(255);
         doc.setFont('helvetica', 'bold');
-        doc.text(`${index + 1}. ${b.title.toUpperCase()}`, 14, yPos);
-        doc.setFontSize(8);
-        doc.setTextColor(100);
-        doc.text(`Periodo: ${format(parseISO(b.start_date), 'dd/MM')} al ${format(parseISO(b.end_date), 'dd/MM')}`, 14, yPos + 5);
+        doc.text('TIKTAK', 14, 25);
         
-        const tableData = (b.items || []).map(item => [
-            item.description,
-            item.is_done ? 'HECHA' : 'PENDIENTE',
-            item.completed_by || '---',
-            '[  ]'
-        ]);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'normal');
+        doc.text('REPORTE DE AUDITORÍA DE CAJA (ARQUEOS)', 14, 34);
         
+        doc.setFontSize(9);
+        doc.text(`Fecha Emisión: ${today}`, 196, 25, { align: 'right' });
+        doc.text('CONTROL FINANCIERO INTERNO', 196, 31, { align: 'right' });
+
+        const tableData = (history || []).map(h => {
+            const diff = Number(h.total || 0) - Number(h.expected_total || 0);
+            return [
+                format(parseISO(h.date), 'dd/MM/yyyy'),
+                h.responsible_1 || '---',
+                `${formatPrice(h.expected_total)}€`,
+                `${formatPrice(h.total)}€`,
+                { content: `${diff > 0 ? '+' : ''}${formatPrice(diff)}€`, styles: { textColor: diff < 0 ? [220, 38, 38] : diff > 0 ? [22, 163, 74] : [100, 100, 100] } },
+                h.observations || 'Sin incidencias'
+            ];
+        });
+
         doc.autoTable({
-            startY: yPos + 8,
-            head: [['Tarea / Descripción', 'Estado', 'Empleado', 'Check Manual']],
+            startY: 55,
+            head: [['FECHA', 'RESPONSABLE', 'SISTEMA', 'CONTADO', 'DIFERENCIA', 'OBSERVACIONES']],
             body: tableData,
             theme: 'grid',
-            headStyles: { fillColor: [26, 54, 93], fontSize: 8, fontStyle: 'bold' },
-            bodyStyles: { fontSize: 8 },
+            headStyles: { fillColor: [248, 249, 251], textColor: [26, 52, 92], fontStyle: 'bold', fontSize: 9 },
+            bodyStyles: { fontSize: 8, cellPadding: 4 },
             columnStyles: {
-                0: { cellWidth: 100 },
-                1: { cellWidth: 25 },
-                2: { cellWidth: 35 },
-                3: { cellWidth: 20, halign: 'center' }
+                2: { halign: 'right' },
+                3: { halign: 'right', fontStyle: 'bold' },
+                4: { halign: 'right', fontStyle: 'bold' },
+                5: { cellWidth: 50 }
             }
         });
-        
-        yPos = doc.lastAutoTable.finalY + 15;
-    });
-    
-    doc.save(`TikTak_Baterias_${today.replace(/\//g, '-')}.pdf`);
+
+        doc.save(`TikTak_Arqueos_${today.replace(/\//g, '-')}.pdf`);
+    } catch (e) { console.error(e); }
 };
+
+const downloadJewelryPDF = (movements) => {
+    try {
+        const doc = new jsPDF('l', 'mm', 'a4');
+        const today = format(new Date(), 'dd/MM/yyyy');
+        
+        doc.setFillColor(255, 140, 157); // #FF8C9D
+        doc.rect(0, 0, 297, 40, 'F');
+        
+        doc.setFontSize(28);
+        doc.setTextColor(255);
+        doc.setFont('helvetica', 'bold');
+        doc.text('TIKTAK JOYERÍA', 14, 25);
+        
+        doc.setFontSize(12);
+        doc.text('HISTORIAL DE MOVIMIENTOS Y RENTABILIDAD', 14, 33);
+
+        const tableData = (movements || []).map(m => {
+            const cost = Number(m.acquisition_cost || 0);
+            const rec = Number(m.received_amount || 0);
+            const benefit = rec > 0 ? (rec - cost) : 0;
+            return [
+                format(parseISO(m.date), 'dd/MM/yyyy'),
+                m.type.toUpperCase(),
+                (m.inventory_category || 'N/A').toUpperCase(),
+                (m.partner_name || '---').toUpperCase(),
+                `${m.weight}g`,
+                cost > 0 ? `${formatPrice(cost)}€` : '---',
+                rec > 0 ? `${formatPrice(rec)}€` : '---',
+                benefit !== 0 ? { content: `${benefit > 0 ? '+' : ''}${formatPrice(benefit)}€`, styles: { textColor: benefit > 0 ? [22, 163, 74] : [200, 0, 0], fontStyle: 'bold' } } : '---',
+                m.status || '---'
+            ];
+        });
+
+        doc.autoTable({
+            startY: 50,
+            head: [['FECHA', 'TIPO', 'CAT.', 'SOCIO', 'PESO', 'COSTE ADQ.', 'VALOR FINAL', 'BENEFICIO', 'ESTADO']],
+            body: tableData,
+            theme: 'striped',
+            headStyles: { fillColor: [30, 30, 30], fontSize: 8 },
+            bodyStyles: { fontSize: 8 },
+            columnStyles: {
+                4: { halign: 'right' },
+                5: { halign: 'right' },
+                6: { halign: 'right' },
+                7: { halign: 'right' }
+            }
+        });
+
+        doc.save(`TikTak_Joyería_${today.replace(/\//g, '-')}.pdf`);
+    } catch (e) { console.error(e); }
+};
+
 
 // --- MAIN PAGE ---
 const Gerencia = () => {
@@ -329,10 +487,10 @@ const Gerencia = () => {
         else { const err = await res.json(); alert('Error: ' + (err.error || 'Server error')); }
     };
 
-    const handleUpdateSmelt = async (moveId, refining, received) => {
+    const handleUpdateSmelt = async (moveId, refining, received, cost) => {
         const res = await fetch(`/api/gerencia/goldsmith/movements/${moveId}`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore },
-            body: JSON.stringify({ status: 'Completado', refining_percentage: refining, received_amount: received })
+            body: JSON.stringify({ status: 'Completado', refining_percentage: refining, received_amount: received, acquisition_cost: cost })
         });
         if (res.ok) { setModal({ type: null, data: null }); loadData(); }
     };
@@ -1955,31 +2113,48 @@ const ReportsView = ({ batteries, cashHistory, movements, partners }) => {
                     </button>
                 </div>
 
-                {/* ARQUEOS EXCEL/CSV */}
+                {/* ARQUEOS PDF */}
                 <div className="bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm hover:shadow-xl transition-all group">
-                    <div className="w-14 h-14 bg-green-50 text-green-500 rounded-2xl flex items-center justify-center mb-6"><Table size={28}/></div>
-                    <h3 className="text-lg font-black text-[#1A365D] uppercase mb-2">Histórico de Arqueos</h3>
-                    <p className="text-xs text-slate-400 font-bold mb-8">Listado completo de cierres de caja, descuadres y responsables en formato Excel/CSV.</p>
-                    <button 
-                        onClick={handleDownloadCashCSV}
-                        className="w-full py-4 border-2 border-[#1A365D] text-[#1A365D] rounded-2xl font-black text-[10px] uppercase flex items-center justify-center gap-3 hover:bg-[#1A365D] hover:text-white transition-all"
-                    >
-                        <Download size={16}/> DESCARGAR EXCEL / CSV
-                    </button>
+                    <div className="w-14 h-14 bg-green-50 text-green-500 rounded-2xl flex items-center justify-center mb-6"><Calculator size={28}/></div>
+                    <h3 className="text-lg font-black text-[#1A365D] uppercase mb-2">Informe Arqueos</h3>
+                    <p className="text-xs text-slate-400 font-bold mb-8">PDF profesional con el histórico de cierres de caja, descuadres y auditoría de firmas.</p>
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={() => downloadCashPDF(safeHistory)}
+                            className="flex-1 py-4 bg-[#1A365D] text-white rounded-2xl font-black text-[10px] uppercase flex items-center justify-center gap-3 group-hover:bg-green-600 transition-colors"
+                        >
+                            <Download size={16}/> PDF
+                        </button>
+                        <button 
+                            onClick={handleDownloadCashCSV}
+                            className="px-4 py-4 border-2 border-slate-100 text-slate-400 rounded-2xl font-black text-[10px] uppercase hover:bg-slate-50 transition-all"
+                        >
+                            CSV
+                        </button>
+                    </div>
                 </div>
 
-                {/* JOYERÍA EXCEL/CSV */}
+                {/* JOYERÍA PDF */}
                 <div className="bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm hover:shadow-xl transition-all group">
                     <div className="w-14 h-14 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center mb-6"><Pocket size={28}/></div>
-                    <h3 className="text-lg font-black text-[#1A365D] uppercase mb-2">Movimientos Joyería</h3>
-                    <p className="text-xs text-slate-400 font-bold mb-8">Reporte de fundiciones, recepciones y balances por socio para conciliación externa.</p>
-                    <button 
-                        onClick={handleDownloadJewelryCSV}
-                        className="w-full py-4 border-2 border-[#1A365D] text-[#1A365D] rounded-2xl font-black text-[10px] uppercase flex items-center justify-center gap-3 hover:bg-[#1A365D] hover:text-white transition-all"
-                    >
-                        <Download size={16}/> DESCARGAR EXCEL / CSV
-                    </button>
+                    <h3 className="text-lg font-black text-[#1A365D] uppercase mb-2">Informe Joyería</h3>
+                    <p className="text-xs text-slate-400 font-bold mb-8">Reporte corporativo en PDF de fundiciones, beneficios y balances de metales por socio.</p>
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={() => downloadJewelryPDF(safeMovements)}
+                            className="flex-1 py-4 bg-[#1A365D] text-white rounded-2xl font-black text-[10px] uppercase flex items-center justify-center gap-3 group-hover:bg-amber-500 transition-colors"
+                        >
+                            <Download size={16}/> PDF
+                        </button>
+                        <button 
+                            onClick={handleDownloadJewelryCSV}
+                            className="px-4 py-4 border-2 border-slate-100 text-slate-400 rounded-2xl font-black text-[10px] uppercase hover:bg-slate-50 transition-all"
+                        >
+                            CSV
+                        </button>
+                    </div>
                 </div>
+
             </div>
         </div>
     );
@@ -2731,10 +2906,11 @@ const MovementForm = ({ type: movType, partners, onSave, onCancel }) => {
 
             {movType === 'Fundición' && (
                 <div className="bg-blue-50/50 p-6 rounded-3xl border border-blue-100">
-                    <label className="text-[10px] font-black text-blue-400 uppercase block mb-2">Coste Total de la Operativa (€)</label>
-                    <input type="number" step="0.01" required className="w-full bg-white border-2 border-transparent focus:border-blue-300 rounded-xl p-4 font-black text-blue-900" placeholder="Ej: 4500.00" value={data.total_cost} onChange={e => setData({...data, total_cost: e.target.value})}/>
+                    <label className="text-[10px] font-black text-blue-400 uppercase block mb-2">Coste de Adquisición / Envío (€) <span className="text-[8px] opacity-60">(Opcional si se introduce al refinar)</span></label>
+                    <input type="number" step="0.01" className="w-full bg-white border-2 border-transparent focus:border-blue-300 rounded-xl p-4 font-black text-blue-900" placeholder="Ej: 4500.00" value={data.total_cost} onChange={e => setData({...data, total_cost: e.target.value})}/>
                 </div>
             )}
+
 
             <div className="pt-2 flex justify-between font-black text-[10px] uppercase px-2 text-slate-400">
                 <span>Total Peso Real: {totalW.toFixed(2)}g</span>
@@ -2827,17 +3003,42 @@ const MovementForm = ({ type: movType, partners, onSave, onCancel }) => {
 };
 
 const RefineForm = ({ movement, onSave, onCancel }) => {
-    const [ref, setRef] = useState('');
-    const [rec, setRec] = useState('');
+    const [ref, setRef] = useState(movement.refining_percentage || '');
+    const [rec, setRec] = useState(movement.received_amount || '');
+    const [cost, setCost] = useState(movement.acquisition_cost || '');
+
     return (
-        <form onSubmit={(e) => { e.preventDefault(); onSave(movement.id, ref, rec); }} className="space-y-6">
-            <div className="text-center mb-6"><div className="p-4 bg-coral-50 text-[#FF8C9D] rounded-full w-fit mx-auto mb-2"><TrendingUp/></div><p className="text-xs font-black text-slate-400">{movement.partner_name} | {movement.weight}g</p></div>
-            <div><label className="text-[10px] font-black text-slate-400 block mb-1 uppercase">Afinaje Resultante (%)</label><input type="number" step="0.1" required className="w-full bg-slate-50 rounded-2xl p-4 text-center font-black" value={ref} onChange={e => setRef(e.target.value)}/></div>
-            <div><label className="text-[10px] font-black text-slate-400 block mb-1 uppercase">Importe Final (€)</label><input type="number" step="0.01" required className="w-full bg-slate-50 rounded-2xl p-4 text-center font-black text-green-600" value={rec} onChange={e => setRec(e.target.value)}/></div>
-            <button type="submit" className="w-full py-5 bg-[#FF8C9D] text-white rounded-3xl font-black text-xs uppercase shadow-xl hover:scale-[1.02] transition-all">FINALIZAR Y ARCHIVAR</button>
+        <form onSubmit={(e) => { e.preventDefault(); onSave(movement.id, ref, rec, cost); }} className="space-y-6">
+            <div className="text-center mb-6">
+                <div className="p-4 bg-coral-50 text-[#FF8C9D] rounded-full w-fit mx-auto mb-2"><TrendingUp/></div>
+                <p className="text-xs font-black text-slate-400">{movement.partner_name} | {movement.weight}g</p>
+            </div>
+            
+            <div className="grid grid-cols-1 gap-4">
+                <div>
+                    <label className="text-[10px] font-black text-slate-400 block mb-1 uppercase">Afinaje Resultante (%)</label>
+                    <input type="number" step="0.1" required className="w-full bg-slate-50 rounded-2xl p-4 text-center font-black" value={ref} onChange={e => setRef(e.target.value)}/>
+                </div>
+                
+                <div>
+                    <label className="text-[10px] font-black text-slate-400 block mb-1 uppercase">Coste de Adquisición Total (€)</label>
+                    <input type="number" step="0.01" required className="w-full bg-slate-50 rounded-2xl p-4 text-center font-black text-blue-600" value={cost} onChange={e => setCost(e.target.value)}/>
+                    <p className="text-[8px] text-slate-300 mt-1 italic uppercase text-center">Puedes modificarlo si varió desde el envío</p>
+                </div>
+
+                <div>
+                    <label className="text-[10px] font-black text-slate-400 block mb-1 uppercase">Importe Final Recibido (€)</label>
+                    <input type="number" step="0.01" required className="w-full bg-slate-50 rounded-2xl p-4 text-center font-black text-green-600" value={rec} onChange={e => setRec(e.target.value)}/>
+                </div>
+            </div>
+
+            <button type="submit" className="w-full py-5 bg-[#FF8C9D] text-white rounded-3xl font-black text-xs uppercase shadow-xl hover:scale-102 transition-all">
+                FINALIZAR Y ARCHIVAR
+            </button>
         </form>
     );
 };
+
 
 const OrderForm = ({ partners, onSave, onCancel }) => {
     const [data, setData] = useState({
@@ -3063,7 +3264,9 @@ const BatteryForm = ({ initialData, onSave, onCancel }) => {
     const [title, setTitle] = useState(initialData?.title || '');
     const [startDate, setStartDate] = useState(initialData?.start_date || format(new Date(), 'yyyy-MM-dd'));
     const [endDate, setEndDate] = useState(initialData?.end_date || format(addMonths(new Date(), 1), 'yyyy-MM-dd'));
-    const [items, setItems] = useState(initialData ? [] : ['', '', '']); // Only for new batteries
+    
+    // Support for editing items in existing batteries
+    const [items, setItems] = useState(initialData?.items?.map(i => i.description) || ['', '', '']);
 
     const handleItemChange = (idx, val) => {
         const ni = [...items];
@@ -3075,16 +3278,17 @@ const BatteryForm = ({ initialData, onSave, onCancel }) => {
     const removeItem = (idx) => setItems(items.filter((_, i) => i !== idx));
 
     return (
-        <form onSubmit={(e) => { 
+        <form onSubmit={async (e) => { 
             e.preventDefault(); 
             const filteredItems = items.filter(i => i.trim() !== '');
-            if (!initialData && filteredItems.length === 0) return alert('Debes añadir al menos una tarea.');
+            if (filteredItems.length === 0) return alert('Debes añadir al menos una tarea.');
+            
             onSave({ 
                 id: initialData?.id,
                 title, 
                 start_date: startDate, 
                 end_date: endDate, 
-                items: initialData ? undefined : filteredItems 
+                items: filteredItems 
             });
         }} className="space-y-8">
             <div className="grid grid-cols-1 gap-6">
@@ -3103,43 +3307,45 @@ const BatteryForm = ({ initialData, onSave, onCancel }) => {
                     </div>
                 </div>
 
-                {!initialData && (
-                    <div className="space-y-4 pt-4">
-                        <div className="flex justify-between items-center px-1">
-                            <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest">Lista de Tareas Iniciales ({items.filter(i => i.trim()).length})</label>
-                            <button type="button" onClick={addItem} className="text-[9px] font-black text-[#FF8C9D] bg-coral-50 hover:bg-coral-100 px-4 py-2 rounded-xl transition-all uppercase tracking-widest">+ AÑADIR FILA</button>
-                        </div>
-                        <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
-                            {items.map((item, idx) => (
-                                <div key={idx} className="flex gap-3 group">
-                                    <div className="bg-slate-50 flex-1 flex items-center rounded-2xl overflow-hidden focus-within:ring-2 focus-within:ring-[#1A365D]/10 transition-all">
-                                        <span className="pl-5 text-[10px] font-black text-slate-300">{idx + 1}.</span>
-                                        <input 
-                                            type="text" 
-                                            placeholder={`Tarea a realizar...`}
-                                            className="w-full bg-transparent border-none p-5 font-bold text-xs outline-none" 
-                                            value={item} 
-                                            onChange={e => handleItemChange(idx, e.target.value)}
-                                        />
-                                    </div>
-                                    {items.length > 1 && (
-                                        <button type="button" onClick={() => removeItem(idx)} className="text-slate-300 hover:text-red-400 p-2 transition-colors"><Trash2 size={18}/></button>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
+                <div className="space-y-4 pt-4">
+                    <div className="flex justify-between items-center px-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest">Lista de Tareas ({items.filter(i => i.trim()).length})</label>
+                        <button type="button" onClick={addItem} className="text-[9px] font-black text-[#FF8C9D] bg-coral-50 hover:bg-coral-100 px-4 py-2 rounded-xl transition-all uppercase tracking-widest">+ AÑADIR TAREA</button>
                     </div>
-                )}
+                    <div className="space-y-3 max-h-[350px] overflow-y-auto custom-scrollbar pr-2">
+                        {items.map((item, idx) => (
+                            <div key={idx} className="flex gap-3 group">
+                                <div className="bg-slate-50 flex-1 flex items-center rounded-2xl overflow-hidden focus-within:ring-2 focus-within:ring-[#1A365D]/10 transition-all">
+                                    <span className="pl-5 text-[10px] font-black text-slate-300">{idx + 1}.</span>
+                                    <input 
+                                        type="text" 
+                                        placeholder={`Tarea a realizar...`}
+                                        className="w-full bg-transparent border-none p-5 font-bold text-xs outline-none" 
+                                        value={item} 
+                                        onChange={e => handleItemChange(idx, e.target.value)}
+                                    />
+                                </div>
+                                {items.length > 1 && (
+                                    <button type="button" onClick={() => removeItem(idx)} className="text-slate-300 hover:text-red-400 p-2 transition-colors"><Trash2 size={18}/></button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                    {initialData && (
+                        <p className="text-[8px] text-slate-400 italic text-center uppercase">Aviso: Al editar una batería existente, las tareas marcadas como hechas se mantendrán si su descripción coincide exactamente.</p>
+                    )}
+                </div>
             </div>
             <div className="flex gap-4 pt-4 shrink-0">
                 <button type="button" onClick={onCancel} className="flex-1 py-5 font-black text-[10px] text-slate-400 uppercase tracking-widest">CANCELAR</button>
                 <button type="submit" className="flex-1 py-5 bg-[#1A365D] text-white rounded-[32px] font-black text-[10px] uppercase tracking-widest shadow-xl shadow-blue-900/10 hover:scale-[1.01] transition-all">
-                    {initialData ? 'GUARDAR CAMBIOS' : 'CREAR BATERÍA'}
+                    {initialData ? 'ACTUALIZAR BATERÍA Y TAREAS' : 'CREAR BATERÍA'}
                 </button>
             </div>
         </form>
     );
 };
+
 
 const BatteryItemForm = ({ batteryId, onSave, onCancel }) => {
     const [description, setDescription] = useState('');

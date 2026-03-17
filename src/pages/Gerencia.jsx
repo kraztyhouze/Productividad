@@ -592,7 +592,7 @@ const AccountStatusWidget = ({ partners }) => {
                 <div className="bg-white p-6 rounded-[32px] shadow-2xl border border-[#E2E8F0] w-80 mb-2 animate-in slide-in-from-bottom-4 duration-300">
                     <h4 className="text-[10px] font-black text-[#A0AEC0] uppercase tracking-widest mb-4">Liquidaciones Pendientes</h4>
                     <div className="max-h-60 overflow-y-auto pr-2 custom-scrollbar space-y-3">
-                        {partners.filter(p => Number(p.debt_grams) > 0).map(p => (
+                        {(partners || []).filter(p => Number(p.debt_grams) > 0).map(p => (
                             <div key={p.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-2xl">
                                 <span className="text-[10px] font-black text-[#1A365D] uppercase truncate w-2/3">{p.name}</span>
                                 <span className="text-[10px] font-black text-[#FF8C9D]">{Number(p.debt_grams).toFixed(2)}g</span>
@@ -668,7 +668,7 @@ const DailyTimelineView = ({ tasks, employees, onEdit, onToggleStatus }) => {
     );
 };
 
-const TasksView = ({ tasks, batteries, onEdit, onAdd, onAddBattery, onCheckBattery, onDeleteBattery, loadData, currentStore, employees }) => {
+const TasksView = ({ tasks, batteries, onEdit, onAdd, onAddBattery, onCheckBattery, onDeleteBattery, loadData, currentStore, employees, partners }) => {
     const safeTasks = Array.isArray(tasks) ? tasks : [];
     const [month, setMonth] = useState(new Date());
     const [selectedTask, setSelectedTask] = useState(null);

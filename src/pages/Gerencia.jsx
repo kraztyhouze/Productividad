@@ -29,7 +29,10 @@ import {
     X,
     Info,
     Package,
-    Camera
+    Camera,
+    FileText,
+    Download,
+    Table
 } from 'lucide-react';
 import { 
     format, 
@@ -118,6 +121,23 @@ const compressImage = (file, maxWidth = 800) => {
             };
         };
     });
+};
+
+const downloadCSV = (data, filename) => {
+    if (!data || !data.length) return;
+    const headers = Object.keys(data[0]).join(',');
+    const rows = data.map(row => 
+        Object.values(row).map(value => `"${String(value).replace(/"/g, '""')}"`).join(',')
+    );
+    const content = [headers, ...rows].join('\n');
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${filename}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 };
 
 const downloadWeeklyPDF = (batteries) => {
@@ -408,9 +428,33 @@ const Gerencia = () => {
         }
     };
 
+    const handleSaveBatteryItem = async (itemData) => {
+        const res = await fetch(`/api/task-batteries/${itemData.battery_id}/items`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore },
+            body: JSON.stringify({ description: itemData.description })
+        });
+        if (res.ok) { setModal({ type: null, data: null }); loadData(); }
+    };
+
+    const handleDeleteBatteryItem = async (itemId) => {
+        if (!confirm('¿Eliminar esta tarea de la batería?')) return;
+        const res = await fetch(`/api/task-batteries/items/${itemId}`, {
+            method: 'DELETE', headers: { 'x-store-id': currentStore }
+        });
+        if (res.ok) loadData();
+    };
+
+    const cumulativeCashDiff = useMemo(() => {
+        const currentYear = new Date().getFullYear();
+        return (Array.isArray(cashHistory) ? cashHistory : [])
+            .filter(h => new Date(h.date).getFullYear() === currentYear && h.is_closed)
+            .reduce((acc, h) => acc + (Number(h.total || 0) - Number(h.expected_total || 0)), 0);
+    }, [cashHistory]);
+
     const tabs = [
         { id: 'summary', label: 'Resumen', icon: BarChart3 },
         { id: 'tasks', label: 'Agenda', icon: CalendarIcon },
+        { id: 'reports', label: 'Informes', icon: FileText },
         { id: 'jewelry', label: 'Joyería', icon: Pocket },
         { id: 'cash', label: 'Fondos', icon: Calculator }
     ];
@@ -438,7 +482,8 @@ const Gerencia = () => {
             </div>
 
             <div className="min-h-[70vh]">
-                {activeTab === 'summary' && <GerenciaDashboard tasks={tasks} partners={partners} movements={movements} cashHistory={cashHistory} inventory={inventory} orders={orders} />}
+                {activeTab === 'summary' && <GerenciaDashboard tasks={tasks} partners={partners} movements={movements} cashHistory={cashHistory} inventory={inventory} orders={orders} cumulativeCashDiff={cumulativeCashDiff} />}
+                {activeTab === 'reports' && <ReportsView batteries={batteries} cashHistory={cashHistory} movements={movements} partners={partners} />}
                 {activeTab === 'tasks' && (
                     <TasksView 
                         tasks={tasks} 
@@ -448,6 +493,9 @@ const Gerencia = () => {
                         onEdit={(t) => setModal({ type: 'task', data: t })} 
                         onAdd={() => setModal({ type: 'task', data: null })} 
                         onAddBattery={() => setModal({ type: 'battery', data: null })}
+                        onEditBattery={(b) => setModal({ type: 'battery', data: b })}
+                        onAddBatteryItem={(bId) => setModal({ type: 'battery_item', data: { battery_id: bId } })}
+                        onDeleteBatteryItem={handleDeleteBatteryItem}
                         onCheckBattery={(item) => setModal({ type: 'battery_item_check', data: item })}
                         onDeleteBattery={handleDeleteBattery}
                         loadData={loadData} 
@@ -471,7 +519,7 @@ const Gerencia = () => {
                         onAdjustInventory={(cat) => setModal({ type: 'inventory_adjust', data: cat })}
                     />
                 )}
-                {activeTab === 'cash' && <CashView history={Array.isArray(cashHistory) ? cashHistory : []} employees={employees} onSave={handleSaveCash} user={user} />}
+                {activeTab === 'cash' && <CashView history={Array.isArray(cashHistory) ? cashHistory : []} employees={employees} onSave={handleSaveCash} user={user} cumulativeCashDiff={cumulativeCashDiff} />}
             </div>
 
             <GlobalModal isOpen={modal.type === 'task'} onClose={() => setModal({ type: null, data: null })} title={modal.data ? 'Editar Tarea' : 'Nueva Tarea'}>
@@ -496,8 +544,12 @@ const Gerencia = () => {
                 <RefineForm movement={modal.data} onSave={handleUpdateSmelt} onCancel={() => setModal({ type: null, data: null })} />
             </GlobalModal>
 
-            <GlobalModal isOpen={modal.type === 'battery'} onClose={() => setModal({ type: null, data: null })} title="Nueva Batería de Tareas">
-                <BatteryForm onSave={handleSaveBattery} onCancel={() => setModal({ type: null, data: null })} />
+            <GlobalModal isOpen={modal.type === 'battery'} onClose={() => setModal({ type: null, data: null })} title={modal.data ? "Editar Batería" : "Nueva Batería de Tareas"}>
+                <BatteryForm initialData={modal.data} onSave={handleSaveBattery} onCancel={() => setModal({ type: null, data: null })} />
+            </GlobalModal>
+
+            <GlobalModal isOpen={modal.type === 'battery_item'} onClose={() => setModal({ type: null, data: null })} title="Añadir Tarea Extra">
+                <BatteryItemForm batteryId={modal.data?.battery_id} onSave={handleSaveBatteryItem} onCancel={() => setModal({ type: null, data: null })} />
             </GlobalModal>
 
             <GlobalModal isOpen={modal.type === 'battery_item_check'} onClose={() => setModal({ type: null, data: null })} title="Confirmar Tarea Realizada">
@@ -521,7 +573,7 @@ const Gerencia = () => {
 
 // --- SUB-COMPONENTS/VIEWS ---
 
-const GerenciaDashboard = ({ tasks, partners, movements, cashHistory, inventory, orders }) => {
+const GerenciaDashboard = ({ tasks, partners, movements, cashHistory, inventory, orders, cumulativeCashDiff }) => {
     const safeHistory = Array.isArray(cashHistory) ? cashHistory : [];
     const safeMovements = Array.isArray(movements) ? movements : [];
     const safeTasks = Array.isArray(tasks) ? tasks : [];
@@ -657,8 +709,13 @@ const GerenciaDashboard = ({ tasks, partners, movements, cashHistory, inventory,
                     <div><p className="text-3xl font-black text-amber-600">{formatWeight(totalDebt)}</p><p className="text-xs text-[#A0AEC0] font-bold">Deuda Oro</p></div>
                 </div>
                 <div className="bg-white p-6 rounded-[32px] border border-[#E2E8F0] shadow-sm flex flex-col justify-between h-40">
-                    <div className="flex justify-between items-start"><div className="p-3 bg-green-50 text-green-500 rounded-2xl"><Euro size={24}/></div><span className="text-[10px] font-black text-[#A0AEC0] uppercase tracking-widest">Caja</span></div>
-                    <div><p className="text-3xl font-black text-green-600">{formatPrice(lastCash.total)} €</p><p className="text-xs text-[#A0AEC0] font-bold">Arqueo</p></div>
+                    <div className="flex justify-between items-start"><div className="p-3 bg-green-50 text-green-500 rounded-2xl"><Euro size={24}/></div><span className="text-[10px] font-black text-[#A0AEC0] uppercase tracking-widest">Caja (YTD)</span></div>
+                    <div>
+                        <p className={`text-3xl font-black ${cumulativeCashDiff >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {cumulativeCashDiff > 0 ? '+' : ''}{formatPrice(cumulativeCashDiff)} €
+                        </p>
+                        <p className="text-xs text-[#A0AEC0] font-bold uppercase tracking-tighter">Arqueo Acumulado</p>
+                    </div>
                 </div>
                 <div className="bg-white p-6 rounded-[32px] border-2 border-coral-100 shadow-xl shadow-coral-50 flex flex-col justify-between h-40">
                     <div className="flex justify-between items-start"><div className="p-3 bg-coral-50 text-[#FF8C9D] rounded-2xl"><TrendingUp size={24}/></div><span className="text-[10px] font-black text-[#FF8C9D] uppercase tracking-widest">Margen</span></div>
@@ -831,7 +888,7 @@ const DailyTimelineView = ({ tasks, employees, onEdit, onToggleStatus }) => {
     );
 };
 
-const TasksView = ({ tasks, batteries, onEdit, onAdd, onAddBattery, onCheckBattery, onDeleteBattery, loadData, currentStore, employees, partners }) => {
+const TasksView = ({ tasks, batteries, onEdit, onAdd, onAddBattery, onEditBattery, onAddBatteryItem, onDeleteBatteryItem, onCheckBattery, onDeleteBattery, loadData, currentStore, employees, partners }) => {
     const safeTasks = Array.isArray(tasks) ? tasks : [];
     const [month, setMonth] = useState(new Date());
     const [selectedTask, setSelectedTask] = useState(null);
@@ -1171,6 +1228,9 @@ const TasksView = ({ tasks, batteries, onEdit, onAdd, onAddBattery, onCheckBatte
                             hideHeader 
                             isCompact 
                             onCheck={onCheckBattery} 
+                            onEdit={onEditBattery}
+                            onAddItem={onAddBatteryItem}
+                            onDeleteItem={onDeleteBatteryItem}
                             onDelete={onDeleteBattery} 
                         />
                     </div>
@@ -1842,7 +1902,90 @@ const JewelryReport = ({ movements, partners, inventory }) => {
     );
 };
 
-const CashView = ({ history, onSave, employees, user }) => {
+const ReportsView = ({ batteries, cashHistory, movements, partners }) => {
+    const safeBatteries = Array.isArray(batteries) ? batteries : [];
+    const safeHistory = Array.isArray(cashHistory) ? cashHistory : [];
+    const safeMovements = Array.isArray(movements) ? movements : [];
+    const safePartners = Array.isArray(partners) ? partners : [];
+
+    const handleDownloadCashCSV = () => {
+        const data = safeHistory.map(h => ({
+            Fecha: format(parseISO(h.date), 'dd/MM/yyyy'),
+            Responsable: h.responsible_1,
+            Teorico: h.expected_total,
+            Real: h.total,
+            Diferencia: (Number(h.total) - Number(h.expected_total)).toFixed(2),
+            Observaciones: h.observations
+        }));
+        downloadCSV(data, `TikTak_Arqueos_${format(new Date(), 'yyyy-MM-dd')}`);
+    };
+
+    const handleDownloadJewelryCSV = () => {
+        const data = safeMovements.map(m => ({
+            Fecha: m.date,
+            Tipo: m.type,
+            Socio: m.partner_name,
+            Peso: m.weight,
+            Costo_Adq: m.acquisition_cost,
+            Valor_Final: m.received_amount,
+            Beneficio: m.status === 'Completado' ? (Number(m.received_amount) - Number(m.acquisition_cost)).toFixed(2) : '0.00',
+            Estado: m.status
+        }));
+        downloadCSV(data, `TikTak_Joyería_${format(new Date(), 'yyyy-MM-dd')}`);
+    };
+
+    return (
+        <div className="space-y-8 animate-in fade-in duration-500 pb-10">
+            <div className="bg-white/40 backdrop-blur-md p-10 rounded-[40px] border border-white">
+                <h2 className="text-3xl font-black text-[#1A365D] tracking-tighter uppercase">Panel de <span className="text-[#FF8C9D]">Informes</span></h2>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Exportación de datos para contabilidad y control</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {/* BATERÍAS PDF */}
+                <div className="bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm hover:shadow-xl transition-all group">
+                    <div className="w-14 h-14 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mb-6"><FileText size={28}/></div>
+                    <h3 className="text-lg font-black text-[#1A365D] uppercase mb-2">Tareas Semanales</h3>
+                    <p className="text-xs text-slate-400 font-bold mb-8">Exporta el estado actual de todas las baterías vigentes en formato PDF imprimible.</p>
+                    <button 
+                        onClick={() => downloadWeeklyPDF(safeBatteries)}
+                        className="w-full py-4 bg-[#1A365D] text-white rounded-2xl font-black text-[10px] uppercase flex items-center justify-center gap-3 group-hover:bg-[#FF8C9D] transition-colors"
+                    >
+                        <Download size={16}/> DESCARGAR PDF (FIRMAS)
+                    </button>
+                </div>
+
+                {/* ARQUEOS EXCEL/CSV */}
+                <div className="bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm hover:shadow-xl transition-all group">
+                    <div className="w-14 h-14 bg-green-50 text-green-500 rounded-2xl flex items-center justify-center mb-6"><Table size={28}/></div>
+                    <h3 className="text-lg font-black text-[#1A365D] uppercase mb-2">Histórico de Arqueos</h3>
+                    <p className="text-xs text-slate-400 font-bold mb-8">Listado completo de cierres de caja, descuadres y responsables en formato Excel/CSV.</p>
+                    <button 
+                        onClick={handleDownloadCashCSV}
+                        className="w-full py-4 border-2 border-[#1A365D] text-[#1A365D] rounded-2xl font-black text-[10px] uppercase flex items-center justify-center gap-3 hover:bg-[#1A365D] hover:text-white transition-all"
+                    >
+                        <Download size={16}/> DESCARGAR EXCEL / CSV
+                    </button>
+                </div>
+
+                {/* JOYERÍA EXCEL/CSV */}
+                <div className="bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm hover:shadow-xl transition-all group">
+                    <div className="w-14 h-14 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center mb-6"><Pocket size={28}/></div>
+                    <h3 className="text-lg font-black text-[#1A365D] uppercase mb-2">Movimientos Joyería</h3>
+                    <p className="text-xs text-slate-400 font-bold mb-8">Reporte de fundiciones, recepciones y balances por socio para conciliación externa.</p>
+                    <button 
+                        onClick={handleDownloadJewelryCSV}
+                        className="w-full py-4 border-2 border-[#1A365D] text-[#1A365D] rounded-2xl font-black text-[10px] uppercase flex items-center justify-center gap-3 hover:bg-[#1A365D] hover:text-white transition-all"
+                    >
+                        <Download size={16}/> DESCARGAR EXCEL / CSV
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const CashView = ({ history, onSave, employees, user, cumulativeCashDiff }) => {
     const safeHistory = Array.isArray(history) ? history : [];
     const safeEmployees = Array.isArray(employees) ? employees : [];
     const [localDate, setLocalDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -1934,11 +2077,15 @@ const CashView = ({ history, onSave, employees, user }) => {
                             {diff > 0 ? '+' : ''}{diff.toFixed(2)}€
                         </div>
                     </div>
-                    {diff !== 0 && (
-                        <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm ${diff > 0 ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
-                            {diff > 0 ? 'Sobra dinero' : 'Falta dinero'}
-                        </span>
-                    )}
+                </div>
+
+                <div className="flex flex-col items-end gap-2 w-full md:w-auto bg-slate-50 p-6 rounded-[32px] border border-white">
+                    <div className="text-right">
+                        <span className="text-[9px] font-black text-[#1A365D] uppercase tracking-widest block mb-1">Arqueo Global {new Date().getFullYear()}</span>
+                        <div className={`text-3xl font-black tabular-nums tracking-tighter ${cumulativeCashDiff >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                            {cumulativeCashDiff > 0 ? '+' : ''}{cumulativeCashDiff.toFixed(2)}€
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -2109,6 +2256,13 @@ const CashView = ({ history, onSave, employees, user }) => {
                             Registro de Auditoría <BarChart3 size={16} className="text-blue-500"/>
                         </h3>
                         <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">Histórico de cierres y arqueos</p>
+                    </div>
+                    <div className="flex-1 space-y-1">
+                        <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest block">Arqueo Acumulado {new Date().getFullYear()}</span>
+                        <div className={`text-4xl font-black tabular-nums tracking-tighter ${cumulativeCashDiff >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                            {cumulativeCashDiff > 0 ? '+' : ''}{cumulativeCashDiff.toFixed(2)}€
+                        </div>
+                        <p className="text-[8px] font-bold text-slate-400 uppercase">Resultado Global de todas las entradas</p>
                     </div>
                 </div>
                 <div className="overflow-x-auto">
@@ -2757,7 +2911,7 @@ const OrderClosureModal = ({ order, onConfirm, onCancel }) => {
 };
 
 
-const BatteriesView = ({ batteries, onAdd, onCheck, onDelete, hideHeader, isCompact }) => {
+const BatteriesView = ({ batteries, onAdd, onCheck, onDelete, onEdit, onAddItem, onDeleteItem, hideHeader, isCompact }) => {
     const safeBatteries = Array.isArray(batteries) ? batteries : [];
 
     return (
@@ -2807,6 +2961,7 @@ const BatteriesView = ({ batteries, onAdd, onCheck, onDelete, hideHeader, isComp
                                             <div className="flex justify-between items-start mb-6">
                                                 <div className="bg-blue-50 text-[#1A365D] p-3 rounded-2xl"><Layers size={20}/></div>
                                                 <div className="flex gap-2">
+                                                    <button onClick={() => onEdit(b)} className="p-2 text-slate-300 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-all"><Edit3 size={16}/></button>
                                                     <button onClick={() => onDelete(b.id)} className="p-2 text-slate-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={16}/></button>
                                                 </div>
                                             </div>
@@ -2851,8 +3006,22 @@ const BatteriesView = ({ batteries, onAdd, onCheck, onDelete, hideHeader, isComp
                                                                 )}
                                                             </div>
                                                         </div>
+                                                        <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                                                            <button 
+                                                                onClick={() => onDeleteItem(item.id)}
+                                                                className="p-2 text-slate-300 hover:text-red-400 transition-colors"
+                                                            >
+                                                                <Trash2 size={14}/>
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 ))}
+                                                <button 
+                                                    onClick={() => onAddItem(b.id)}
+                                                    className="w-full p-4 border-2 border-dashed border-slate-100 rounded-2xl text-[9px] font-black text-slate-400 uppercase hover:border-blue-200 hover:text-blue-400 transition-all flex items-center justify-center gap-2"
+                                                >
+                                                    <PlusCircle size={14}/> Añadir Tarea Extra
+                                                </button>
                                             </div>
                                         </div>
                                     </>
@@ -2890,11 +3059,11 @@ const BatteriesView = ({ batteries, onAdd, onCheck, onDelete, hideHeader, isComp
     );
 };
 
-const BatteryForm = ({ onSave, onCancel }) => {
-    const [title, setTitle] = useState('');
-    const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-    const [endDate, setEndDate] = useState(format(addMonths(new Date(), 1), 'yyyy-MM-dd'));
-    const [items, setItems] = useState(['', '', '']);
+const BatteryForm = ({ initialData, onSave, onCancel }) => {
+    const [title, setTitle] = useState(initialData?.title || '');
+    const [startDate, setStartDate] = useState(initialData?.start_date || format(new Date(), 'yyyy-MM-dd'));
+    const [endDate, setEndDate] = useState(initialData?.end_date || format(addMonths(new Date(), 1), 'yyyy-MM-dd'));
+    const [items, setItems] = useState(initialData ? [] : ['', '', '']); // Only for new batteries
 
     const handleItemChange = (idx, val) => {
         const ni = [...items];
@@ -2909,8 +3078,14 @@ const BatteryForm = ({ onSave, onCancel }) => {
         <form onSubmit={(e) => { 
             e.preventDefault(); 
             const filteredItems = items.filter(i => i.trim() !== '');
-            if (filteredItems.length === 0) return alert('Debes añadir al menos una tarea.');
-            onSave({ title, start_date: startDate, end_date: endDate, items: filteredItems });
+            if (!initialData && filteredItems.length === 0) return alert('Debes añadir al menos una tarea.');
+            onSave({ 
+                id: initialData?.id,
+                title, 
+                start_date: startDate, 
+                end_date: endDate, 
+                items: initialData ? undefined : filteredItems 
+            });
         }} className="space-y-8">
             <div className="grid grid-cols-1 gap-6">
                 <div>
@@ -2927,35 +3102,63 @@ const BatteryForm = ({ onSave, onCancel }) => {
                         <input type="date" required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-black text-[#1A365D] shadow-inner" value={endDate} onChange={e => setEndDate(e.target.value)}/>
                     </div>
                 </div>
-                <div className="space-y-4 pt-4">
-                    <div className="flex justify-between items-center px-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest">Lista de Tareas ({items.filter(i => i.trim()).length})</label>
-                        <button type="button" onClick={addItem} className="text-[9px] font-black text-[#FF8C9D] bg-coral-50 hover:bg-coral-100 px-4 py-2 rounded-xl transition-all uppercase tracking-widest">+ AÑADIR FILA</button>
-                    </div>
-                    <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
-                        {items.map((item, idx) => (
-                            <div key={idx} className="flex gap-3 group">
-                                <div className="bg-slate-50 flex-1 flex items-center rounded-2xl overflow-hidden focus-within:ring-2 focus-within:ring-[#1A365D]/10 transition-all">
-                                    <span className="pl-5 text-[10px] font-black text-slate-300">{idx + 1}.</span>
-                                    <input 
-                                        type="text" 
-                                        placeholder={`Tarea a realizar...`}
-                                        className="w-full bg-transparent border-none p-5 font-bold text-xs outline-none" 
-                                        value={item} 
-                                        onChange={e => handleItemChange(idx, e.target.value)}
-                                    />
+
+                {!initialData && (
+                    <div className="space-y-4 pt-4">
+                        <div className="flex justify-between items-center px-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest">Lista de Tareas Iniciales ({items.filter(i => i.trim()).length})</label>
+                            <button type="button" onClick={addItem} className="text-[9px] font-black text-[#FF8C9D] bg-coral-50 hover:bg-coral-100 px-4 py-2 rounded-xl transition-all uppercase tracking-widest">+ AÑADIR FILA</button>
+                        </div>
+                        <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+                            {items.map((item, idx) => (
+                                <div key={idx} className="flex gap-3 group">
+                                    <div className="bg-slate-50 flex-1 flex items-center rounded-2xl overflow-hidden focus-within:ring-2 focus-within:ring-[#1A365D]/10 transition-all">
+                                        <span className="pl-5 text-[10px] font-black text-slate-300">{idx + 1}.</span>
+                                        <input 
+                                            type="text" 
+                                            placeholder={`Tarea a realizar...`}
+                                            className="w-full bg-transparent border-none p-5 font-bold text-xs outline-none" 
+                                            value={item} 
+                                            onChange={e => handleItemChange(idx, e.target.value)}
+                                        />
+                                    </div>
+                                    {items.length > 1 && (
+                                        <button type="button" onClick={() => removeItem(idx)} className="text-slate-300 hover:text-red-400 p-2 transition-colors"><Trash2 size={18}/></button>
+                                    )}
                                 </div>
-                                {items.length > 1 && (
-                                    <button type="button" onClick={() => removeItem(idx)} className="text-slate-300 hover:text-red-400 p-2 transition-colors"><Trash2 size={18}/></button>
-                                )}
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
             <div className="flex gap-4 pt-4 shrink-0">
                 <button type="button" onClick={onCancel} className="flex-1 py-5 font-black text-[10px] text-slate-400 uppercase tracking-widest">CANCELAR</button>
-                <button type="submit" className="flex-1 py-5 bg-[#1A365D] text-white rounded-[32px] font-black text-[10px] uppercase tracking-widest shadow-xl shadow-blue-900/10 hover:scale-[1.01] transition-all">CREAR BATERÍA</button>
+                <button type="submit" className="flex-1 py-5 bg-[#1A365D] text-white rounded-[32px] font-black text-[10px] uppercase tracking-widest shadow-xl shadow-blue-900/10 hover:scale-[1.01] transition-all">
+                    {initialData ? 'GUARDAR CAMBIOS' : 'CREAR BATERÍA'}
+                </button>
+            </div>
+        </form>
+    );
+};
+
+const BatteryItemForm = ({ batteryId, onSave, onCancel }) => {
+    const [description, setDescription] = useState('');
+
+    return (
+        <form onSubmit={(e) => { e.preventDefault(); onSave({ battery_id: batteryId, description }); }} className="space-y-6">
+            <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase block mb-2 tracking-widest">Descripción de la Tarea Extra</label>
+                <input 
+                    type="text" required autoFocus
+                    placeholder="Ej: Pintar estantería entrada..."
+                    className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold text-[#1A365D]" 
+                    value={description} 
+                    onChange={e => setDescription(e.target.value)}
+                />
+            </div>
+            <div className="flex gap-4 pt-4">
+                <button type="button" onClick={onCancel} className="flex-1 py-4 font-black text-[10px] text-slate-400 uppercase">CANCELAR</button>
+                <button type="submit" className="flex-1 py-4 bg-[#1A365D] text-white rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-blue-900/10">AÑADIR A LA LISTA</button>
             </div>
         </form>
     );

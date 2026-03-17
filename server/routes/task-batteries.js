@@ -95,6 +95,50 @@ router.put('/items/:itemId', async (req, res) => {
     }
 });
 
+// PUT update battery metadata
+router.put('/:id', async (req, res) => {
+    const { id } = req.params;
+    const { title, start_date, end_date } = req.body;
+    try {
+        const result = await pool.query(
+            'UPDATE task_batteries SET title = $1, start_date = $2, end_date = $3 WHERE id = $4 RETURNING *',
+            [title, start_date, end_date, id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        logError(err, `PUT /api/task-batteries/${id}`);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST add item to existing battery
+router.post('/:id/items', async (req, res) => {
+    const { id } = req.params;
+    const { description } = req.body;
+    try {
+        const result = await pool.query(
+            'INSERT INTO battery_items (battery_id, description) VALUES ($1, $2) RETURNING *',
+            [id, description]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        logError(err, `POST /api/task-batteries/${id}/items`);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// DELETE item from battery
+router.delete('/items/:itemId', async (req, res) => {
+    const { itemId } = req.params;
+    try {
+        await pool.query('DELETE FROM battery_items WHERE id = $1', [itemId]);
+        res.json({ success: true });
+    } catch (err) {
+        logError(err, `DELETE /api/task-batteries/items/${itemId}`);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // DELETE battery
 router.delete('/:id', async (req, res) => {
     const { id } = req.params;

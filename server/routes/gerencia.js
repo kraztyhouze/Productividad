@@ -399,7 +399,8 @@ router.delete('/goldsmith/movements/:id', async (req, res) => {
 router.get('/cash-control', async (req, res) => {
     const storeId = req.headers['x-store-id'] || 'store_1';
     try {
-        const result = await pool.query('SELECT * FROM cash_control_logs WHERE store_id = $1 ORDER BY date DESC, created_at DESC LIMIT 30', [storeId]);
+        // Increase limit to 1000 to cover full year of daily records
+        const result = await pool.query('SELECT * FROM cash_control_logs WHERE store_id = $1 ORDER BY date DESC, created_at DESC LIMIT 1000', [storeId]);
         res.json(result.rows);
     } catch (err) { 
         logError(err, 'GET /cash-control');

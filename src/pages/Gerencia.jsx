@@ -67,8 +67,8 @@ import {
     AreaChart,
     Area
 } from 'recharts';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // --- CONSTANTS ---
 const BILLS = [500, 200, 100, 50, 20, 10, 5];
@@ -140,125 +140,104 @@ const downloadCSV = (data, filename) => {
     document.body.removeChild(link);
 };
 
-const downloadWeeklyPDF = (batteries) => {
+const downloadWeeklyPDF = (batteries, tasks = []) => {
     try {
         const doc = new jsPDF();
         const today = format(new Date(), 'dd/MM/yyyy');
         
         // --- CONFIG & STYLES ---
         const primaryColor = [26, 54, 93]; // #1A365D
+        const secondaryColor = [255, 140, 157]; // #FF8C9D
         
-        // Header Background
+        // Header
         doc.setFillColor(248, 249, 251);
         doc.rect(0, 0, 210, 40, 'F');
-        
-        // Title
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(24);
         doc.setTextColor(...primaryColor);
         doc.text('TIKTAK', 14, 22);
-        
         doc.setFontSize(10);
         doc.setTextColor(100);
         doc.setFont('helvetica', 'normal');
-        doc.text('SUITE DE GESTIÓN DE PRODUCTIVIDAD', 14, 28);
-        
-        // Right side header info
+        doc.text('CONTROL OPERATIVO Y AGENDA SEMANAL', 14, 28);
         doc.setFontSize(9);
         doc.setTextColor(150);
         doc.text(`Generado: ${today}`, 196, 20, { align: 'right' });
-        doc.text('CONTROL OPERATIVO SEMANAL', 196, 25, { align: 'right' });
         
         let yPos = 50;
-        
+
+        // --- SECTION 1: AGENDA TASKS (CURRENT WEEK) ---
+        const start = startOfWeek(new Date(), { weekStartsOn: 1 });
+        const end = endOfWeek(new Date(), { weekStartsOn: 1 });
+        const weekTasks = tasks.filter(t => {
+            const d = parseISO(t.date);
+            return d >= start && d <= end;
+        }).sort((a,b) => a.date.localeCompare(b.date));
+
+        if (weekTasks.length > 0) {
+            doc.setFillColor(...secondaryColor);
+            doc.rect(14, yPos, 182, 8, 'F');
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10);
+            doc.setTextColor(255);
+            doc.text('AGENDA DE LA SEMANA (TAREAS PUNTUALES)', 18, yPos + 5.5);
+            
+            const agendaData = weekTasks.map(t => [
+                format(parseISO(t.date), 'dd/MM (EEE)', { locale: es }).toUpperCase(),
+                (t.title || '').toUpperCase(),
+                (t.assigned_to || 'S/A').toUpperCase(),
+                t.status === 'Hecha' ? 'OK' : '[  ]'
+            ]);
+
+            autoTable(doc, {
+                startY: yPos + 12,
+                head: [['FECHA', 'TAREA', 'RESPONSABLE', 'CHECK']],
+                body: agendaData,
+                theme: 'grid',
+                headStyles: { fillColor: [100, 100, 100], fontSize: 8 },
+                bodyStyles: { fontSize: 8 },
+                columnStyles: { 0: { cellWidth: 30 }, 2: { cellWidth: 35 }, 3: { cellWidth: 15, halign: 'center' } }
+            });
+            yPos = doc.lastAutoTable.finalY + 15;
+        }
+
+        // --- SECTION 2: TASK BATTERIES ---
         if (!Array.isArray(batteries) || batteries.length === 0) {
-            doc.setFontSize(12);
+            doc.setFontSize(10);
             doc.setTextColor(180);
-            doc.text('No hay baterías de tareas registradas para este periodo.', 14, 70);
+            doc.text('No hay baterías de tareas activas.', 14, yPos);
         } else {
             batteries.forEach((b, index) => {
-                if (!b) return;
-
-                // Check page space
-                if (yPos > 240) {
-                    doc.addPage();
-                    yPos = 20;
-                }
+                if (yPos > 240) { doc.addPage(); yPos = 20; }
                 
-                // Battery Title Block
                 doc.setFillColor(...primaryColor);
-                doc.rect(14, yPos, 182, 10, 'F');
-                
-                doc.setFontSize(11);
+                doc.rect(14, yPos, 182, 8, 'F');
+                doc.setFontSize(10);
                 doc.setTextColor(255);
                 doc.setFont('helvetica', 'bold');
-                doc.text(`${index + 1}. ${(b.title || 'SIN TÍTULO').toUpperCase()}`, 18, yPos + 6.5);
-                
-                doc.setFontSize(8);
-                doc.setTextColor(120);
-                doc.setFont('helvetica', 'normal');
-                
-                let periodText = 'Periodo: Sin definir';
-                try {
-                    if (b.start_date && b.end_date) {
-                        periodText = `Periodo: ${format(parseISO(b.start_date), 'dd/MM/yyyy')} al ${format(parseISO(b.end_date), 'dd/MM/yyyy')}`;
-                    }
-                } catch(e) { 
-                    console.warn("Date error", e);
-                }
-                doc.text(periodText, 14, yPos + 15);
+                doc.text(`${index + 1}. BATERÍA: ${(b.title || 'SIN TÍTULO').toUpperCase()}`, 18, yPos + 5.5);
                 
                 const tableData = (b.items || []).map(item => [
                     (item.description || '').toUpperCase(),
-                    (item.is_done ? 'FINALIZADA' : 'PENDIENTE').toUpperCase(),
+                    (item.is_done ? 'HECHA' : 'PENDIENTE').toUpperCase(),
                     (item.completed_by || 'POR ASIGNAR').toUpperCase(),
                     '[       ]'
                 ]);
                 
-                if (typeof doc.autoTable !== 'function') {
-                    throw new Error("El generador de tablas (autoTable) no está disponible. Contacta con soporte.");
-                }
-
-                doc.autoTable({
-                    startY: yPos + 18,
-                    head: [['DESCRIPCIÓN DE LA TAREA / OBJETIVO', 'ESTADO', 'FIRMA/RESPONSABLE', 'CHECK']],
+                autoTable(doc, {
+                    startY: yPos + 10,
+                    head: [['DESCRIPCIÓN', 'ESTADO', 'FIRMA/RESPONSABLE', 'CHECK']],
                     body: tableData,
                     theme: 'striped',
-                    headStyles: { 
-                        fillColor: [60, 80, 110], 
-                        fontSize: 8, 
-                        fontStyle: 'bold',
-                        halign: 'left',
-                        cellPadding: 4
-                    },
-                    bodyStyles: { 
-                        fontSize: 8,
-                        textColor: 50,
-                        cellPadding: 3
-                    },
-                    columnStyles: {
-                        0: { cellWidth: 95 },
-                        1: { cellWidth: 25, halign: 'center' },
-                        2: { cellWidth: 40 },
-                        3: { cellWidth: 22, halign: 'center' }
-                    },
-                    didDrawPage: (data) => {
-                        doc.setFontSize(7);
-                        doc.setTextColor(200);
-                        doc.text(`Página ${doc.internal.getNumberOfPages()}`, 196, 285, { align: 'right' });
-                        doc.text('TikTak Suite - Informe Confidencial de Gerencia', 14, 285);
-                    }
+                    headStyles: { fillColor: [60, 80, 110], fontSize: 8 },
+                    bodyStyles: { fontSize: 8 },
+                    columnStyles: { 0: { cellWidth: 95 }, 1: { cellWidth: 25 }, 2: { cellWidth: 40 }, 3: { cellWidth: 22 } }
                 });
-                
-                if (doc.lastAutoTable && doc.lastAutoTable.finalY) {
-                    yPos = doc.lastAutoTable.finalY + 20;
-                } else {
-                    yPos += 50;
-                }
+                yPos = doc.lastAutoTable.finalY + 12;
             });
         }
         
-        doc.save(`TikTak_Baterias_${today.replace(/\//g, '-')}.pdf`);
+        doc.save(`TikTak_Agenda_Semanal_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
     } catch (error) {
         console.error("Critical error generating PDF:", error);
         alert(`Error al generar el PDF: ${error.message}`);
@@ -299,7 +278,7 @@ const downloadCashPDF = (history) => {
             ];
         });
 
-        doc.autoTable({
+        autoTable(doc, {
             startY: 55,
             head: [['FECHA', 'RESPONSABLE', 'SISTEMA', 'CONTADO', 'DIFERENCIA', 'OBSERVACIONES']],
             body: tableData,
@@ -351,7 +330,7 @@ const downloadJewelryPDF = (movements) => {
             ];
         });
 
-        doc.autoTable({
+        autoTable(doc, {
             startY: 50,
             head: [['FECHA', 'TIPO', 'CAT.', 'SOCIO', 'PESO', 'COSTE ADQ.', 'VALOR FINAL', 'BENEFICIO', 'ESTADO']],
             body: tableData,
@@ -680,7 +659,7 @@ const Gerencia = () => {
 
             <div className="min-h-[70vh]">
                 {activeTab === 'summary' && <GerenciaDashboard tasks={tasks} partners={partners} movements={movements} cashHistory={cashHistory} inventory={inventory} orders={orders} cumulativeCashDiff={cumulativeCashDiff} />}
-                {activeTab === 'reports' && <ReportsView batteries={batteries} cashHistory={cashHistory} movements={movements} partners={partners} />}
+                {activeTab === 'reports' && <ReportsView batteries={batteries} tasks={tasks} cashHistory={cashHistory} movements={movements} partners={partners} />}
                 {activeTab === 'tasks' && (
                     <TasksView 
                         tasks={tasks} 
@@ -2101,7 +2080,7 @@ const JewelryReport = ({ movements, partners, inventory }) => {
     );
 };
 
-const ReportsView = ({ batteries, cashHistory, movements, partners }) => {
+const ReportsView = ({ batteries, tasks, cashHistory, movements, partners }) => {
     const safeBatteries = Array.isArray(batteries) ? batteries : [];
     const safeHistory = Array.isArray(cashHistory) ? cashHistory : [];
     const safeMovements = Array.isArray(movements) ? movements : [];
@@ -2144,13 +2123,13 @@ const ReportsView = ({ batteries, cashHistory, movements, partners }) => {
                 {/* BATERÍAS PDF */}
                 <div className="bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm hover:shadow-xl transition-all group">
                     <div className="w-14 h-14 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mb-6"><FileText size={28}/></div>
-                    <h3 className="text-lg font-black text-[#1A365D] uppercase mb-2">Tareas Semanales</h3>
-                    <p className="text-xs text-slate-400 font-bold mb-8">Exporta el estado actual de todas las baterías vigentes en formato PDF imprimible.</p>
+                    <h3 className="text-lg font-black text-[#1A365D] uppercase mb-2">Agenda Semanal</h3>
+                    <p className="text-xs text-slate-400 font-bold mb-8">PDF con las tareas de la agenda y las baterías de objetivos vigentes para firma física.</p>
                     <button 
-                        onClick={() => downloadWeeklyPDF(safeBatteries)}
+                        onClick={() => downloadWeeklyPDF(safeBatteries, tasks)}
                         className="w-full py-4 bg-[#1A365D] text-white rounded-2xl font-black text-[10px] uppercase flex items-center justify-center gap-3 group-hover:bg-[#FF8C9D] transition-colors"
                     >
-                        <Download size={16}/> DESCARGAR PDF (FIRMAS)
+                        <Download size={16}/> GENERAR PDF SEMANAL
                     </button>
                 </div>
 
@@ -3280,24 +3259,36 @@ const BatteriesView = ({ batteries, onAdd, onCheck, onDelete, onEdit, onAddItem,
                                     <div className="space-y-4">
                                         <div className="flex justify-between items-start">
                                             <h3 className="text-xs font-black text-[#1A365D] uppercase tracking-tighter truncate pr-4">{b.title}</h3>
-                                            <span className="text-[9px] font-black text-[#FF8C9D] bg-coral-50 px-2 py-0.5 rounded-lg whitespace-nowrap">{progress.toFixed(0)}%</span>
+                                            <div className="flex items-center gap-2">
+                                                <button onClick={() => onEdit(b)} className="p-1 text-slate-300 hover:text-blue-500 transition-colors"><Edit3 size={12}/></button>
+                                                <button onClick={() => onDelete(b.id)} className="p-1 text-slate-300 hover:text-red-400 transition-colors"><Trash2 size={12}/></button>
+                                                <span className="text-[9px] font-black text-[#FF8C9D] bg-coral-50 px-2 py-0.5 rounded-lg whitespace-nowrap">{progress.toFixed(0)}%</span>
+                                            </div>
                                         </div>
                                         <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                                             <div className="h-full bg-[#1A365D] transition-all duration-700" style={{ width: `${progress}%` }} />
                                         </div>
                                         <div className="space-y-2">
                                             {(b.items || []).map(item => (
-                                                <button 
-                                                    key={item.id} 
-                                                    onClick={() => onCheck(item)}
-                                                    className="w-full flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl transition-all group/it"
-                                                >
-                                                    <div className={`w-4 h-4 rounded-md border-2 flex items-center justify-center shrink-0 ${item.is_done ? 'bg-green-500 border-green-500 text-white' : 'border-slate-200'}`}>
-                                                        {item.is_done && <Check size={10} strokeWidth={4}/>}
-                                                    </div>
-                                                    <span className={`text-[10px] font-bold uppercase truncate ${item.is_done ? 'text-slate-300 line-through' : 'text-slate-600'}`}>{item.description}</span>
-                                                </button>
+                                                <div key={item.id} className="flex items-center gap-2 group/compact">
+                                                    <button 
+                                                        onClick={() => onCheck(item)}
+                                                        className="flex-1 flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl transition-all"
+                                                    >
+                                                        <div className={`w-4 h-4 rounded-md border-2 flex items-center justify-center shrink-0 ${item.is_done ? 'bg-green-500 border-green-500 text-white' : 'border-slate-200'}`}>
+                                                            {item.is_done && <Check size={10} strokeWidth={4}/>}
+                                                        </div>
+                                                        <span className={`text-[10px] font-bold uppercase truncate ${item.is_done ? 'text-slate-300 line-through' : 'text-slate-600'}`}>{item.description}</span>
+                                                    </button>
+                                                    <button onClick={() => onDeleteItem(item.id)} className="opacity-0 group-hover/compact:opacity-100 p-1 text-slate-200 hover:text-red-400 transition-all"><X size={10}/></button>
+                                                </div>
                                             ))}
+                                            <button 
+                                                onClick={() => onAddItem(b.id)}
+                                                className="w-full mt-2 py-2 border border-dashed border-slate-100 rounded-lg text-[8px] font-black text-slate-300 uppercase hover:text-blue-400 hover:border-blue-100 transition-all"
+                                            >
+                                                + EXTRA
+                                            </button>
                                         </div>
                                     </div>
                                 )}

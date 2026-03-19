@@ -527,71 +527,64 @@ const Productivity = () => {
                 {/* STATS RIGHT - 3 CELLS RESTORED */}
                 <div className="w-full xl:w-1/3 flex flex-col gap-4 min-h-0 overflow-hidden">
                     {/* Cell 1: Gold Price & Shop Active Timer */}
-                    <div className="flex gap-4 h-32 shrink-0 transition-transform hover:scale-[1.01]">
+                    <div className="flex gap-4 h-44 shrink-0">
+                        {/* WIDGET PRECIOS ORO */}
                         <div 
-                            className="flex-1 bg-gradient-to-r from-amber-200 via-yellow-400 to-amber-600 rounded-3xl shadow-xl relative overflow-hidden group border-2 border-amber-300/30"
+                            className="flex-1 rounded-[24px] border border-[#F3E5AB] p-4 transition-all duration-300 hover:-translate-y-0.5 relative flex flex-col"
+                            style={{ 
+                                background: 'linear-gradient(180deg, #FFFFFF 0%, #FFF4D6 100%)',
+                                boxShadow: '0 4px 15px rgba(212, 175, 55, 0.1)'
+                            }}
                         >
-                            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/brushed-alum.png')] opacity-10 mix-blend-overlay"></div>
+                            <span className="absolute top-4 right-4 text-xl">📈</span>
                             
-                            <div className="relative z-10 h-full flex flex-col p-4">
-                                <div className="flex justify-between items-center mb-2 px-1">
-                                    <h4 className="text-[10px] font-black text-black/40 uppercase tracking-[0.2em]">Precios Oro (€/gr)</h4>
-                                    <div className="w-1.5 h-1.5 rounded-full bg-black/20 animate-pulse"></div>
+                            {/* BLOQUE SUPERIOR: 18K PRINCIPAL */}
+                            <div 
+                                className="flex flex-col cursor-pointer group/gold"
+                                onClick={handleGoldPriceUpdate}
+                            >
+                                <span className="text-[12px] font-bold text-[#4A5568] uppercase tracking-wider mb-1">Oro 18k</span>
+                                <div className="flex items-baseline gap-1">
+                                    <span className="text-[32px] font-[900] text-[#1A365D] tracking-tighter leading-none">{goldPrice}</span>
+                                    <span className="text-[16px] font-bold text-[#1A365D]/60 whitespace-nowrap">€/gr</span>
+                                    <Pencil size={12} className="ml-2 text-[#A0AEC0] opacity-0 group-hover/gold:opacity-100 transition-opacity"/>
                                 </div>
-                                
-                                <div className="grid grid-cols-2 gap-x-6 gap-y-2 flex-1">
-                                    {/* 24K */}
-                                    <div className="flex flex-col justify-center">
-                                        <span className="text-[8px] font-black text-black/40 uppercase">Puro 24K</span>
-                                        <div className="flex items-baseline gap-0.5">
-                                            <span className="text-xl font-black font-mono text-black leading-none">{Math.round(goldPrice * 1.33)}</span>
-                                            <span className="text-[8px] font-bold text-black/50">€</span>
-                                        </div>
-                                    </div>
+                            </div>
 
-                                    {/* 18K (Base/Editable) */}
-                                    <div 
-                                        className="flex flex-col justify-center cursor-pointer hover:bg-black/5 p-1 rounded-xl transition-all border border-transparent hover:border-black/10"
-                                        onClick={handleGoldPriceUpdate}
-                                    >
-                                        <span className="text-[8px] font-black text-black/60 uppercase flex items-center gap-1">Base 18K <Pencil size={8}/></span>
-                                        <div className="flex items-baseline gap-0.5">
-                                            <span className="text-2xl font-black font-mono text-black leading-none underline decoration-black/20 underline-offset-4">{goldPrice}</span>
-                                            <span className="text-[9px] font-bold text-black/80">€/gr</span>
-                                        </div>
-                                    </div>
-
-                                    {/* 14K */}
-                                    <div className="flex flex-col justify-center">
-                                        <span className="text-[8px] font-black text-black/40 uppercase">14K</span>
-                                        <div className="flex items-baseline gap-0.5">
-                                            <span className="text-xl font-black font-mono text-black leading-none">{Math.round(goldPrice * 0.75)}</span>
-                                            <span className="text-[8px] font-bold text-black/50">€</span>
-                                        </div>
-                                    </div>
-
-                                    {/* 9K */}
-                                    <div className="flex flex-col justify-center">
-                                        <span className="text-[8px] font-black text-black/40 uppercase">Low 9K</span>
-                                        <div className="flex items-baseline gap-0.5">
-                                            <span className="text-xl font-black font-mono text-black leading-none">{Math.round(goldPrice * 0.40)}</span>
-                                            <span className="text-[8px] font-bold text-black/50">€</span>
-                                        </div>
-                                    </div>
+                            {/* BLOQUE INFERIOR: GRID OTROS QUILATES */}
+                            <div className="grid grid-cols-3 gap-2 mt-auto pt-3 border-t border-[#D4AF37]/20">
+                                <div className="flex flex-col">
+                                    <span className="text-[11px] text-[#A0AEC0] font-bold uppercase">24k</span>
+                                    <span className="text-[16px] font-bold text-[#1A365D]">{Math.round(goldPrice * 1.33)}€</span>
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-[11px] text-[#A0AEC0] font-bold uppercase">14k</span>
+                                    <span className="text-[16px] font-bold text-[#1A365D]">{Math.round(goldPrice * 0.75)}€</span>
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-[11px] text-[#A0AEC0] font-bold uppercase">9k</span>
+                                    <span className="text-[16px] font-bold text-[#1A365D]">{Math.round(goldPrice * 0.40)}€</span>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="w-1/3 bg-white border border-[#E2E8F0] rounded-[32px] flex flex-col items-center justify-center relative shadow-sm overflow-hidden group hover:border-[#FF8C9D]/30 transition-all border-b-4 border-b-[#FF8C9D]">
-                            <p className="text-[9px] font-black text-[#A0AEC0] uppercase tracking-widest absolute top-4 group-hover:text-[#FF8C9D] transition-colors">Tiempo Tienda</p>
-                            <span className={`text-2xl font-mono font-black tracking-tighter ${Object.keys(clientSessions).length > 0 ? 'text-[#FF8C9D] animate-pulse' : 'text-[#1A365D]'}`}>
+                        {/* WIDGET TIEMPO TIENDA */}
+                        <div 
+                            className="w-1/3 bg-white border border-[#F3E5AB] rounded-[24px] p-4 transition-all duration-300 hover:-translate-y-0.5 flex flex-col items-center justify-center relative overflow-hidden"
+                            style={{ boxShadow: '0 4px 15px rgba(212, 175, 55, 0.05)' }}
+                        >
+                            <p className="text-[11px] font-bold text-[#A0AEC0] uppercase tracking-widest mb-2">Tiempo Tienda</p>
+                            <span className={`text-[32px] font-mono font-black tracking-tighter ${Object.keys(clientSessions).length > 0 ? 'text-[#FF8C9D] animate-pulse' : 'text-[#1A365D]'}`}>
                                 {formatDuration(shopActiveSeconds * 1000)}
                             </span>
-                            <div className="absolute bottom-2 flex gap-1">
-                                {Array.from({ length: Object.keys(clientSessions).length }).map((_, i) => (
-                                    <div key={i} className="w-1.5 h-1.5 rounded-full bg-[#FF8C9D] animate-bounce" style={{ animationDelay: `${i * 0.1}s` }} />
+                            <div className="mt-4 flex gap-1.5">
+                                {Array.from({ length: Math.min(6, Object.keys(clientSessions).length) }).map((_, i) => (
+                                    <div key={i} className="w-2 h-2 rounded-full bg-[#FF8C9D] animate-bounce" style={{ animationDelay: `${i * 0.1}s` }} />
                                 ))}
+                                {Object.keys(clientSessions).length > 6 && <span className="text-[10px] text-[#FF8C9D] font-bold">+{Object.keys(clientSessions).length - 6}</span>}
                             </div>
+                            {/* Subtle bottom accent to match 18k pride */}
+                            <div className={`absolute bottom-0 left-0 right-0 h-1.5 transition-colors ${Object.keys(clientSessions).length > 0 ? 'bg-[#FF8C9D]' : 'bg-[#F3E5AB]/30'}`} />
                         </div>
                     </div>
 

@@ -112,24 +112,7 @@ const Productivity = () => {
         }
     };
 
-    const [externalPrices, setExternalPrices] = useState(null);
     const [showGoldDetails, setShowGoldDetails] = useState(false);
-
-    // Fetch External Gold Prices
-    useEffect(() => {
-        const fetchGold = async () => {
-            try {
-                const res = await fetch('/api/gold-prices');
-                if (res.ok) {
-                    const data = await res.json();
-                    setExternalPrices(data);
-                }
-            } catch (err) { console.error("Failed to fetch gold prices", err); }
-        };
-        fetchGold();
-        const interval = setInterval(fetchGold, 1800000); // 30 mins
-        return () => clearInterval(interval);
-    }, []);
 
 
 
@@ -544,48 +527,62 @@ const Productivity = () => {
                 {/* STATS RIGHT - 3 CELLS RESTORED */}
                 <div className="w-full xl:w-1/3 flex flex-col gap-4 min-h-0 overflow-hidden">
                     {/* Cell 1: Gold Price & Shop Active Timer */}
-                    <div className="flex gap-4 h-24 shrink-0 transition-transform hover:scale-[1.02]">
-                        <div className="flex-1 flex bg-gradient-to-r from-amber-200 via-yellow-400 to-amber-600 rounded-3xl shadow-xl relative overflow-hidden group">
-                            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/brushed-alum.png')] opacity-20 mix-blend-overlay"></div>
-
-                            {/* Left: Editable Main Price */}
-                            <div
-                                onClick={handleGoldPriceUpdate}
-                                className="flex-[3] p-3 flex flex-col justify-center cursor-pointer hover:bg-black/5 transition-colors relative z-10"
-                            >
-                                <p className="text-[9px] font-black uppercase tracking-widest opacity-60 text-black mb-0.5">Precio Tienda</p>
-                                <div className="flex items-baseline gap-1">
-                                    <p className="text-4xl font-black font-mono tracking-tighter text-black leading-none">{goldPrice}</p>
-                                    <span className="text-xs font-bold text-black/60">€/gr</span>
+                    <div className="flex gap-4 h-32 shrink-0 transition-transform hover:scale-[1.01]">
+                        <div 
+                            className="flex-1 bg-gradient-to-r from-amber-200 via-yellow-400 to-amber-600 rounded-3xl shadow-xl relative overflow-hidden group border-2 border-amber-300/30"
+                        >
+                            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/brushed-alum.png')] opacity-10 mix-blend-overlay"></div>
+                            
+                            <div className="relative z-10 h-full flex flex-col p-4">
+                                <div className="flex justify-between items-center mb-2 px-1">
+                                    <h4 className="text-[10px] font-black text-black/40 uppercase tracking-[0.2em]">Precios Oro (€/gr)</h4>
+                                    <div className="w-1.5 h-1.5 rounded-full bg-black/20 animate-pulse"></div>
                                 </div>
-                            </div>
-
-                            {/* Right: External Reference Prices (Permanent) */}
-                            <div className="flex-[2] bg-black/10 backdrop-blur-sm border-l border-black/5 p-2 flex flex-col justify-center gap-1.5 relative z-10">
-                                {externalPrices ? (
-                                    <>
-                                        <div className="flex justify-between items-center px-1">
-                                            <span className="text-[8px] font-black text-black/50 uppercase tracking-tighter">ANDORRANO</span>
-                                            <span className="text-xs font-mono font-bold text-black leading-none">{externalPrices.andorrano}</span>
+                                
+                                <div className="grid grid-cols-2 gap-x-6 gap-y-2 flex-1">
+                                    {/* 24K */}
+                                    <div className="flex flex-col justify-center">
+                                        <span className="text-[8px] font-black text-black/40 uppercase">Puro 24K</span>
+                                        <div className="flex items-baseline gap-0.5">
+                                            <span className="text-xl font-black font-mono text-black leading-none">{Math.round(goldPrice * 1.33)}</span>
+                                            <span className="text-[8px] font-bold text-black/50">€</span>
                                         </div>
-                                        <div className="flex justify-between items-center px-1">
-                                            <span className="text-[8px] font-black text-black/50 uppercase tracking-tighter">QUICKGOLD</span>
-                                            <span className="text-xs font-mono font-bold text-black leading-none">{externalPrices.quickgold}</span>
-                                        </div>
-                                        <div className="text-[7px] text-black/40 text-center font-mono mt-0.5">
-                                            {new Date(externalPrices.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                        </div>
-                                    </>
-                                ) : (
-                                    <div className="flex flex-col items-center justify-center h-full gap-1">
-                                        <div className="w-3 h-3 border-2 border-black/30 border-t-transparent rounded-full animate-spin"></div>
-                                        <span className="text-[8px] font-bold text-black/40">Cargando...</span>
                                     </div>
-                                )}
+
+                                    {/* 18K (Base/Editable) */}
+                                    <div 
+                                        className="flex flex-col justify-center cursor-pointer hover:bg-black/5 p-1 rounded-xl transition-all border border-transparent hover:border-black/10"
+                                        onClick={handleGoldPriceUpdate}
+                                    >
+                                        <span className="text-[8px] font-black text-black/60 uppercase flex items-center gap-1">Base 18K <Pencil size={8}/></span>
+                                        <div className="flex items-baseline gap-0.5">
+                                            <span className="text-2xl font-black font-mono text-black leading-none underline decoration-black/20 underline-offset-4">{goldPrice}</span>
+                                            <span className="text-[9px] font-bold text-black/80">€/gr</span>
+                                        </div>
+                                    </div>
+
+                                    {/* 14K */}
+                                    <div className="flex flex-col justify-center">
+                                        <span className="text-[8px] font-black text-black/40 uppercase">14K</span>
+                                        <div className="flex items-baseline gap-0.5">
+                                            <span className="text-xl font-black font-mono text-black leading-none">{Math.round(goldPrice * 0.75)}</span>
+                                            <span className="text-[8px] font-bold text-black/50">€</span>
+                                        </div>
+                                    </div>
+
+                                    {/* 9K */}
+                                    <div className="flex flex-col justify-center">
+                                        <span className="text-[8px] font-black text-black/40 uppercase">Low 9K</span>
+                                        <div className="flex items-baseline gap-0.5">
+                                            <span className="text-xl font-black font-mono text-black leading-none">{Math.round(goldPrice * 0.40)}</span>
+                                            <span className="text-[8px] font-bold text-black/50">€</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        <div className="w-1/3 bg-white border border-[#E2E8F0] rounded-[32px] flex flex-col items-center justify-center relative shadow-sm overflow-hidden group hover:border-[#FF8C9D]/30 transition-all">
+                        <div className="w-1/3 bg-white border border-[#E2E8F0] rounded-[32px] flex flex-col items-center justify-center relative shadow-sm overflow-hidden group hover:border-[#FF8C9D]/30 transition-all border-b-4 border-b-[#FF8C9D]">
                             <p className="text-[9px] font-black text-[#A0AEC0] uppercase tracking-widest absolute top-4 group-hover:text-[#FF8C9D] transition-colors">Tiempo Tienda</p>
                             <span className={`text-2xl font-mono font-black tracking-tighter ${Object.keys(clientSessions).length > 0 ? 'text-[#FF8C9D] animate-pulse' : 'text-[#1A365D]'}`}>
                                 {formatDuration(shopActiveSeconds * 1000)}
@@ -598,8 +595,8 @@ const Productivity = () => {
                         </div>
                     </div>
 
-                    {/* Cell 2 & 3: Needs & Overstock (Grid) */}
-                    <div className="flex-1 min-h-0 grid grid-rows-2 gap-4">
+                    {/* Cell 2 & 3: Needs & Overstock (Flex) */}
+                    <div className="flex-1 min-h-0 flex flex-col gap-4">
                         <InfoPanel
                             title="NECESIDADES"
                             items={productFamilies.filter(f => f.type === 'need')}

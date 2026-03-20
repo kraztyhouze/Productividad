@@ -217,6 +217,26 @@ router.put('/goldsmith/orders/:id/receive', async (req, res) => {
             [real_weight, order.partner_id]
         );
 
+        // 4. Create Movement Record for History
+        await client.query(
+            `INSERT INTO goldsmith_movements (
+                partner_id, type, weight, cost, date, store_id,
+                acquisition_cost, status, notes, inventory_category
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+            [
+                order.partner_id, 
+                'Recepción', 
+                real_weight, 
+                total_cost, 
+                receive_date, 
+                order.store_id,
+                total_cost, 
+                'Completado', 
+                `Recepción de pedido #${id}: ${order.category}`,
+                order.category
+            ]
+        );
+
         await client.query('COMMIT');
         res.json({ success: true });
     } catch (err) {

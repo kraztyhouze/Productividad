@@ -599,6 +599,49 @@ export const ProductivityProvider = ({ children }) => {
                     });
                     if (res.ok) return await res.json();
                 } catch (err) { console.error('Error logging transaction:', err); }
+            },
+            
+            // --- ADMINISTRATIVE ACTIONS (MANAGER ONLY) ---
+            adminActions: {
+                updateTransaction: async (id, data) => {
+                    const res = await fetch(`/api/gerencia/transactions/${id}`, {
+                        method: 'PUT',
+                        headers: { ...getHeaders(), 'x-user-role': 'Gerente' },
+                        body: JSON.stringify(data)
+                    });
+                    if (res.ok) { fetchData(); return true; }
+                    return false;
+                },
+                deleteTransaction: async (id) => {
+                    const res = await fetch(`/api/gerencia/transactions/${id}`, {
+                        method: 'DELETE',
+                        headers: { ...getHeaders(), 'x-user-role': 'Gerente' }
+                    });
+                    if (res.ok) { fetchData(); return true; }
+                    return false;
+                },
+                approveCashControl: async (id) => {
+                    const res = await fetch(`/api/gerencia/cash-control/${id}/approve`, {
+                        method: 'PUT',
+                        headers: { ...getHeaders(), 'x-user-role': 'Gerente' }
+                    });
+                    return res.ok;
+                },
+                reopenCashControl: async (id) => {
+                    const res = await fetch(`/api/gerencia/cash-control/${id}/reopen`, {
+                        method: 'PUT',
+                        headers: { ...getHeaders(), 'x-user-role': 'Gerente' }
+                    });
+                    return res.ok;
+                },
+                grantBonusXP: async (employeeId, xp, reason) => {
+                    const res = await fetch('/api/gamification/grant-reward', {
+                        method: 'POST',
+                        headers: getHeaders(),
+                        body: JSON.stringify({ employeeId, xp, reason })
+                    });
+                    return res.ok;
+                }
             }
         }}>
             {children}

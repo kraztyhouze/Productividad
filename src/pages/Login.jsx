@@ -1,17 +1,23 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth, ROLES } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
+import { useModule, MODULES } from '../context/ModuleContext';
 import { Lock, User, AlertCircle, Store, ArrowRight } from 'lucide-react';
 
 const Login = () => {
     const { login } = useAuth();
     const { clearStore, selectedStoreData } = useStore();
+    const { switchModule, getInitialModuleForRole } = useModule();
     const navigate = useNavigate();
+    const location = useLocation();
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    const queryParams = new URLSearchParams(location.search);
+    const redirectPath = queryParams.get('redirect');
 
     const handleBackToStore = () => {
         clearStore();
@@ -24,7 +30,20 @@ const Login = () => {
         setLoading(true);
         const result = await login(username, password);
         if (result.success) {
-            navigate(result.role === 'Puesto Compras' ? '/productivity' : '/');
+            // Set initial module based on role
+            const initialModule = getInitialModuleForRole(result.role);
+            switchModule(initialModule);
+
+            if (redirectPath) {
+                navigate(redirectPath);
+            } else {
+                // If Manager/Supervisor/Responsible -> go to Gerencia dashboard if available, or stay in Compras
+                if (initialModule === MODULES.GERENCIA) {
+                    navigate('/gerencia');
+                } else {
+                    navigate(result.role === 'Puesto Compras' ? '/productivity' : '/');
+                }
+            }
         } else {
             setError(result.message);
             setLoading(false);

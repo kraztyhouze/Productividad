@@ -196,6 +196,34 @@ export const initDb = async () => {
             );
         `);
 
+        // Meetings & Excel Metrics (New System)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS excel_metrics (
+                id SERIAL PRIMARY KEY,
+                employee_id TEXT REFERENCES employees(id),
+                report_date TEXT NOT NULL,
+                category TEXT NOT NULL, 
+                metric_name TEXT NOT NULL,
+                metric_value NUMERIC NOT NULL,
+                store_id TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS meeting_records (
+                id SERIAL PRIMARY KEY,
+                employee_id TEXT REFERENCES employees(id),
+                interviewer_id TEXT REFERENCES employees(id),
+                date TEXT NOT NULL,
+                category TEXT NOT NULL,
+                summary JSONB,
+                pdf_url TEXT,
+                store_id TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
         // Migrations / Alters (Safe to run multiple times)
         const alters = [
             "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recurring_days JSONB DEFAULT '[]';",
@@ -230,7 +258,8 @@ export const initDb = async () => {
             "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS category TEXT;",
             "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS time TEXT;",
             "ALTER TABLE goldsmith_movements ADD COLUMN IF NOT EXISTS inventory_category TEXT;",
-            "ALTER TABLE goldsmith_inventory ADD COLUMN IF NOT EXISTS restock_threshold NUMERIC DEFAULT 100;"
+            "ALTER TABLE goldsmith_inventory ADD COLUMN IF NOT EXISTS restock_threshold NUMERIC DEFAULT 100;",
+            "ALTER TABLE employees ADD COLUMN IF NOT EXISTS is_interviewer BOOLEAN DEFAULT FALSE;"
         ];
         for (const sql of alters) {
             try { await client.query(sql); } catch (e) { /* ignore already exists */ }

@@ -10,7 +10,7 @@ const StoreSelection = () => {
 
     const handleSelect = (storeId) => {
         selectStore(storeId);
-        navigate('/select-module');
+        navigate('/login');
     };
 
     return (

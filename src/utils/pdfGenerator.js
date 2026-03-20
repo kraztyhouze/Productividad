@@ -320,3 +320,134 @@ export const generateWatchCertificate = (data) => {
 
     doc.save(`Reloj_${data.brand}_${data.model}.pdf`);
 };
+
+export const generateMeetingPDF = (meetingData) => {
+    const { employeeName, interviewerName, date, category, metrics, summary } = meetingData;
+    const doc = new jsPDF();
+
+    // COLORS
+    const ACCENT = [26, 54, 93]; // Deep Blue
+    const GRAY = [107, 114, 128]; // Text Gray
+    const SUCCESS = [22, 163, 74];
+
+    // TOP BAR
+    doc.setFillColor(...ACCENT);
+    doc.rect(0, 0, 210, 4, 'F');
+
+    // LOGO / HEADER
+    // Attempt to load logo (as data URL or standard fetch)
+    // For now, simple text branding or placeholder
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(24);
+    doc.setTextColor(...ACCENT);
+    doc.text("TIKTAK", 14, 25);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text("SUITE GESTIÓN CENTRALIZADA", 14, 30);
+
+    // REPORT TYPE
+    doc.setFillColor(243, 244, 246);
+    doc.rect(130, 15, 66, 20, 'F');
+    doc.setTextColor(...ACCENT);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("ACTA DE REUNIÓN 1:1", 163, 23, { align: "center" });
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text(category.toUpperCase(), 163, 28, { align: "center" });
+
+    // PARTICIPANTS BOX
+    const partY = 50;
+    doc.setDrawColor(229, 231, 235);
+    doc.roundedRect(14, partY, 182, 35, 2, 2, 'D');
+
+    // Col 1
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+    doc.text("EMPLEADO", 20, partY + 10);
+    doc.setFontSize(11);
+    doc.setTextColor(...ACCENT);
+    doc.text(employeeName ? employeeName.toUpperCase() : 'N/A', 20, partY + 16);
+
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+    doc.text("ENTREVISTADOR", 20, partY + 25);
+    doc.setFontSize(11);
+    doc.setTextColor(...ACCENT);
+    doc.text(interviewerName ? interviewerName.toUpperCase() : 'N/A', 20, partY + 31);
+
+    // Col 2
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+    doc.text("FECHA REUNIÓN", 110, partY + 10);
+    doc.setFontSize(11);
+    doc.setTextColor(...ACCENT);
+    doc.text(date, 110, partY + 16);
+
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+    doc.text("ESTADO", 110, partY + 25);
+    doc.setFontSize(11);
+    doc.setTextColor(...SUCCESS);
+    doc.text("COMPLETADA / FIRMADA", 110, partY + 31);
+
+    // PERFORMANCE TABLE
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(...ACCENT);
+    doc.text("MÉTRICAS DE RENDIMIENTO ANALIZADAS", 14, 100);
+
+    const tableData = metrics.map(m => [
+        m.metric_name,
+        m.metric_value,
+        m.target || '-',
+        m.achievement ? `${m.achievement}%` : '-'
+    ]);
+
+    autoTable(doc, {
+        startY: 105,
+        head: [['KPI / MÉTRICA', 'VALOR REAL', 'OBJETIVO', 'LOGRO']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillColor: [...ACCENT], textColor: 255, fontSize: 10 },
+        styles: { fontSize: 10, cellPadding: 5 },
+        columnStyles: {
+            0: { fontStyle: 'bold' },
+            1: { halign: 'center' },
+            2: { halign: 'center' },
+            3: { halign: 'center', fontStyle: 'bold' }
+        }
+    });
+
+    // SUMMARY / NOTES
+    let finalY = doc.lastAutoTable.finalY + 15;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(...ACCENT);
+    doc.text("ACUERDOS Y NOTAS", 14, finalY);
+    
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(50);
+    const splitText = doc.splitTextToSize(summary || 'No hay notas adicionales del ciclo.', 182);
+    doc.text(splitText, 14, finalY + 8);
+
+    // SIGNATURES
+    const sigY = 240;
+    doc.setDrawColor(200);
+    doc.line(14, sigY, 90, sigY);
+    doc.line(120, sigY, 196, sigY);
+
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+    doc.text("FIRMADO (EMPLEADO)", 52, sigY + 5, { align: "center" });
+    doc.text("FIRMADO (ENTREVISTADOR)", 158, sigY + 5, { align: "center" });
+
+    // FOOTER
+    doc.setFontSize(7);
+    doc.setTextColor(180);
+    doc.text(`TikTak Suite Management Systems · v2.1 · Identificador: ${Math.random().toString(36).substr(2, 9).toUpperCase()}`, 105, 290, { align: "center" });
+
+    doc.save(`Reunion_1_1_${employeeName.replace(/\s+/g, '_')}_${date}.pdf`);
+};

@@ -15,7 +15,7 @@ router.get('/', async (req, res) => {
                 id, avatar, first_name as "firstName", last_name as "lastName", alias, email, 
                 role, contract_hours as "contractHours", contract_type as "contractType", 
                 username, is_buyer as "isBuyer", phone, address, "order", store_id, gamification,
-                can_count_cash as "canCountCash"
+                can_count_cash as "canCountCash", is_interviewer as "isInterviewer"
             FROM employees 
             WHERE store_id = $1
             ORDER BY "order" ASC, id ASC
@@ -35,9 +35,14 @@ router.post('/', async (req, res) => {
         const result = await pool.query(
             `INSERT INTO employees (
                 first_name, last_name, alias, email, role, contract_hours, contract_type, 
-                username, password, is_buyer, phone, address, avatar, store_id, gamification, can_count_cash
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id`,
-            [firstName, lastName, alias, email, role, contractHours, contractType, username, hashedPassword, isBuyer, phone, address, avatar, storeId, gamification || {}, req.body.canCountCash || false]
+                username, password, is_buyer, phone, address, avatar, store_id, gamification, 
+                can_count_cash, is_interviewer
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING id`,
+            [
+                firstName, lastName, alias, email, role, contractHours, contractType, 
+                username, hashedPassword, isBuyer, phone, address, avatar, storeId, 
+                gamification || {}, req.body.canCountCash || false, req.body.isInterviewer || false
+            ]
         );
         // Return confirmed data but NO PASSWORD
         res.json({
@@ -74,6 +79,7 @@ router.put('/:id', async (req, res) => {
         const newAvatar = avatar !== undefined ? avatar : old.avatar;
         const newOrder = order !== undefined ? order : old.order;
         const newCanCount = req.body.canCountCash !== undefined ? req.body.canCountCash : old.can_count_cash;
+        const newIsInterviewer = req.body.isInterviewer !== undefined ? req.body.isInterviewer : (old.is_interviewer || false);
         let newGamification = gamification !== undefined ? gamification : (old.gamification || {});
 
         let hashedPassword = old.password;
@@ -146,9 +152,9 @@ router.put('/:id', async (req, res) => {
             `UPDATE employees SET 
                 first_name=$1, last_name=$2, alias=$3, email=$4, role=$5, contract_hours=$6, 
                 contract_type=$7, username=$8, password=$9, is_buyer=$10, phone=$11, address=$12, 
-                avatar=$13, "order"=$14, gamification=$15, can_count_cash=$16
-            WHERE id=$17 RETURNING *`,
-            [newFirstName, newLastName, newAlias, newEmail, newRole, newContractHours, newContractType, newUsername, hashedPassword, newIsBuyer, newPhone, newAddress, newAvatar, newOrder, newGamification, newCanCount, id]
+                avatar=$13, "order"=$14, gamification=$15, can_count_cash=$16, is_interviewer=$17
+            WHERE id=$18 RETURNING *`,
+            [newFirstName, newLastName, newAlias, newEmail, newRole, newContractHours, newContractType, newUsername, hashedPassword, newIsBuyer, newPhone, newAddress, newAvatar, newOrder, newGamification, newCanCount, newIsInterviewer, id]
         );
 
         const updated = result.rows[0];
@@ -168,7 +174,8 @@ router.put('/:id', async (req, res) => {
             order: updated.order,
             avatar: updated.avatar,
             gamification: updated.gamification,
-            canCountCash: updated.can_count_cash
+            canCountCash: updated.can_count_cash,
+            isInterviewer: updated.is_interviewer
         });
     } catch (err) { res.status(500).json({ error: err.message }) }
 });

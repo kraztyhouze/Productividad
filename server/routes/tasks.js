@@ -91,14 +91,15 @@ router.post('/', async (req, res) => {
             `INSERT INTO tasks (
                 title, date, priority, status, assigned_to, description, 
                 recurring, periodicity, recurring_days, recurring_month_day, 
-                recurring_interval, recurring_end_date, recurring_type, store_id
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
+                recurring_interval, recurring_end_date, recurring_type, store_id,
+                category, priority_level, zone_id
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING *`,
             [
                 title, date || new Date().toISOString().split('T')[0], priority || 'Media', status || 'Pendiente', assigned_to || '', description || '', 
                 !!recurring, periodicity || 'Manual', 
                 JSON.stringify(recurring_days || []), recurring_month_day || null,
                 recurring_interval || 1, recurring_end_date || null, recurring_type || 'simple',
-                storeId
+                storeId, req.body.category || 'Gerencia', req.body.priority_level || 'Media', req.body.zone_id || null
             ]
         );
         res.json(result.rows[0]);
@@ -125,13 +126,14 @@ router.put('/:id', async (req, res) => {
             `UPDATE tasks SET 
                 title=$1, date=$2, priority=$3, status=$4, assigned_to=$5, description=$6, 
                 recurring=$7, periodicity=$8, recurring_days=$9, recurring_month_day=$10,
-                recurring_interval=$11, recurring_end_date=$12, recurring_type=$13
-            WHERE id=$14 RETURNING *`,
+                recurring_interval=$11, recurring_end_date=$12, recurring_type=$13,
+                category=$14, priority_level=$15, zone_id=$16
+            WHERE id=$17 RETURNING *`,
             [
                 title, date, priority, status, assigned_to || '', description || '', 
                 !!recurring, periodicity, JSON.stringify(recurring_days || []), 
                 recurring_month_day, recurring_interval || 1, recurring_end_date || null, 
-                recurring_type || 'simple', id
+                recurring_type || 'simple', req.body.category, req.body.priority_level, req.body.zone_id || null, id
             ]
         );
 
@@ -142,13 +144,14 @@ router.put('/:id', async (req, res) => {
                     `INSERT INTO tasks (
                         title, date, priority, status, assigned_to, description, 
                         recurring, periodicity, recurring_days, recurring_month_day, 
-                        recurring_interval, recurring_end_date, recurring_type, store_id
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+                        recurring_interval, recurring_end_date, recurring_type, store_id,
+                        category, priority_level, zone_id
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
                     [
                         title, nextDateStr, priority, 'Pendiente', assigned_to || '', description || '', 
                         true, periodicity, JSON.stringify(recurring_days || []), 
                         recurring_month_day, recurring_interval || 1, recurring_end_date || null, 
-                        recurring_type || 'simple', storeId
+                        recurring_type || 'simple', storeId, req.body.category, req.body.priority_level, req.body.zone_id || null
                     ]
                 );
             }

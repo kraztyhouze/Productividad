@@ -250,8 +250,8 @@ const KioskoModal = ({ isOpen, onClose, employee, updateEmployee, isManagerial, 
                                     <div className="h-full bg-gradient-to-r from-[#4299E1] to-[#FF8C9D] rounded-full transition-all duration-1000" style={{ width: `${progressPercent}%` }}></div>
                                 </div>
                                 <div className="w-full flex justify-between text-[10px] font-black text-[#A0AEC0] uppercase tracking-widest mb-6 px-1">
-                                    <span>{xp} XP</span>
-                                    <span>META: {nextLevelThreshold} XP</span>
+                                    <span>{xp} Puntos</span>
+                                    <span>META: {nextLevelThreshold} Pts</span>
                                 </div>
                                 {pendingRewards > 0 && (
                                     <button onClick={() => setSelectingTheme(true)} className="w-full py-4 bg-gradient-to-r from-[#FF8C9D] to-[#9F7AEA] text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-[#FF8C9D]/30 flex items-center justify-center gap-3 hover:scale-105 transition-transform active:scale-95">
@@ -534,7 +534,7 @@ const KioskoModal = ({ isOpen, onClose, employee, updateEmployee, isManagerial, 
                             <div className="bg-white rounded-[40px] border border-[#E2E8F0] p-8 shadow-sm space-y-6">
                                 <h4 className="font-black text-[#1A365D] text-lg uppercase tracking-widest flex items-center gap-3"><Gift className="text-amber-500" size={20} /> Inyectar Premios</h4>
                                 <div className="grid grid-cols-3 gap-6">
-                                    {[{ k: 'coins', l: 'Oro', c: '#ECC94B' }, { k: 'chests', l: 'Cofres', c: '#ED8936' }, { k: 'xp', l: 'XP', c: '#4299E1' }].map(f => (
+                                    {[{ k: 'coins', l: 'Oro', c: '#ECC94B' }, { k: 'chests', l: 'Cofres', c: '#ED8936' }, { k: 'xp', l: 'Puntos', c: '#4299E1' }].map(f => (
                                         <div key={f.k} className="space-y-2">
                                             <label className="text-[10px] text-[#A0AEC0] font-black uppercase tracking-widest ml-1">{f.l}</label>
                                             <input type="number" min="0" value={grantData[f.k]} onChange={e => setGrantData({ ...grantData, [f.k]: parseInt(e.target.value) || 0 })} className="w-full p-4 bg-[#F4F7FA] border-2 border-transparent focus:border-[#FF8C9D] rounded-2xl text-[#1A365D] font-black text-center outline-none" style={{ color: f.c }} />
@@ -554,7 +554,7 @@ const KioskoModal = ({ isOpen, onClose, employee, updateEmployee, isManagerial, 
                                             <div className="flex gap-2 shrink-0">
                                                 {e.coins > 0 && <span className="text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg text-[10px] font-black">🪙{e.coins}</span>}
                                                 {e.chests > 0 && <span className="text-orange-600 bg-orange-50 px-2.5 py-1 rounded-lg text-[10px] font-black">📦{e.chests}</span>}
-                                                {e.xp > 0 && <span className="text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg text-[10px] font-black">⚡{e.xp}</span>}
+                                                {e.xp > 0 && <span className="text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg text-[10px] font-black">⚡{e.xp} Pts</span>}
                                             </div>
                                         </div>
                                     ))}

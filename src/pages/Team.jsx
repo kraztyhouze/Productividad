@@ -108,6 +108,10 @@ const Team = () => {
         setIsModalOpen(false);
     };
 
+    const handleToggleInterviewer = (id, value) => {
+        updateEmployee(id, { isInterviewer: value });
+    };
+
     return (
         <div className="space-y-6 pb-10 animate-in">
             {/* Header & Controls */}
@@ -117,7 +121,7 @@ const Team = () => {
                     <p className="text-[#718096] text-sm mt-0.5">Gestiona usuarios, roles y fichas.</p>
                 </div>
 
-                {user.role === ROLES.MANAGER && (
+                {(user.role === ROLES.MANAGER || user.role === ROLES.SUPERVISOR || user.role === ROLES.RESPONSIBLE) && (
                     <div className="flex gap-3 w-full lg:w-auto">
                         <button
                             onClick={() => setIsRoleModalOpen(true)}
@@ -177,6 +181,7 @@ const Team = () => {
                         stats={getStats(emp.id, firstDayOfMonth, currentDay)}
                         onEdit={(e) => { setEditingEmployee(e); setIsModalOpen(true); }}
                         onDelete={handleDelete}
+                        onToggleInterviewer={handleToggleInterviewer}
                     />
                 ))}
             </div>

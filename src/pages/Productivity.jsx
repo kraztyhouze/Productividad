@@ -148,14 +148,14 @@ const Productivity = () => {
         }
     };
 
-    const isManagerial = user?.role === ROLES.MANAGER || user?.role === ROLES.SUPERVISOR;
+    const isManagerial = [ROLES.MANAGER, ROLES.SUPERVISOR, ROLES.RESPONSIBLE].includes(user?.role);
     // Responsible can edit panels but NOT necessarily see deep stats? Let's check request.
     // Request: "estadisticas completas solo las pueda ver el gerente y el supervisor".
     // So Responsible/Employee/Kiosk get simplified view.
-    const canSeeDeepStats = [ROLES.MANAGER, ROLES.SUPERVISOR].includes(user?.role);
+    const canSeeDeepStats = [ROLES.MANAGER, ROLES.SUPERVISOR, ROLES.RESPONSIBLE].includes(user?.role);
 
     const canEditPanels = [ROLES.MANAGER, ROLES.RESPONSIBLE, ROLES.SUPERVISOR].includes(user?.role);
-    const canEditTimes = [ROLES.MANAGER, ROLES.SUPERVISOR].includes(user?.role);
+    const canEditTimes = [ROLES.MANAGER, ROLES.SUPERVISOR, ROLES.RESPONSIBLE].includes(user?.role);
     const isToday = selectedDate === new Date().toISOString().split('T')[0];
     const isDayClosed = closedDays.includes(selectedDate);
     const unclosedDays = getUnclosedPastDays();

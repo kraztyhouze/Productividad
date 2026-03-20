@@ -45,8 +45,8 @@ router.post('/', async (req, res) => {
         await client.query('BEGIN');
         
         const batteryRes = await client.query(
-            'INSERT INTO task_batteries (title, start_date, end_date, store_id) VALUES ($1, $2, $3, $4) RETURNING *',
-            [title, start_date, end_date, storeId]
+            'INSERT INTO task_batteries (title, start_date, end_date, store_id, zone_id) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+            [title, start_date, end_date, storeId, req.body.zone_id || null]
         );
         
         const batteryId = batteryRes.rows[0].id;
@@ -104,8 +104,8 @@ router.put('/:id', async (req, res) => {
         await client.query('BEGIN');
         
         await client.query(
-            'UPDATE task_batteries SET title = $1, start_date = $2, end_date = $3 WHERE id = $4',
-            [title, start_date, end_date, id]
+            'UPDATE task_batteries SET title = $1, start_date = $2, end_date = $3, zone_id = $4 WHERE id = $5',
+            [title, start_date, end_date, req.body.zone_id || null, id]
         );
         
         if (Array.isArray(items)) {

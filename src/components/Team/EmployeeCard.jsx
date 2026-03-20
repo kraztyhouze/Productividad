@@ -1,7 +1,7 @@
 import React from 'react';
-import { ShoppingBag, Edit2, Trash2, User } from 'lucide-react';
+import { ShoppingBag, Edit2, Trash2, User, UserCheck } from 'lucide-react';
 
-const EmployeeCard = ({ emp, displayName, stats, onEdit, onDelete }) => {
+const EmployeeCard = ({ emp, displayName, stats, onEdit, onDelete, onToggleInterviewer }) => {
     return (
         <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 hover:border-[#FF8C9D]/50 transition-all group relative overflow-hidden flex flex-col justify-between h-full min-h-[160px] shadow-sm hover:shadow-md">
             {/* Header: Avatar + Alias + Role */}
@@ -17,6 +17,17 @@ const EmployeeCard = ({ emp, displayName, stats, onEdit, onDelete }) => {
                     <p className="text-xs text-[#718096] font-semibold truncate">{emp.role}</p>
                     {displayName !== emp.firstName && <p className="text-[10px] text-[#A0AEC0] truncate">{emp.firstName}</p>}
                 </div>
+
+                {/* Interviewer Toggle (Direct Action) */}
+                {['Gerente', 'Supervisor', 'Responsable'].includes(emp.role) && (
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); onToggleInterviewer(emp.id, !emp.isInterviewer); }}
+                        className={`absolute top-3 right-12 p-2 rounded-xl transition-all border ${emp.isInterviewer ? 'bg-[#1A365D] text-white border-[#1A365D]' : 'bg-white text-slate-300 border-slate-100 hover:border-[#1A365D]/20'}`}
+                        title={emp.isInterviewer ? "Desmarcar como Entrevistador" : "Marcar como Entrevistador"}
+                    >
+                        <UserCheck size={14} />
+                    </button>
+                )}
                 
                 {/* Actions Overlay */}
                 <div className="flex flex-col gap-1 absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm rounded-lg border border-[#E2E8F0] shadow-sm p-1">

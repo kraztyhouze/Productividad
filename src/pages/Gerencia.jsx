@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useAuth, ROLES } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
+import { useProductivity } from '../context/ProductivityContext';
+import { motion, AnimatePresence } from 'framer-motion';
+import MeetingsView from '../components/Gerencia/MeetingsView';
 import { 
     Pocket, 
     Calculator, 
@@ -32,7 +36,16 @@ import {
     Camera,
     FileText,
     Download,
-    Table
+    Table,
+    Award,
+    Activity,
+    ShieldAlert,
+    TrendingDown,
+    Zap,
+    MessageSquare,
+    RefreshCcw,
+    List,
+    Layout
 } from 'lucide-react';
 import { 
     format, 
@@ -48,27 +61,23 @@ import {
     addYears,
     eachDayOfInterval,
     parseISO,
-    isToday
+    isToday,
+    startOfDay,
+    addWeeks
 } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { 
-    BarChart, 
-    Bar, 
-    XAxis, 
-    YAxis, 
-    CartesianGrid, 
-    Tooltip, 
-    ResponsiveContainer, 
-    Cell,
-    PieChart,
-    Pie,
-    LineChart,
-    Line,
-    AreaChart,
-    Area
-} from 'recharts';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+
+// --- NEW UI COMPONENTS ---
+import GlassCard from '../components/Gerencia/GlassCard';
+import ProductivityTrendChart from '../components/Gerencia/ProductivityTrendChart';
+import SalesMixChart from '../components/Gerencia/SalesMixChart';
+import XPGoalsChart from '../components/Gerencia/XPGoalsChart';
+import ZoneFilter from '../components/Gerencia/ZoneFilter';
+import OrderReminder from '../components/Gerencia/OrderReminder';
+import * as dateUtils from '../utils/dateUtils';
 
 // --- CONSTANTS ---
 const BILLS = [500, 200, 100, 50, 20, 10, 5];
@@ -95,7 +104,7 @@ const formatPrice = (p) => Number(p || 0).toLocaleString('es-ES', { minimumFract
 const formatWeight = (w) => Number(w || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' gr';
 const getEmpName = (e) => {
     if (!e) return '---';
-    return e.alias || `${e.firstName} ${e.lastName || ''}`.trim() || e.username;
+    return e.alias || `${e.first_name || ''} ${e.last_name || ''}`.trim() || e.username || 'S/N';
 };
 
 const compressImage = (file, maxWidth = 800) => {
@@ -354,7 +363,26 @@ const downloadJewelryPDF = (movements) => {
 const Gerencia = () => {
     const { user } = useAuth();
     const { currentStore } = useStore();
-    const [activeTab, setActiveTab] = useState('summary');
+    const { dailyGroups, transactionLogs, adminActions } = useProductivity();
+    
+    const [activeTab, setActiveTabState] = useState('summary');
+    
+    // Sync with URL params
+    const location = useLocation();
+    useEffect(() => {
+        const queryTab = new URLSearchParams(location.search).get('tab');
+        if (queryTab) setActiveTabState(queryTab);
+        else setActiveTabState('summary');
+    }, [location.search]);
+
+    const setActiveTab = (tab) => {
+        // Option 1: navigate to change URL
+        // navigate(`/gerencia?tab=${tab}`);
+        // Option 2: just state (but sidebar won't update its active state)
+        // I will use state for internal toggles but the sidebar uses URLs.
+        setActiveTabState(tab);
+    };
+
     const [tasks, setTasks] = useState([]);
     const [partners, setPartners] = useState([]);
     const [movements, setMovements] = useState([]);
@@ -363,22 +391,32 @@ const Gerencia = () => {
     const [employees, setEmployees] = useState([]);
     const [inventory, setInventory] = useState([]);
     const [orders, setOrders] = useState([]);
+    const [zones, setZones] = useState([]);
+    const [activeZoneId, setActiveZoneId] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [auditAlerts, setAuditAlerts] = useState([]);
 
     const [modal, setModal] = useState({ type: null, data: null });
+
+    const setLoadingSafe = (val) => setLoading(val);
 
     const loadData = async () => {
         setLoading(true);
         try {
-            const h = { 'x-store-id': currentStore };
-            const [tRes, pRes, mRes, cRes, bRes, iRes, oRes] = await Promise.all([
-                fetch('/api/tasks', { headers: h }),
+            const h = { 
+                'x-store-id': currentStore,
+                'x-user-role': user?.role === ROLES.MANAGER ? 'Gerente' : user?.role
+            };
+            const [tRes, pRes, mRes, cRes, bRes, iRes, oRes, aRes, zRes] = await Promise.all([
+                fetch('/api/gerencia/tasks/unified', { headers: h }),
                 fetch('/api/gerencia/goldsmith/partners', { headers: h }),
                 fetch('/api/gerencia/goldsmith/movements', { headers: h }),
                 fetch('/api/gerencia/cash-control', { headers: h }),
                 fetch('/api/task-batteries', { headers: h }),
                 fetch('/api/gerencia/goldsmith/inventory', { headers: h }),
-                fetch('/api/gerencia/goldsmith/orders', { headers: h })
+                fetch('/api/gerencia/goldsmith/orders', { headers: h }),
+                fetch('/api/gerencia/audit-alerts', { headers: h }),
+                fetch('/api/gerencia/store-zones', { headers: h })
             ]);
             
             if (tRes.ok) setTasks(await tRes.json());
@@ -388,6 +426,8 @@ const Gerencia = () => {
             if (bRes.ok) setBatteries(await bRes.json());
             if (iRes.ok) setInventory(await iRes.json());
             if (oRes.ok) setOrders(await oRes.json());
+            if (aRes.ok) setAuditAlerts(await aRes.json());
+            if (zRes.ok) setZones(await zRes.json());
             
             const eRes = await fetch('/api/employees', { headers: h });
             if (eRes.ok) setEmployees(await eRes.json());
@@ -446,12 +486,27 @@ const Gerencia = () => {
         }
     };
 
-    if (user?.role !== ROLES.MANAGER) {
+    const cumulativeCashDiff = useMemo(() => {
+        const currentYear = new Date().getFullYear();
+        return (Array.isArray(cashHistory) ? cashHistory : [])
+            .filter(h => new Date(h.date).getFullYear() === currentYear && h.is_closed)
+            .reduce((acc, h) => acc + (Number(h.total || 0) - Number(h.expected_total || 0)), 0);
+    }, [cashHistory]);
+
+    const tabs = [
+        { id: 'summary', label: 'Resumen', icon: BarChart3 },
+        { id: 'tasks', label: 'Agenda', icon: CalendarIcon },
+        { id: 'reports', label: 'Informes', icon: FileText },
+        { id: 'jewelry', label: 'Joyería', icon: Pocket },
+        { id: 'cash', label: 'Conteo', icon: Calculator }
+    ];
+
+    if (![ROLES.MANAGER, ROLES.SUPERVISOR, ROLES.RESPONSIBLE].includes(user?.role)) {
         return (
             <div className="min-h-[80vh] flex flex-col items-center justify-center p-8 bg-[#F8F9FB] rounded-[40px] border-2 border-[#E2E8F0] animate-in zoom-in duration-500">
                 <div className="p-10 bg-red-50 text-red-500 rounded-full mb-8"><Lock size={64} /></div>
                 <h1 className="text-4xl font-black text-[#1A365D] tracking-tighter uppercase">ACCESO RESTRINGIDO</h1>
-                <p className="text-[#A0AEC0] font-bold text-xs uppercase tracking-widest mt-4">Solo Gerentes autorizados</p>
+                <p className="text-[#A0AEC0] font-bold text-xs uppercase tracking-widest mt-4">Solo personal de gerencia autorizado</p>
             </div>
         );
     }
@@ -620,20 +675,14 @@ const Gerencia = () => {
         if (res.ok) loadData();
     };
 
-    const cumulativeCashDiff = useMemo(() => {
-        const currentYear = new Date().getFullYear();
-        return (Array.isArray(cashHistory) ? cashHistory : [])
-            .filter(h => new Date(h.date).getFullYear() === currentYear && h.is_closed)
-            .reduce((acc, h) => acc + (Number(h.total || 0) - Number(h.expected_total || 0)), 0);
-    }, [cashHistory]);
+    const handleGrantXP = async (data) => {
+        const ok = await adminActions.grantBonusXP(data.employeeId, data.xp, data.reason);
+        if (ok) {
+            setModal({ type: null, data: null });
+            loadData();
+        }
+    };
 
-    const tabs = [
-        { id: 'summary', label: 'Resumen', icon: BarChart3 },
-        { id: 'tasks', label: 'Agenda', icon: CalendarIcon },
-        { id: 'reports', label: 'Informes', icon: FileText },
-        { id: 'jewelry', label: 'Joyería', icon: Pocket },
-        { id: 'cash', label: 'Fondos', icon: Calculator }
-    ];
 
     const handleDeleteTask = async (id) => {
         if (!confirm('¿Seguro que quieres eliminar esta tarea?')) return;
@@ -647,334 +696,462 @@ const Gerencia = () => {
         }
     };
 
+    const handleSaveZone = async (z) => {
+        const method = z.id ? 'PUT' : 'POST';
+        const url = z.id ? `/api/gerencia/store-zones/${z.id}` : '/api/gerencia/store-zones';
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore, 'x-user-role': user?.role === ROLES.MANAGER ? 'Gerente' : user?.role },
+            body: JSON.stringify(z)
+        });
+        if (res.ok) {
+            loadData();
+            setModal({ type: 'zone_manager', data: null });
+        }
+    };
+
+    const handleDeleteZone = async (id) => {
+        if (!confirm('¿Seguro que quieres eliminar esta zona?')) return;
+        const res = await fetch(`/api/gerencia/store-zones/${id}`, {
+            method: 'DELETE',
+            headers: { 'x-store-id': currentStore, 'x-user-role': user?.role === ROLES.MANAGER ? 'Gerente' : user?.role }
+        });
+        if (res.ok) loadData();
+    };
+
     return (
-        <div className="p-6 md:p-10 space-y-10 max-w-[1600px] mx-auto animate-in fade-in duration-500">
-            <div className="bg-white/80 backdrop-blur-md p-2 rounded-[40px] shadow-sm border border-[#E2E8F0] flex gap-2 w-fit sticky top-4 z-40 mx-auto md:mx-0">
-                {tabs.map(tab => (
-                    <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-3 px-8 py-4 rounded-[32px] font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-[#1A365D] text-white shadow-xl shadow-[#1A365D]/20' : 'text-[#A0AEC0] hover:bg-slate-50 hover:text-[#1A365D]'}`}>
-                        <tab.icon size={18} /> {tab.label}
+        <div className="animate-in fade-in duration-500">
+            {/* Header / Title bar if needed, otherwise just the content */}
+            <div className="flex justify-between items-center mb-8">
+                <div>
+                    <h1 className="text-2xl font-black text-[#1A365D] uppercase tracking-tight">
+                        {tabs.find(t => t.id === activeTab)?.label}
+                    </h1>
+                    <p className="text-[#A0AEC0] text-xs font-bold uppercase tracking-widest mt-1">Gestión Centralizada</p>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                    <button 
+                        onClick={() => setModal({ type: 'xp_bonus', data: null })} 
+                        className="flex items-center gap-2 px-4 py-2 bg-white border border-[#E2E8F0] rounded-xl text-[#718096] hover:text-blue-500 transition-colors text-xs font-bold uppercase tracking-widest"
+                    >
+                        <Award size={14} />
+                        Bono XP
                     </button>
-                ))}
+                    <button 
+                        onClick={loadData}
+                        className="p-2 bg-white border border-[#E2E8F0] rounded-xl text-[#718096] hover:text-[#1A365D] transition-colors"
+                        title="Refrescar datos"
+                    >
+                        <RefreshCcw size={16} className={loading ? 'animate-spin' : ''} />
+                    </button>
+                </div>
             </div>
 
-            <div className="min-h-[70vh]">
-                {activeTab === 'summary' && <GerenciaDashboard tasks={tasks} partners={partners} movements={movements} cashHistory={cashHistory} inventory={inventory} orders={orders} cumulativeCashDiff={cumulativeCashDiff} />}
-                {activeTab === 'reports' && <ReportsView batteries={batteries} tasks={tasks} cashHistory={cashHistory} movements={movements} partners={partners} />}
-                {activeTab === 'tasks' && (
-                    <TasksView 
-                        tasks={tasks} 
-                        batteries={batteries}
-                        employees={employees}
-                        partners={partners}
-                        onEdit={(t) => setModal({ type: 'task', data: t })} 
-                        onAdd={() => setModal({ type: 'task', data: null })} 
-                        onAddBattery={() => setModal({ type: 'battery', data: null })}
-                        onEditBattery={(b) => setModal({ type: 'battery', data: b })}
-                        onAddBatteryItem={(bId) => setModal({ type: 'battery_item', data: { battery_id: bId } })}
-                        onDeleteBatteryItem={handleDeleteBatteryItem}
-                        onCheckBattery={(item) => setModal({ type: 'battery_item_check', data: item })}
-                        onDeleteBattery={handleDeleteBattery}
-                        onPostponeBattery={handlePostponeBattery}
-                        loadData={loadData} 
-                        currentStore={currentStore} 
-                    />
-                )}
-                {activeTab === 'jewelry' && (
-                    <JewelryView 
-                        inventory={inventory}
-                        orders={orders}
-                        partners={partners} 
-                        movements={movements} 
-                        onAddPartner={() => setModal({ type: 'partner', data: null })} 
-                        onEditPartner={(p) => setModal({ type: 'partner', data: p })} 
-                        onDeletePartner={handleDeletePartner} 
-                        onAddMovement={(type) => setModal({ type: 'movement', data: type })} 
-                        onDeleteMovement={handleDeleteMovement} 
-                        onRefine={(m) => setModal({ type: 'refine', data: m })}
-                        onAddOrder={() => setModal({ type: 'order', data: null })}
-                        onReceiveOrder={(o) => setModal({ type: 'order_receive', data: o })}
-                        onAdjustInventory={(cat) => setModal({ type: 'inventory_adjust', data: cat })}
-                    />
-                )}
+            <div className="max-w-[1700px] mx-auto">
+                {activeTab === 'summary' && <GerenciaDashboard tasks={tasks} batteries={batteries} partners={partners} movements={movements} cashHistory={cashHistory} inventory={inventory} orders={orders} cumulativeCashDiff={cumulativeCashDiff} employees={employees} auditAlerts={auditAlerts} onXPBonus={() => setModal({ type: 'xp_bonus', data: null })} activeZoneId={activeZoneId} onTabSwitch={setActiveTab} />}
+                {activeTab === 'reports' && <ReportsView batteries={batteries} tasks={tasks} cashHistory={cashHistory} movements={movements} partners={partners} activeZoneId={activeZoneId} />}
+                {activeTab === 'tasks' && <TasksView tasks={tasks} batteries={batteries} employees={employees} partners={partners} zones={zones} activeZoneId={activeZoneId} onSelectZone={setActiveZoneId} onManageZones={() => setModal({ type: 'zone_manager', data: null })} onEdit={(t) => setModal({ type: 'task', data: t })} onAdd={() => setModal({ type: 'task', data: null })} onAddBattery={() => setModal({ type: 'battery', data: null })} onEditBattery={(b) => setModal({ type: 'battery', data: b })} onAddBatteryItem={(bId) => setModal({ type: 'battery_item', data: { battery_id: bId } })} onDeleteBatteryItem={handleDeleteBatteryItem} onCheckBattery={(item) => setModal({ type: 'battery_item_check', data: item })} onDeleteBattery={handleDeleteBattery} onPostponeBattery={handlePostponeBattery} loadData={loadData} currentStore={currentStore} />}
+                {activeTab === 'jewelry' && <JewelryView inventory={inventory} orders={orders} partners={partners} movements={movements} onAddPartner={() => setModal({ type: 'partner', data: null })} onEditPartner={(p) => setModal({ type: 'partner', data: p })} onDeletePartner={handleDeletePartner} onAddMovement={(type) => setModal({ type: 'movement', data: type })} onDeleteMovement={handleDeleteMovement} onRefine={(m) => setModal({ type: 'refine', data: m })} onAddOrder={() => setModal({ type: 'order', data: null })} onReceiveOrder={(o) => setModal({ type: 'order_receive', data: o })} onAdjustInventory={(cat) => setModal({ type: 'inventory_adjust', data: cat })} />}
+                {activeTab === 'meetings' && <MeetingsView storeId={currentStore} />}
                 {activeTab === 'cash' && <CashView history={Array.isArray(cashHistory) ? cashHistory : []} employees={employees} onSave={handleSaveCash} user={user} cumulativeCashDiff={cumulativeCashDiff} />}
             </div>
 
-            <GlobalModal isOpen={modal.type === 'task'} onClose={() => setModal({ type: null, data: null })} title={modal.data ? 'Editar Tarea' : 'Nueva Tarea'}>
-                <TaskForm 
-                    initialData={modal.data} 
-                    employees={employees}
-                    onSave={handleSaveTask} 
-                    onCancel={() => setModal({ type: null, data: null })} 
-                    onDelete={handleDeleteTask}
-                />
-            </GlobalModal>
-
-            <GlobalModal isOpen={modal.type === 'partner'} onClose={() => setModal({ type: null, data: null })} title={modal.data ? 'Editar Joyero' : 'Nuevo Joyero'}>
-                <PartnerForm initialData={modal.data} onSave={handleSavePartner} onCancel={() => setModal({ type: null, data: null })} />
-            </GlobalModal>
-
-            <GlobalModal isOpen={modal.type === 'movement'} onClose={() => setModal({ type: null, data: null })} title={modal.data === 'Fundición' ? 'Lote de Fundición' : modal.data === 'Recepción' ? 'Recepción de Oro' : 'Envío a Joyería'} maxWidth="max-w-4xl">
-                <MovementForm type={modal.data} partners={partners} onSave={handleSaveMovement} onCancel={() => setModal({ type: null, data: null })} />
-            </GlobalModal>
-
-            <GlobalModal isOpen={modal.type === 'refine'} onClose={() => setModal({ type: null, data: null })} title="Cerrar Lote / Afinaje">
-                <RefineForm movement={modal.data} onSave={handleUpdateSmelt} onCancel={() => setModal({ type: null, data: null })} />
-            </GlobalModal>
-
-            <GlobalModal isOpen={modal.type === 'battery'} onClose={() => setModal({ type: null, data: null })} title={modal.data ? "Editar Batería" : "Nueva Batería de Tareas"}>
-                <BatteryForm initialData={modal.data} onSave={handleSaveBattery} onCancel={() => setModal({ type: null, data: null })} />
-            </GlobalModal>
-
-            <GlobalModal isOpen={modal.type === 'battery_item'} onClose={() => setModal({ type: null, data: null })} title="Añadir Tarea Extra">
-                <BatteryItemForm batteryId={modal.data?.battery_id} onSave={handleSaveBatteryItem} onCancel={() => setModal({ type: null, data: null })} />
-            </GlobalModal>
-
-            <GlobalModal isOpen={modal.type === 'battery_item_check'} onClose={() => setModal({ type: null, data: null })} title="Confirmar Tarea Realizada">
-                <BatteryItemCheckForm item={modal.data} onConfirm={handleToggleBatteryItem} onCancel={() => setModal({ type: null, data: null })} />
-            </GlobalModal>
-
-            <GlobalModal isOpen={modal.type === 'order'} onClose={() => setModal({ type: null, data: null })} title="Lanzar Nuevo Pedido">
-                <OrderForm partners={partners} onSave={handleSaveOrder} onCancel={() => setModal({ type: null, data: null })} />
-            </GlobalModal>
-
-            <GlobalModal isOpen={modal.type === 'order_receive'} onClose={() => setModal({ type: null, data: null })} title="Confirmar Recepción de Pedido">
-                <OrderClosureModal order={modal.data} onConfirm={handleReceiveOrder} onCancel={() => setModal({ type: null, data: null })} />
-            </GlobalModal>
-
-            <GlobalModal isOpen={modal.type === 'inventory_adjust'} onClose={() => setModal({ type: null, data: null })} title="Ajuste / Transferencia de Inventario">
-                <InventoryAdjustmentModal initialCategory={modal.data} onSave={handleAdjustInventory} onCancel={() => setModal({ type: null, data: null })} />
-            </GlobalModal>
+            {/* MODALS PERSISTENTES (Animaciones movidas aquí) */}
+            <AnimatePresence>
+                {/* ... existing modals ... */}
+                {modal.type === 'task' && (
+                    <GlobalModal isOpen={true} onClose={() => setModal({ type: null, data: null })} title={modal.data ? 'Editar Tarea' : 'Nueva Tarea'}>
+                        <TaskForm initialData={modal.data} employees={employees} zones={zones} onSave={handleSaveTask} onCancel={() => setModal({ type: null, data: null })} onDelete={handleDeleteTask} />
+                    </GlobalModal>
+                )}
+                {modal.type === 'zone_manager' && (
+                    <GlobalModal isOpen={true} onClose={() => setModal({ type: null, data: null })} title="Gestión de Zonas">
+                        <ZoneManagerForm zones={zones} employees={employees} onSave={handleSaveZone} onDelete={handleDeleteZone} onCancel={() => setModal({ type: null, data: null })} />
+                    </GlobalModal>
+                )}
+                {modal.type === 'partner' && (
+                    <GlobalModal isOpen={true} onClose={() => setModal({ type: null, data: null })} title={modal.data ? 'Editar Joyero' : 'Nuevo Joyero'}>
+                        <PartnerForm initialData={modal.data} onSave={handleSavePartner} onCancel={() => setModal({ type: null, data: null })} />
+                    </GlobalModal>
+                )}
+                {modal.type === 'movement' && (
+                    <GlobalModal isOpen={true} onClose={() => setModal({ type: null, data: null })} title="Operación de Joyería" maxWidth="max-w-4xl">
+                        <MovementForm type={modal.data} partners={partners} onSave={handleSaveMovement} onCancel={() => setModal({ type: null, data: null })} />
+                    </GlobalModal>
+                )}
+                {modal.type === 'refine' && (
+                    <GlobalModal isOpen={true} onClose={() => setModal({ type: null, data: null })} title="Cierre de Lote">
+                        <RefineForm movement={modal.data} onSave={handleUpdateSmelt} onCancel={() => setModal({ type: null, data: null })} />
+                    </GlobalModal>
+                )}
+                {modal.type === 'battery' && (
+                    <GlobalModal isOpen={true} onClose={() => setModal({ type: null, data: null })} title={modal.data ? "Editar Batería" : "Nueva Batería"}>
+                        <BatteryForm initialData={modal.data} zones={zones} onSave={handleSaveBattery} onCancel={() => setModal({ type: null, data: null })} />
+                    </GlobalModal>
+                )}
+                {modal.type === 'battery_item' && (
+                    <GlobalModal isOpen={true} onClose={() => setModal({ type: null, data: null })} title="Añadir Tarea">
+                        <BatteryItemForm batteryId={modal.data?.battery_id} onSave={handleSaveBatteryItem} onCancel={() => setModal({ type: null, data: null })} />
+                    </GlobalModal>
+                )}
+                {modal.type === 'battery_item_check' && (
+                    <GlobalModal isOpen={true} onClose={() => setModal({ type: null, data: null })} title="Checkbox Tarea">
+                        <BatteryItemCheckForm item={modal.data} onConfirm={handleToggleBatteryItem} onCancel={() => setModal({ type: null, data: null })} />
+                    </GlobalModal>
+                )}
+                {modal.type === 'order' && (
+                    <GlobalModal isOpen={true} onClose={() => setModal({ type: null, data: null })} title="Lanzar Pedido">
+                        <OrderForm partners={partners} onSave={handleSaveOrder} onCancel={() => setModal({ type: null, data: null })} />
+                    </GlobalModal>
+                )}
+                {modal.type === 'order_receive' && (
+                    <GlobalModal isOpen={true} onClose={() => setModal({ type: null, data: null })} title="Recibir Mercancía">
+                        <OrderClosureModal order={modal.data} onConfirm={handleReceiveOrder} onCancel={() => setModal({ type: null, data: null })} />
+                    </GlobalModal>
+                )}
+                {modal.type === 'inventory_adjust' && (
+                    <GlobalModal isOpen={true} onClose={() => setModal({ type: null, data: null })} title="Stock / Inventario">
+                        <InventoryAdjustmentModal initialCategory={modal.data} onSave={handleAdjustInventory} onCancel={() => setModal({ type: null, data: null })} />
+                    </GlobalModal>
+                )}
+                {modal.type === 'xp_bonus' && (
+                    <GlobalModal isOpen={true} onClose={() => setModal({ type: null, data: null })} title="Bonificación XP">
+                        <XPBonusForm employees={employees} onSave={handleGrantXP} onCancel={() => setModal({ type: null, data: null })} />
+                    </GlobalModal>
+                )}
+            </AnimatePresence>
         </div>
     );
 };
 
 // --- SUB-COMPONENTS/VIEWS ---
 
-const GerenciaDashboard = ({ tasks, partners, movements, cashHistory, inventory, orders, cumulativeCashDiff }) => {
-    const safeHistory = Array.isArray(cashHistory) ? cashHistory : [];
-    const safeMovements = Array.isArray(movements) ? movements : [];
-    const safeTasks = Array.isArray(tasks) ? tasks : [];
-    const safePartners = Array.isArray(partners) ? partners : [];
+const GerenciaDashboard = ({ tasks, batteries, partners, movements, cashHistory, inventory, orders, cumulativeCashDiff, employees, auditAlerts, activeZoneId, onXPBonus, onTabSwitch }) => {
+    const { dailyGroups } = useProductivity();
+    
+    // --- New States for Alerts Filtering ---
+    const [alertMonth, setAlertMonth] = useState(format(new Date(), 'yyyy-MM'));
+    const [showAllAlerts, setShowAllAlerts] = useState(false);
 
-    const today = format(new Date(), 'yyyy-MM-dd');
-    const todayTasks = safeTasks.filter(t => t.date === today && t.status !== 'Hecha');
-    const totalDebt = safePartners.reduce((acc, p) => acc + Number(p.debt_grams || 0), 0);
-    const lastCash = safeHistory[0] || { total: 0, observations: 'Sin registros' };
-    const smeltingMoves = safeMovements.filter(m => m.type === 'Fundición' && m.status === 'Completado');
-    const lastSmelt = smeltingMoves[0];
-    const lastSmeltMargin = lastSmelt ? (Number(lastSmelt.received_amount) - Number(lastSmelt.acquisition_cost)) : 0;
-
-    const inProcessWeight = safeMovements
-        .filter(m => m.type === 'Envío')
-        .reduce((acc, m) => acc + Number(m.weight), 0) - 
-        safeMovements.filter(m => m.type === 'Fundición').reduce((acc, m) => acc + Number(m.weight), 0);
-
-    const chartData = useMemo(() => {
-        const months = [];
-        for (let i = 5; i >= 0; i--) {
-            const d = subMonths(new Date(), i);
-            months.push({ 
-                name: format(d, 'MMM', { locale: es }), 
-                monthKey: format(d, 'yyyy-MM'), 
-                margin: 0,
-                cash: 0,
-                goldIn: 0,
-                goldOut: 0
-            });
-        }
-        
-        smeltingMoves.forEach(m => {
-            const mKey = m.date.substring(0, 7);
-            const dataPoint = months.find(d => d.monthKey === mKey);
-            if (dataPoint) dataPoint.margin += (Number(m.received_amount) - Number(m.acquisition_cost));
-        });
-
-        safeHistory.forEach(h => {
-            const mKey = h.date.substring(0, 7);
-            const dataPoint = months.find(d => d.monthKey === mKey);
-            if (dataPoint) dataPoint.cash = Number(h.total || 0);
-        });
-
-        safeMovements.forEach(m => {
-            const mKey = m.date.substring(0, 7);
-            const dataPoint = months.find(d => d.monthKey === mKey);
-            if (dataPoint) {
-                if (m.type === 'Recepción' || m.type === 'Ajuste+') dataPoint.goldIn += Number(m.weight || 0);
-                if (m.type === 'Envío' || m.type === 'Fundición' || m.type === 'Ajuste-') dataPoint.goldOut += Number(m.weight || 0);
+    const availableAlertMonths = useMemo(() => {
+        const monthsSet = new Set();
+        monthsSet.add(format(new Date(), 'yyyy-MM'));
+        (auditAlerts || []).forEach(a => {
+            if (a.type === 'suspicious_duration' && a.data?.start_time) {
+                monthsSet.add(format(parseISO(a.data.start_time), 'yyyy-MM'));
             }
         });
+        return Array.from(monthsSet).sort().reverse();
+    }, [auditAlerts]);
 
-        return months;
-    }, [safeMovements, safeHistory]);
+    const buyingAlerts = useMemo(() => {
+        const filteredByMonth = (auditAlerts || []).filter(a => {
+            if (a.type !== 'suspicious_duration') return false;
+            const start = a.data?.start_time;
+            if (!start) return false;
+            return format(parseISO(start), 'yyyy-MM') === alertMonth;
+        });
+        
+        const counts = {};
+        filteredByMonth.forEach(a => {
+            const name = a.data?.first_name || 'Desconocido';
+            counts[name] = (counts[name] || 0) + 1;
+        });
+        return Object.entries(counts)
+            .map(([name, count]) => ({ name, count }))
+            .sort((a,b) => b.count - a.count);
+    }, [auditAlerts, alertMonth]);
 
-    const donutData = (Array.isArray(inventory) ? inventory : []).map(item => ({
-        name: item.category,
-        value: Number(item.total_weight)
-    })).filter(d => d.value > 0);
+    // --- restored 1. PRODUCTIVITY RANKING ---
+    const prodRanking = useMemo(() => {
+        if (!employees || !dailyGroups) return [];
+        const today = new Date();
+        const last7Days = Array.from({ length: 7 }, (_, i) => format(addDays(today, -i), 'yyyy-MM-dd'));
 
-    const transitOrderWeight = (Array.isArray(orders) ? orders : []).filter(o => o.status === 'Pedido Lanzado').reduce((acc, o) => acc + Number(o.est_weight), 0);
-    const inOpsWeight = safeMovements.filter(m => m.status === 'Pendiente').reduce((acc, m) => acc + Number(m.weight), 0);
+        return [...employees]
+            .map(emp => {
+                const empId = String(emp.id).trim();
+                let weeklyTotal = 0;
+                last7Days.forEach(date => {
+                    const stats = dailyGroups[`${empId}-${date}`];
+                    if (stats) {
+                        weeklyTotal += (Number(stats.standard || 0) + Number(stats.jewelry || 0) + Number(stats.recoverable || 0));
+                    }
+                });
+                return {
+                    id: emp.id,
+                    name: emp.alias || emp.first_name,
+                    total: weeklyTotal,
+                    avatar: emp.avatar,
+                    role: emp.role
+                };
+            })
+            .sort((a, b) => b.total - a.total)
+            .slice(0, 3);
+    }, [employees, dailyGroups]);
+
+    // --- restored 2. TREND DATA ---
+    const trendData = useMemo(() => {
+        const days = [];
+        const today = new Date();
+        for (let i = 6; i >= 0; i--) {
+            const dStr = format(addDays(today, -i), 'yyyy-MM-dd');
+            let dayTotal = 0;
+            (employees || []).forEach(emp => {
+                const stats = dailyGroups[`${String(emp.id).trim()}-${dStr}`];
+                if (stats) dayTotal += (Number(stats.standard || 0) + Number(stats.jewelry || 0) + Number(stats.recoverable || 0));
+            });
+            days.push({
+                name: format(addDays(today, -i), 'EEE', { locale: es }).toUpperCase(),
+                productividad: dayTotal,
+                tiempo_tienda: 8 
+            });
+        }
+        return days;
+    }, [employees, dailyGroups]);
+
+    // --- restored 3. MIX DATA ---
+    const mixData = useMemo(() => {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        return (employees || []).map(emp => {
+            const stats = dailyGroups[`${String(emp.id).trim()}-${today}`] || {};
+            return {
+                name: emp.alias || emp.first_name,
+                standard: Number(stats.standard || 0),
+                jewelry: Number(stats.jewelry || 0),
+                recoverable: Number(stats.recoverable || 0)
+            };
+        });
+    }, [employees, dailyGroups]);
+
+    // --- restored 4. BATTERY PROGRESS ---
+    const batteryStats = useMemo(() => {
+        const safeBatteries = (Array.isArray(batteries) ? batteries : []).filter(b => !activeZoneId || b.zone_id == activeZoneId);
+        let totalItems = 0;
+        let doneItems = 0;
+        
+        safeBatteries.forEach(b => {
+            (b.items || []).forEach(item => {
+                totalItems++;
+                if (item.is_done) doneItems++;
+            });
+        });
+
+        const progress = totalItems > 0 ? Math.round((doneItems / totalItems) * 100) : 0;
+        return { progress, active: doneItems, total: totalItems };
+    }, [batteries, activeZoneId]);
+
+    // --- restored 5. JEWELRY DEBT ---
+    const totalDebt = (partners || []).reduce((acc, p) => acc + Number(p.debt_grams || 0), 0);
 
     return (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {/* Strategic Jewelry Insights */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="bg-[#1A365D] p-8 rounded-[40px] text-white flex gap-6 items-center shadow-2xl relative overflow-hidden">
-                    <div className="flex-1 z-10">
-                        <h4 className="text-[9px] font-black text-blue-300 uppercase tracking-widest mb-2">Distribución Metal</h4>
-                        <div className="h-28 w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie data={donutData} cx="50%" cy="50%" innerRadius={35} outerRadius={45} paddingAngle={2} dataKey="value">
-                                        {donutData.map((entry, index) => <Cell key={`cell-${index}`} fill={CATEGORY_COLORS[entry.name] || '#FFF'} />)}
-                                    </Pie>
-                                </PieChart>
-                            </ResponsiveContainer>
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            {/* KPI OVERVIEW GRID */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <GlassCard title="Joyería en Tránsito" icon={Pocket} description="Pedidos lanzados no recibidos" 
+                    action={<div className="flex items-center gap-1 text-[10px] bg-blue-100/50 text-blue-600 px-2 py-1 rounded-full"><Plus size={10}/> {orders.filter(o => o.status !== 'Recibido').length} Pedidos</div>}>
+                    <div className="mt-2">
+                        <span className="text-3xl font-black text-slate-800 tracking-tighter">
+                            {orders.filter(o => o.status !== 'Recibido').reduce((acc, o) => acc + Number(o.est_weight || 0), 0).toFixed(1)}g
+                        </span>
+                        <div className="text-[10px] text-slate-400 font-bold uppercase mt-1">Peso estimado pendiente</div>
+                    </div>
+                </GlassCard>
+
+                <GlassCard title="Control de Caja" icon={Calculator} description="Diferencia acumulada anual"
+                    action={<div onClick={() => onTabSwitch('cash')} className="flex items-center gap-1 text-[10px] bg-green-100/50 text-green-600 px-2 py-1 rounded-full cursor-pointer"><ChevronRight size={10}/> Ver Más</div>}>
+                    <div className="mt-2 text-3xl font-black text-slate-800 tracking-tighter">
+                        {cumulativeCashDiff > 0 ? '+' : ''}{Number(cumulativeCashDiff || 0).toFixed(2)}€
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-bold uppercase mt-1">Precisión del arqueo</div>
+                </GlassCard>
+
+                <GlassCard title="Progreso Baterías" icon={Zap} description="Cumplimiento de objetivos"
+                    action={<div onClick={() => onTabSwitch('tasks')} className="flex items-center gap-1 text-[10px] bg-pink-100/50 text-pink-600 px-2 py-1 rounded-full cursor-pointer"><ChevronRight size={10}/> Ver Más</div>}>
+                    <div className="mt-4 h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <motion.div initial={{ width: 0 }} animate={{ width: `${batteryStats.progress || 0}%` }} className="h-full bg-gradient-to-r from-pink-400 to-rose-500" />
+                    </div>
+                    <div className="mt-2 text-[10px] text-slate-400 font-bold uppercase">{batteryStats.active}/{batteryStats.total} Tareas de control completadas</div>
+                </GlassCard>
+
+                <GlassCard title="Alertas Compras" icon={ShieldAlert} description="Alertas por comprador" 
+                    className={buyingAlerts.length > 0 ? " ring-2 ring-rose-300 ring-offset-4 ring-offset-transparent shadow-rose-100 shadow-2xl" : ""}>
+                    
+                    <div className="flex items-center justify-between mb-4 mt-2">
+                        <div className="flex flex-col">
+                            <span className="text-[8px] font-black text-rose-300 uppercase tracking-widest mb-1">Período</span>
+                            <select 
+                                value={alertMonth} 
+                                onChange={(e) => setAlertMonth(e.target.value)}
+                                className="bg-rose-50 border-none text-[10px] font-black uppercase text-rose-600 rounded-xl px-3 py-2 focus:ring-2 focus:ring-rose-200 cursor-pointer transition-all"
+                            >
+                                {availableAlertMonths.map(m => <option key={m} value={m}>{format(parseISO(`${m}-01`), 'MMMM yyyy', { locale: es })}</option>)}
+                            </select>
+                        </div>
+                        <div className="text-right">
+                            <span className="text-[20px] font-black text-rose-500 block leading-none">{buyingAlerts.length}</span>
+                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">Compradores</span>
                         </div>
                     </div>
-                    <div className="w-1/2 space-y-1.5 z-10">
-                         {donutData.slice(0, 3).map(d => (
-                            <div key={d.name} className="flex items-center gap-2">
-                                <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[d.name] }} />
-                                <span className="text-[7px] font-black uppercase text-blue-100 truncate">{d.name}</span>
-                                <span className="text-[8px] font-black text-blue-300 ml-auto">{d.value}g</span>
+
+                    <div className="space-y-2 max-h-[120px] overflow-hidden">
+                        {buyingAlerts.slice(0, 2).map((a, i) => (
+                            <div key={i} className="flex justify-between items-center bg-rose-50/30 p-3 rounded-2xl border border-rose-100/50 group hover:bg-rose-50 transition-all">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                                    <span className="text-[10px] font-black text-slate-700 uppercase tracking-tight truncate max-w-[100px]">{a.name}</span>
+                                </div>
+                                <span className="text-[10px] font-black text-rose-600 bg-white px-3 py-1 rounded-full shadow-sm border border-rose-100">{a.count} <span className="text-[8px] opacity-60">Alertas</span></span>
                             </div>
                         ))}
+                        {buyingAlerts.length === 0 && (
+                            <div className="py-6 flex flex-col items-center justify-center gap-2 opacity-50">
+                                <CheckCircle2 size={24} className="text-green-400" />
+                                <p className="text-[10px] text-slate-400 font-bold uppercase italic">Sin alertas este mes</p>
+                            </div>
+                        )}
                     </div>
-                    <Layers className="absolute -bottom-6 -right-6 text-white/5 w-32 h-32" />
-                </div>
 
-                <div className="bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm flex flex-col justify-center">
-                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                        Oro Flotante (Tránsito) <TrendingUp size={14} className="text-blue-500" />
-                    </h4>
-                    <div className="space-y-3">
-                        <div className="flex justify-between items-end">
-                            <span className="text-[9px] font-black text-slate-300 uppercase">Pedidos Lanzados</span>
-                            <span className="text-xl font-black text-[#1A365D]">{transitOrderWeight.toFixed(2)} gr</span>
-                        </div>
-                        <div className="flex justify-between items-end">
-                            <span className="text-[9px] font-black text-slate-300 uppercase">En Fundiciones</span>
-                            <span className="text-xl font-black text-blue-400">{inOpsWeight.toFixed(2)} gr</span>
-                        </div>
-                        <div className="pt-3 border-t border-dashed border-slate-100 flex justify-between items-center text-[#FF8C9D]">
-                            <span className="text-[9px] font-black uppercase">Total Exterior</span>
-                            <span className="text-sm font-black">{(transitOrderWeight + inOpsWeight).toFixed(2)} gr</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm flex flex-col justify-center">
-                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Control de Pedidos</h4>
-                    <div className="flex items-center gap-6">
-                        <div className="p-5 bg-blue-50 text-blue-500 rounded-3xl"><Package size={28}/></div>
-                        <div>
-                            <p className="text-3xl font-black text-[#1A365D]">{(Array.isArray(orders) ? orders : []).filter(o => o.status === 'Pedido Lanzado').length}</p>
-                            <p className="text-xs text-[#A0AEC0] font-bold uppercase tracking-tighter">Entradas Pendientes</p>
-                        </div>
-                    </div>
-                </div>
+                    {buyingAlerts.length >= 3 && (
+                        <button 
+                            onClick={() => setShowAllAlerts(true)}
+                            className="w-full mt-4 py-3 bg-white border border-rose-100 text-[9px] font-black text-rose-500 hover:bg-rose-500 hover:text-white uppercase tracking-widest rounded-xl transition-all shadow-sm active:scale-95"
+                        >
+                            Ver todos los compradores ({buyingAlerts.length})
+                        </button>
+                    )}
+                </GlassCard>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="bg-white p-6 rounded-[32px] border border-[#E2E8F0] shadow-sm flex flex-col justify-between h-40">
-                    <div className="flex justify-between items-start"><div className="p-3 bg-blue-50 text-blue-500 rounded-2xl"><CheckCircle2 size={24}/></div><span className="text-[10px] font-black text-[#A0AEC0] uppercase tracking-widest">Agenda</span></div>
-                    <div><p className="text-3xl font-black text-[#1A365D]">{todayTasks.length}</p><p className="text-xs text-[#A0AEC0] font-bold">Tareas Hoy</p></div>
-                </div>
-                <div className="bg-white p-6 rounded-[32px] border border-[#E2E8F0] shadow-sm flex flex-col justify-between h-40">
-                    <div className="flex justify-between items-start"><div className="p-3 bg-amber-50 text-amber-500 rounded-2xl"><Weight size={24}/></div><span className="text-[10px] font-black text-[#A0AEC0] uppercase tracking-widest">Metal</span></div>
-                    <div><p className="text-3xl font-black text-amber-600">{formatWeight(totalDebt)}</p><p className="text-xs text-[#A0AEC0] font-bold">Deuda Oro</p></div>
-                </div>
-                <div className="bg-white p-6 rounded-[32px] border border-[#E2E8F0] shadow-sm flex flex-col justify-between h-40">
-                    <div className="flex justify-between items-start"><div className="p-3 bg-green-50 text-green-500 rounded-2xl"><Euro size={24}/></div><span className="text-[10px] font-black text-[#A0AEC0] uppercase tracking-widest">Caja (YTD)</span></div>
-                    <div>
-                        <p className={`text-3xl font-black ${cumulativeCashDiff >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {cumulativeCashDiff > 0 ? '+' : ''}{formatPrice(cumulativeCashDiff)} €
-                        </p>
-                        <p className="text-xs text-[#A0AEC0] font-bold uppercase tracking-tighter">Arqueo Acumulado</p>
-                    </div>
-                </div>
-                <div className="bg-white p-6 rounded-[32px] border-2 border-coral-100 shadow-xl shadow-coral-50 flex flex-col justify-between h-40">
-                    <div className="flex justify-between items-start"><div className="p-3 bg-coral-50 text-[#FF8C9D] rounded-2xl"><TrendingUp size={24}/></div><span className="text-[10px] font-black text-[#FF8C9D] uppercase tracking-widest">Margen</span></div>
-                    <div><p className="text-3xl font-black text-[#FF8C9D]">+{formatPrice(lastSmeltMargin)} €</p><p className="text-xs text-[#A0AEC0] font-bold">Realizado</p></div>
-                </div>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm">
-                    <div className="flex justify-between items-center mb-8">
-                        <div>
-                            <h3 className="text-sm font-black text-[#1A365D] uppercase tracking-tighter">Evolución de Caja (Arqueos)</h3>
-                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">Tendencia de fondos acumulados</p>
-                        </div>
-                        <div className="bg-green-50 text-green-600 px-3 py-1 rounded-lg text-[9px] font-black uppercase">Tendencia Estable</div>
-                    </div>
-                    <div className="h-[250px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={chartData}>
-                                <defs>
-                                    <linearGradient id="colorCash" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#10B981" stopOpacity={0.1}/>
-                                        <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F0F0F0" />
-                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#A0AEC0'}} />
-                                <YAxis hide domain={['auto', 'auto']} />
-                                <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', fontWeight: 800 }} />
-                                <Area type="monotone" dataKey="cash" stroke="#10B981" strokeWidth={3} fillOpacity={1} fill="url(#colorCash)" />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
+            {/* CHARTS & RANKING SECTION */}
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+                <div className="xl:col-span-8">
+                    <GlassCard title="Tendencia de Compras" icon={Activity} description="Volumen real de compras (últimos 7 días)">
+                        <ProductivityTrendChart data={trendData} />
+                    </GlassCard>
                 </div>
 
-                <div className="bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm">
-                    <div className="flex justify-between items-center mb-8">
-                        <div>
-                            <h3 className="text-sm font-black text-[#1A365D] uppercase tracking-tighter">Flujos de Metal (Mensual)</h3>
-                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">Entradas vs Salidas de Oro/Plata</p>
+                <div className="xl:col-span-4">
+                    <GlassCard title="Ranking Semanal" icon={Award} description="Productividad acumulada en compras" className="h-full">
+                        <div className="space-y-6 mt-4">
+                            {prodRanking.map((emp, index) => (
+                                <div key={emp.id} className="flex items-center justify-between group">
+                                    <div className="flex items-center gap-4">
+                                        <div className="relative">
+                                            <div className={`w-12 h-12 rounded-2xl overflow-hidden border-2 transition-transform group-hover:scale-110 ${index === 0 ? 'border-yellow-400 shadow-lg' : 'border-white/50'}`}>
+                                                <img src={emp.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${emp.name}`} alt="" />
+                                            </div>
+                                            <div className={`absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black text-white ${index === 0 ? 'bg-yellow-400' : index === 1 ? 'bg-slate-300' : 'bg-orange-400'}`}>
+                                                {index + 1}°
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div className="font-bold text-slate-800 text-sm truncate max-w-[100px]">{emp.name}</div>
+                                            <div className="text-[10px] font-bold text-slate-400 uppercase truncate max-w-[100px]">{emp.role}</div>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="font-black text-slate-800">{emp.total.toFixed(0)}</div>
+                                        <div className="text-[9px] font-black text-pink-500 uppercase">Compras Sem.</div>
+                                    </div>
+                                </div>
+                            ))}
+                            {prodRanking.length === 0 && <p className="text-center text-slate-300 text-xs italic mt-10">Sin datos de compras esta semana</p>}
                         </div>
-                        <div className="flex gap-4">
-                            <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-400"/><span className="text-[8px] font-black uppercase text-slate-400">IN</span></div>
-                            <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-coral-400"/><span className="text-[8px] font-black uppercase text-slate-400">OUT</span></div>
-                        </div>
-                    </div>
-                    <div className="h-[250px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData} barGap={4}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F0F0F0" />
-                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#A0AEC0'}} />
-                                <YAxis hide />
-                                <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', fontWeight: 800 }} />
-                                <Bar dataKey="goldIn" fill="#60A5FA" radius={[4, 4, 0, 0]} barSize={10} />
-                                <Bar dataKey="goldOut" fill="#FF8C9D" radius={[4, 4, 0, 0]} barSize={10} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
+                    </GlassCard>
                 </div>
-            </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm">
-                    <h3 className="text-lg font-black text-[#1A365D] tracking-tighter mb-8 lowercase">Margen de Afinaje (Realizado)</h3>
-                    <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F0F0F0" />
-                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#A0AEC0'}} dy={10} />
-                                <YAxis hide />
-                                <Tooltip cursor={{fill: '#F8F9FB'}} contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', fontWeight: 800 }} />
-                                <Bar dataKey="margin" radius={[10, 10, 10, 10]} barSize={40}>
-                                    {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.margin > 0 ? '#FF8C9D' : '#E2E8F0'} />)}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
+                <div className="xl:col-span-6">
+                    <GlassCard title="Mix de Trabajo Diario" icon={Layers} description="Distribución de compras por empleado (Hoy)">
+                        <SalesMixChart data={mixData} />
+                    </GlassCard>
                 </div>
-                <div className="space-y-6">
-                    {inProcessWeight > 500 && <div className="bg-amber-50 border-2 border-amber-200 p-6 rounded-[32px] animate-pulse"><h4 className="text-amber-700 font-black text-xs uppercase flex items-center gap-2"><AlertCircle size={16}/> ALERTA</h4><p className="text-xs font-bold text-amber-600 mt-2">{formatWeight(inProcessWeight)} fuera de tienda.</p></div>}
-                    <div className="bg-white p-6 rounded-[32px] border border-[#E2E8F0] shadow-sm"><h4 className="text-[10px] font-black text-[#A0AEC0] uppercase tracking-widest mb-4">Próximos Eventos</h4><div className="space-y-2">{todayTasks.length === 0 && <p className="text-xs text-[#A0AEC0] italic italic">Sin eventos.</p>}{todayTasks.slice(0, 5).map(task => (<div key={task.id} className="flex items-center gap-2 p-3 bg-[#F4F7FA] rounded-2xl"><div className={`w-2 h-2 rounded-full ${task.priority === 'Alta' ? 'bg-red-400' : 'bg-blue-400'}`} /><span className="text-xs font-bold text-[#1A365D] truncate">{task.title}</span></div>))}</div></div>
+
+                <div className="xl:col-span-3">
+                    <GlassCard title="Deuda Joyeros" icon={Euro} description="Total liquidación pendiente">
+                        <div className="mt-4 flex flex-col items-center justify-center py-6">
+                            <span className="text-4xl font-black text-rose-500 tracking-tighter">{(totalDebt || 0).toFixed(2)}<span className="text-sm ml-1">gr</span></span>
+                            <div className="mt-3 px-4 py-1.5 bg-rose-50 text-rose-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-rose-100">Pendiente de regular</div>
+                            <button onClick={() => onTabSwitch('jewelry')} className="mt-6 text-[9px] font-black text-slate-400 hover:text-[#1A365D] uppercase underline flex items-center gap-1 transition-colors">
+                                <Pocket size={12}/> Ir a Joyería
+                            </button>
+                        </div>
+                    </GlassCard>
+                </div>
+
+                <div className="xl:col-span-3">
+                    <GlassCard title="Acciones Rápidas" icon={PlusCircle} description="Accesos directos de gestión">
+                        <div className="grid grid-cols-1 gap-3 mt-2">
+                            <button onClick={() => onTabSwitch('cash')} className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 hover:bg-pink-50 text-slate-700 hover:text-pink-600 transition-all font-bold text-xs uppercase tracking-tight">
+                                <ShieldAlert size={16}/> Revisar Auditoría de Arqueos
+                            </button>
+                            <button 
+                                onClick={onXPBonus}
+                                className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-600 transition-all font-bold text-xs uppercase tracking-tight"
+                            >
+                                <Zap size={16}/> Bono Productividad Manual
+                            </button>
+                            <button onClick={() => onTabSwitch('reports')} className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 hover:bg-green-50 text-slate-700 hover:text-green-600 transition-all font-bold text-xs uppercase tracking-tight">
+                                <FileText size={16}/> Informes PDF
+                            </button>
+                        </div>
+                    </GlassCard>
                 </div>
             </div>
+            
+            {/* Modal for All Alerts */}
+            <AnimatePresence>
+                {showAllAlerts && (
+                    <motion.div 
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[100] bg-[#1A365D]/40 backdrop-blur-md flex items-center justify-center p-6"
+                        onClick={() => setShowAllAlerts(false)}
+                    >
+                        <motion.div 
+                            initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+                            className="bg-white w-full max-w-xl rounded-[40px] shadow-2xl overflow-hidden border border-white"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-rose-50/20">
+                                <div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <div className="p-2 bg-rose-500 text-white rounded-xl shadow-lg shadow-rose-200"><ShieldAlert size={20}/></div>
+                                        <h3 className="text-xl font-black text-[#1A365D] tracking-tighter uppercase">Todas las Alertas de Compras</h3>
+                                    </div>
+                                    <p className="text-[10px] font-black text-rose-400 uppercase tracking-[0.2em]">{format(parseISO(`${alertMonth}-01`), 'MMMM yyyy', { locale: es })}</p>
+                                </div>
+                                <button onClick={() => setShowAllAlerts(false)} className="p-3 bg-white text-slate-400 hover:text-rose-500 rounded-2xl shadow-sm transition-all"><X size={20}/></button>
+                            </div>
+                            
+                            <div className="p-8 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {buyingAlerts.map((a, i) => (
+                                        <div key={i} className="flex justify-between items-center p-5 bg-slate-50 rounded-3xl border border-transparent hover:border-rose-100 transition-all group items-center">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center text-rose-500 font-black text-xs shadow-sm shadow-rose-100 group-hover:scale-110 transition-transform">{a.name.charAt(0)}</div>
+                                                <div>
+                                                    <div className="font-black text-[#1A365D] text-xs uppercase tracking-tight">{a.name}</div>
+                                                    <div className="text-[9px] font-bold text-slate-400 uppercase">Comprador Activo</div>
+                                                </div>
+                                            </div>
+                                            <div className="bg-white px-4 py-2 rounded-2xl shadow-sm border border-rose-50 flex flex-col items-center">
+                                                <span className="text-xl font-black text-rose-500">{a.count}</span>
+                                                <span className="text-[8px] font-black text-slate-300 uppercase tracking-tighter">Alertas</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                {buyingAlerts.length === 0 && <p className="text-center text-slate-300 uppercase italic py-20 font-black text-xs">Sin alertas este período</p>}
+                            </div>
+
+                            <div className="p-8 bg-slate-50 border-t border-slate-100 text-center">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest max-w-sm mx-auto">Estas alertas se generan por tiempos de atención sospechosamente cortos en compras de oro.</p>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };
@@ -1027,37 +1204,39 @@ const DailyTimelineView = ({ tasks, employees, onEdit, onToggleStatus }) => {
                         ))}
                     </div>
                     <div className="max-h-[600px] overflow-y-auto custom-scrollbar">
-                        {hours.map(hour => (
-                            <div key={hour} className="grid grid-cols-[100px_repeat(auto-fill,minmax(200px,1fr))] border-b border-dashed border-[#F4F7FA] min-h-[80px]">
-                                <div className="p-4 bg-slate-50/50 border-r border-[#E2E8F0] flex items-center justify-center font-black text-[10px] text-slate-400">
-                                    {hour}
+                        {hours.map(hour => {
+                            return (
+                                <div key={hour} className="grid grid-cols-[100px_repeat(auto-fill,minmax(200px,1fr))] border-b border-dashed border-[#F4F7FA] min-h-[80px]">
+                                    <div className="p-4 bg-slate-50/50 border-r border-[#E2E8F0] flex items-center justify-center font-black text-[10px] text-slate-400">
+                                        {hour}
+                                    </div>
+                                    {employees.map(emp => {
+                                        const empName = getEmpName(emp);
+                                        const task = todayTasks.find(t => t.assigned_to === empName && (t.time || '09:00').startsWith(hour.substring(0, 2)));
+                                        return (
+                                            <div key={emp.id} className="p-2 border-r border-[#F4F7FA] relative flex items-center justify-center">
+                                                {task && (
+                                                    <button 
+                                                        onClick={() => onEdit(task)}
+                                                        className={`w-full p-3 rounded-2xl text-[9px] font-black uppercase transition-all hover:scale-[1.02] shadow-sm ${
+                                                            task.status === 'Hecha' ? 'bg-green-50 text-green-500 border border-green-100' :
+                                                            task.priority === 'Alta' ? 'bg-red-50 text-red-500 border border-red-100 shadow-red-100' :
+                                                            'bg-blue-50 text-[#1A365D] border border-blue-100 shadow-blue-50'
+                                                        }`}
+                                                    >
+                                                        <div className="flex justify-between items-start mb-1">
+                                                            <span>{task.time || '--:--'}</span>
+                                                            <div className={`w-1.5 h-1.5 rounded-full ${task.status === 'Hecha' ? 'bg-green-500' : task.priority === 'Alta' ? 'bg-red-500' : 'bg-blue-500'}`} />
+                                                        </div>
+                                                        <div className="truncate">{task.title}</div>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
-                                {employees.map(emp => {
-                                    const empName = getEmpName(emp);
-                                    const task = todayTasks.find(t => t.assigned_to === empName && (t.time || '09:00').startsWith(hour.substring(0, 2)));
-                                    return (
-                                        <div key={emp.id} className="p-2 border-r border-[#F4F7FA] relative flex items-center justify-center">
-                                            {task && (
-                                                <button 
-                                                    onClick={() => onEdit(task)}
-                                                    className={`w-full p-3 rounded-2xl text-[9px] font-black uppercase transition-all hover:scale-[1.02] shadow-sm ${
-                                                        task.status === 'Hecha' ? 'bg-green-50 text-green-500 border border-green-100' :
-                                                        task.priority === 'Alta' ? 'bg-red-50 text-red-500 border border-red-100 shadow-red-100' :
-                                                        'bg-blue-50 text-[#1A365D] border border-blue-100 shadow-blue-50'
-                                                    }`}
-                                                >
-                                                    <div className="flex justify-between items-start mb-1">
-                                                        <span>{task.time || '--:--'}</span>
-                                                        <div className={`w-1.5 h-1.5 rounded-full ${task.status === 'Hecha' ? 'bg-green-500' : task.priority === 'Alta' ? 'bg-red-500' : 'bg-blue-500'}`} />
-                                                    </div>
-                                                    <div className="truncate">{task.title}</div>
-                                                </button>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             </div>
@@ -1065,30 +1244,127 @@ const DailyTimelineView = ({ tasks, employees, onEdit, onToggleStatus }) => {
     );
 };
 
-const TasksView = ({ tasks, batteries, onEdit, onAdd, onAddBattery, onEditBattery, onAddBatteryItem, onDeleteBatteryItem, onCheckBattery, onDeleteBattery, onPostponeBattery, loadData, currentStore, employees, partners }) => {
+const MiniCalendar = ({ currentMonth, onMonthChange, tasks }) => {
+    const startDate = startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 1 });
+    const endDate = endOfWeek(endOfMonth(currentMonth), { weekStartsOn: 1 });
+    const days = eachDayOfInterval({ start: startDate, end: endDate });
+
+    return (
+        <div className="bg-white/40 backdrop-blur-md rounded-[32px] border border-white p-6 shadow-sm">
+            <div className="flex justify-between items-center mb-6">
+                <h4 className="text-[10px] font-black text-[#1A365D] uppercase tracking-widest">{format(currentMonth, 'MMMM yyyy', { locale: es })}</h4>
+                <div className="flex gap-2">
+                    <button onClick={() => onMonthChange(subMonths(currentMonth, 1))} className="p-1.5 hover:bg-slate-50 rounded-xl text-slate-400 transition-all"><ChevronLeft size={14}/></button>
+                    <button onClick={() => onMonthChange(addMonths(currentMonth, 1))} className="p-1.5 hover:bg-slate-50 rounded-xl text-slate-400 transition-all"><ChevronRight size={14}/></button>
+                </div>
+            </div>
+            <div className="grid grid-cols-7 gap-1 text-center">
+                {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(d => (
+                    <div key={d} className="text-[8px] font-black text-slate-300 mb-2">{d}</div>
+                ))}
+                {days.map((day, i) => {
+                    const isCurrentMonth = isSameMonth(day, currentMonth);
+                    const isTodayDay = isToday(day);
+                    const hasTasks = tasks.some(t => isSameDay(parseISO(t.date), day));
+                    
+                    return (
+                        <div 
+                            key={i} 
+                            className={`aspect-square flex flex-col items-center justify-center rounded-lg text-[9px] font-black relative cursor-pointer transition-all
+                                ${!isCurrentMonth ? 'text-slate-200' : isTodayDay ? 'bg-[#FF8C9D] text-white shadow-lg shadow-coral-100' : 'text-slate-600 hover:bg-slate-50'}
+                            `}
+                        >
+                            {format(day, 'd')}
+                            {hasTasks && !isTodayDay && <div className="absolute bottom-1 w-1 h-1 bg-blue-400 rounded-full" />}
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
+const UpcomingTimeline = ({ tasks, onSelectTask }) => {
+    const today = startOfDay(new Date());
+    const horizon = addDays(today, 14);
+    
+    const upcomingDays = [];
+    for (let d = today; d <= horizon; d = addDays(d, 1)) {
+        const dayTasks = tasks.filter(t => isSameDay(parseISO(t.date), d));
+        if (dayTasks.length > 0) {
+            upcomingDays.push({ date: d, tasks: dayTasks });
+        }
+    }
+
+    return (
+        <div className="space-y-6">
+            <div className="flex items-center justify-between px-2">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Cronograma Próximo</h4>
+                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+            </div>
+            
+            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                {upcomingDays.map((day, idx) => (
+                    <div key={idx} className="relative pl-6 border-l-2 border-slate-100 py-1">
+                        <div className="absolute left-[-5px] top-2 w-2 h-2 rounded-full bg-slate-200" />
+                        <div className="mb-2">
+                            <span className="text-[10px] font-black text-[#1A365D] uppercase tracking-tighter">
+                                {isToday(day.date) ? 'HOY' : format(day.date, 'EEEE d', { locale: es })}
+                            </span>
+                        </div>
+                        <div className="space-y-2">
+                            {day.tasks.map(t => (
+                                <button 
+                                    key={t.id} 
+                                    onClick={() => onSelectTask(t)}
+                                    className={`w-full text-left p-3 rounded-2xl border transition-all hover:scale-[1.01] active:scale-[0.98] flex items-center gap-3
+                                        ${t.status === 'Hecha' ? 'bg-green-50/50 border-green-100 text-green-600' : 'bg-white border-[#E2E8F0] text-[#1A365D] shadow-sm'}
+                                    `}
+                                >
+                                    <div className={`w-2 h-2 rounded-full shrink-0 ${t.status === 'Hecha' ? 'bg-green-500' : t.priority === 'Alta' ? 'bg-rose-500' : 'bg-blue-400'}`} />
+                                    <div className="min-w-0">
+                                        <div className="text-[10px] font-black uppercase truncate">{t.title}</div>
+                                        <div className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{t.time || 'TODO EL DÍA'}</div>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+                {upcomingDays.length === 0 && (
+                    <p className="text-center text-[10px] text-slate-300 italic py-10 uppercase tracking-widest">Sin tareas próximos</p>
+                )}
+            </div>
+        </div>
+    );
+};
+
+const TasksView = ({ tasks, batteries, onEdit, onAdd, onAddBattery, onEditBattery, onAddBatteryItem, onDeleteBatteryItem, onCheckBattery, onDeleteBattery, onPostponeBattery, loadData, currentStore, employees, partners, zones, activeZoneId, onSelectZone, onManageZones }) => {
     const safeTasks = Array.isArray(tasks) ? tasks : [];
     const [month, setMonth] = useState(new Date());
     const [selectedTask, setSelectedTask] = useState(null);
-    const [view, setView] = useState('calendar'); // 'calendar', 'list', 'daily'
+    const [view, setView] = useState('batteries'); // 'batteries', 'calendar', 'list'
 
     const startDate = startOfWeek(startOfMonth(month), { weekStartsOn: 1 });
     const endDate = endOfWeek(endOfMonth(month), { weekStartsOn: 1 });
     const days = eachDayOfInterval({ start: startDate, end: endDate });
 
+    const filteredTasks = safeTasks.filter(t => !activeZoneId || t.zone_id == activeZoneId);
+    const alertTasks = safeTasks.filter(t => t.type === 'jewelry_alert');
+    const displayTasks = filteredTasks.filter(t => t.type !== 'jewelry_alert');
+
     const projectTasks = (physicalTasks) => {
         const projected = [];
-        const horizon = addMonths(new Date(), 6); // Project 6 months ahead
+        const horizon = addMonths(new Date(), 6);
         
-        // Only project from "Pendiente" recurring tasks to avoid duplicates
-        physicalTasks.filter(t => t.recurring && t.status !== 'Hecha').forEach(task => {
-            let current = parseISO(task.date);
-            const limit = task.recurring_end_date ? parseISO(task.recurring_end_date) : horizon;
-            const stopDate = limit < horizon ? limit : horizon;
-            
+        physicalTasks.filter(t => t.recurring && t.status !== 'Hecha' && t.type !== 'jewelry_alert').forEach(task => {
+            let currentStr = task.date;
+            if (!currentStr) return;
+
             // Generate up to 50 instances to prevent infinite loops
             for (let i = 0; i < 50; i++) {
-                const nextDate = getNextOccurrenceDate(format(current, 'yyyy-MM-dd'), task);
-                if (!nextDate || nextDate > format(stopDate, 'yyyy-MM-dd')) break;
+                const nextDate = getNextOccurrenceDate(currentStr, task);
+                if (!nextDate || nextDate > format(horizon, 'yyyy-MM-dd')) break;
                 
                 projected.push({
                     ...task,
@@ -1096,17 +1372,18 @@ const TasksView = ({ tasks, batteries, onEdit, onAdd, onAddBattery, onEditBatter
                     date: nextDate,
                     isVirtual: true
                 });
-                current = parseISO(nextDate);
+                currentStr = nextDate;
             }
         });
         return projected;
     };
 
-    // Frontend version of getNextOccurrence
     const getNextOccurrenceDate = (currentDateStr, task) => {
         try {
             const { periodicity, recurring_days, recurring_month_day, recurring_interval = 1, recurring_type = 'simple' } = task;
             let next = parseISO(currentDateStr);
+            if (isNaN(next.getTime())) return null;
+
             const interval = Number(recurring_interval) || 1;
 
             if (periodicity === 'Diario') {
@@ -1129,7 +1406,6 @@ const TasksView = ({ tasks, batteries, onEdit, onAdd, onAddBattery, onEditBatter
                 }
             } else if (periodicity === 'Mensual') {
                 if (recurring_type === 'on_day' && recurring_month_day) {
-                    // Safety to avoid date jumps on short months
                     next.setDate(1);
                     next = addMonths(next, interval);
                     next.setDate(Number(recurring_month_day));
@@ -1145,7 +1421,7 @@ const TasksView = ({ tasks, batteries, onEdit, onAdd, onAddBattery, onEditBatter
         } catch (e) { return null; }
     };
 
-    const allTasks = [...safeTasks, ...projectTasks(safeTasks)];
+    const allTasks = [...displayTasks, ...projectTasks(displayTasks)];
 
     const toggleStatus = async (task) => {
         if (task.isVirtual) {
@@ -1181,80 +1457,105 @@ const TasksView = ({ tasks, batteries, onEdit, onAdd, onAddBattery, onEditBatter
         loadData();
     };
 
-    return (
-        <div className="flex flex-col xl:flex-row gap-8 animate-in fade-in duration-500">
-            {/* Main Content: Calendar/List */}
-            <div className="flex-1 space-y-6">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
-                        <h2 className="text-3xl font-black text-[#1A365D] tracking-tighter uppercase tabular-nums">
-                            Agenda <span className="text-[#FF8C9D]">TikTak</span>
-                        </h2>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Planificación y seguimiento de tareas</p>
+        return (
+        <div className="flex flex-col lg:flex-row gap-10 items-start">
+            {/* PANEL CENTRAL (75%) */}
+            <div className="flex-1 w-full lg:max-w-[calc(100%-360px)] space-y-8 animate-in fade-in slide-in-from-left-4 duration-700">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                    <div className="bg-white p-1 rounded-2xl border border-[#E5E7EB] shadow-sm flex gap-1">
+                        {[
+                            { id: 'batteries', label: 'Baterías', icon: Layers },
+                            { id: 'calendar', label: 'Calendario', icon: CalendarIcon },
+                            { id: 'list', label: 'Lista', icon: List }
+                        ].map(v => (
+                            <button 
+                                key={v.id} onClick={() => setView(v.id)}
+                                className={`px-6 py-3 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] transition-all ${view === v.id ? 'bg-[#1A365D] text-white shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
+                            >
+                                <v.icon size={14} />
+                                {v.label}
+                            </button>
+                        ))}
                     </div>
-                    <div className="flex items-center gap-3">
-                        <div className="bg-white p-1 rounded-2xl border border-slate-100 flex gap-1 shadow-sm">
-                            <button 
-                                onClick={() => setView('calendar')}
-                                className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${view === 'calendar' ? 'bg-[#1A365D] text-white' : 'text-slate-400 hover:bg-slate-50'}`}
-                            >
-                                Calendario
-                            </button>
-                            <button 
-                                onClick={() => setView('list')}
-                                className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${view === 'list' ? 'bg-[#1A365D] text-white' : 'text-slate-400 hover:bg-slate-50'}`}
-                            >
-                                Lista
-                            </button>
-                            <button 
-                                onClick={() => setView('daily')}
-                                className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${view === 'daily' ? 'bg-[#1A365D] text-white' : 'text-slate-400 hover:bg-slate-50'}`}
-                            >
-                                Diaria
-                            </button>
-                        </div>
-                        <div className="flex gap-2">
-                            <button 
-                                onClick={onAddBattery} 
-                                className="bg-[#1A365D] text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-blue-900/10 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2"
-                            >
-                                <Plus size={16} /> BATERÍA
-                            </button>
-                            <button 
-                                onClick={onAdd} 
-                                className="bg-[#FF8C9D] text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase shadow-xl shadow-coral-100 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2"
-                            >
-                                <Plus size={16} /> TAREA
-                            </button>
-                        </div>
+                    <div className="flex gap-2">
+                        <button onClick={onManageZones} className="px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border border-slate-200 rounded-2xl hover:bg-slate-50 transition-colors">Ajustes Zonas</button>
                     </div>
                 </div>
 
+                {view === 'batteries' && (
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
+                        {(zones.length > 0 ? zones : [{id: 'general', name: 'ZONA GENERAL'}]).map(zone => {
+                            const zoneBatteries = (batteries || []).filter(b => b.zone_id == zone.id);
+                            const zoneTasks = (tasks || []).filter(t => t.zone_id == zone.id && t.status !== 'Hecha');
+                            
+                            let total = 0, done = 0;
+                            zoneBatteries.forEach(b => { (b.items || []).forEach(i => { total++; if(i.is_done) done++; }); });
+                            const progress = total > 0 ? Math.round((done / total) * 100) : 0;
+
+                            return (
+                                <div key={zone.id} className="bg-white rounded-[48px] border border-[#E5E7EB] shadow-sm flex flex-col overflow-hidden hover:shadow-2xl hover:translate-y-[-4px] transition-all duration-700">
+                                    <header className="p-10 border-b border-[#F8F9FA] flex justify-between items-center bg-slate-50/10">
+                                        <div className="flex items-center gap-6">
+                                            <div className="relative w-16 h-16 flex items-center justify-center">
+                                                 <svg className="absolute inset-0 w-full h-full -rotate-90">
+                                                     <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-slate-100" />
+                                                     <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-[#1A365D] transition-all duration-1000" strokeDasharray={176} strokeDashoffset={176 - (176 * progress) / 100} />
+                                                 </svg>
+                                                 <span className="text-xs font-black text-[#1A365D] tabular-nums">{progress}%</span>
+                                            </div>
+                                            <div>
+                                                <h3 className="text-lg font-[900] text-[#1A365D] uppercase tracking-tighter leading-none">{zone.name}</h3>
+                                                <div className="flex items-center gap-2 mt-2 opacity-40">
+                                                     <span className="text-[9px] font-black uppercase tracking-[0.2em]">{zoneBatteries.length} Planes Activos</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button onClick={onAdd} className="w-12 h-12 flex items-center justify-center bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-[#FF8C9D] hover:border-[#FF8C9D] transition-all shadow-sm">
+                                            <Plus size={20} />
+                                        </button>
+                                    </header>
+                                    
+                                    <div className="flex-1 p-8 space-y-6 overflow-y-auto max-h-[500px] custom-scrollbar bg-white">
+                                        <BatteriesView 
+                                            batteries={zoneBatteries} onEdit={onEditBattery} onAddExtra={onAddBatteryItem} onDeleteExtra={onDeleteBatteryItem} onCheck={onCheckBattery} onDelete={onDeleteBattery} onPostpone={onPostponeBattery}
+                                            hideHeader={true} isCompact={true} activeZoneId={zone.id}
+                                        />
+                                        
+                                        {zoneTasks.length > 0 && (
+                                            <div className="mt-10 pt-8 border-t border-slate-100">
+                                                <h4 className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] mb-6">Ejecución Inmediata</h4>
+                                                <div className="space-y-1">
+                                                    {zoneTasks.slice(0, 10).map(t => (
+                                                        <div key={t.id} onClick={() => setSelectedTask(t)} className="flex items-center gap-5 p-4 rounded-3xl hover:bg-slate-50 transition-all cursor-pointer group">
+                                                            <div className={`w-0.5 h-7 rounded-full transition-all ${t.priority_level === 'Urgente' ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : t.priority_level === 'Alta' ? 'bg-amber-400' : 'bg-slate-200'}`} />
+                                                            <div className="w-6 h-6 rounded-full border-2 border-slate-200 group-hover:border-blue-400 bg-white transition-all shadow-sm" />
+                                                            <span className="text-[12px] font-black text-slate-600 uppercase truncate flex-1 tracking-tight">{t.title}</span>
+                                                            <span className="text-[9px] font-black text-slate-300 group-hover:text-blue-500 tabular-nums">{t.time || ''}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    
+                                    <footer className="p-6 bg-slate-50/50 border-t border-[#F8F9FA] flex justify-between items-center">
+                                         <button onClick={() => setView('list')} className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-[#1A365D] px-4 py-2 transition-colors">Auditar Zona</button>
+                                         <button onClick={onAddBattery} className="px-6 py-3 bg-white border border-slate-200 text-[#1A365D] rounded-2xl text-[10px] font-black uppercase shadow-sm hover:shadow-xl transition-all">Nuevo Despliegue</button>
+                                    </footer>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+
                 {view === 'calendar' && (
-                    <div className="bg-white rounded-[40px] border border-[#E2E8F0] shadow-sm overflow-hidden text-sm">
-                        <div className="p-8 flex justify-between items-center bg-white border-b border-[#F4F7FA]">
-                            <div className="flex items-center gap-4">
-                                <h3 className="text-xl font-black text-[#1A365D] uppercase tracking-tighter">
-                                    {format(month, 'MMMM yyyy', { locale: es })}
-                                </h3>
-                                <button 
-                                    onClick={() => setMonth(new Date())}
-                                    className="text-[9px] font-black text-[#FF8C9D] uppercase tracking-widest px-3 py-1 bg-coral-50 rounded-lg hover:bg-coral-100 transition-colors"
-                                >
-                                    Hoy
-                                </button>
-                            </div>
-                            <div className="flex gap-2">
-                                <button onClick={() => setMonth(subMonths(month, 1))} className="w-10 h-10 flex items-center justify-center hover:bg-slate-50 rounded-2xl text-slate-400 border border-slate-100 transition-all"><ChevronLeft size={20}/></button>
-                                <button onClick={() => setMonth(addMonths(month, 1))} className="w-10 h-10 flex items-center justify-center hover:bg-slate-50 rounded-2xl text-slate-400 border border-slate-100 transition-all"><ChevronRight size={20}/></button>
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-7 bg-[#F8F9FB] border-b border-[#E2E8F0]">
-                            {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(d => (
-                                <div key={d} className="p-4 text-center text-[9px] font-black text-[#A0AEC0] uppercase tracking-widest">{d}</div>
+                     <div className="bg-white rounded-[64px] border border-[#E5E7EB] shadow-sm overflow-hidden animate-in fade-in zoom-in-95 duration-700">
+                        <div className="grid grid-cols-7 bg-slate-50/50 border-b border-[#E5E7EB]">
+                            {['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Dom'].map(d => (
+                                <div key={d} className="p-6 text-center text-[11px] font-[900] text-slate-300 uppercase tracking-[0.3em]">{d}</div>
                             ))}
                         </div>
-                        <div className="grid grid-cols-7 bg-slate-50/20">
+                        <div className="grid grid-cols-7">
                             {days.map((day, i) => {
                                 const dayTasks = allTasks.filter(t => isSameDay(parseISO(t.date), day));
                                 const isCurrentMonth = isSameMonth(day, month);
@@ -1263,29 +1564,20 @@ const TasksView = ({ tasks, batteries, onEdit, onAdd, onAddBattery, onEditBatter
                                 return (
                                     <div 
                                         key={i} 
-                                        className={`min-h-[140px] p-3 border-r border-b border-[#E2E8F0] transition-all relative ${!isCurrentMonth ? 'opacity-10' : 'hover:bg-white'} ${isTodayDay ? 'bg-[#FF8C9D]/5' : ''}`}
+                                        className={`min-h-[160px] p-6 border-r border-b border-[#E5E7EB] transition-all relative ${!isCurrentMonth ? 'opacity-10 grayscale' : 'hover:bg-slate-50/30'} ${isTodayDay ? 'bg-blue-50/10' : ''}`}
                                     >
-                                        <div className={`text-[10px] font-black mb-3 flex items-center justify-center w-7 h-7 rounded-lg transition-all ${isTodayDay ? 'bg-[#FF8C9D] text-white shadow-lg shadow-coral-100' : 'text-slate-300'}`}>
+                                        <div className={`text-xs font-black mb-6 flex items-center justify-center w-9 h-9 rounded-2xl transition-all ${isTodayDay ? 'bg-[#1A365D] text-white shadow-2xl' : 'text-slate-300'}`}>
                                             {format(day, 'd')}
                                         </div>
-                                        <div className="space-y-1.5 overflow-y-auto max-h-[90px] custom-scrollbar pr-1">
+                                        <div className="space-y-1.5 max-h-[120px] overflow-y-auto custom-scrollbar">
                                              {dayTasks.map(t => (
-                                                 <button 
-                                                     key={t.id} 
-                                                     onClick={() => setSelectedTask(t)} 
-                                                     className={`w-full text-left text-[8px] px-2.5 py-1.5 rounded-xl font-black truncate uppercase transition-all active:scale-95 flex items-center gap-1.5 ${
-                                                         t.status === 'Hecha' 
-                                                         ? 'bg-green-50 text-green-500 border border-green-100' 
-                                                         : t.priority === 'Alta'
-                                                         ? 'bg-red-50 text-red-500 border border-red-100'
-                                                         : t.isVirtual
-                                                         ? 'bg-slate-50 text-slate-400 border border-dashed border-slate-200 opacity-60'
-                                                         : 'bg-blue-50 text-[#1A365D] border border-blue-100 shadow-sm'
-                                                     }`}
-                                                 >
-                                                     <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${t.status === 'Hecha' ? 'bg-green-500' : t.priority === 'Alta' ? 'bg-red-500' : t.isVirtual ? 'bg-slate-300' : 'bg-[#1A365D]'}`} />
-                                                     {t.title}
-                                                 </button>
+                                                <div 
+                                                    key={t.id} 
+                                                    onClick={() => setSelectedTask(t)} 
+                                                    className={`px-3 py-2 rounded-xl text-[9px] font-black truncate uppercase border ${t.status === 'Hecha' ? 'bg-green-50 text-green-500 border-green-100 line-through' : 'bg-white text-[#1A365D] border-slate-100 shadow-sm cursor-pointer hover:border-blue-400 transition-all font-bold tracking-tight'}`}
+                                                >
+                                                    {t.title}
+                                                </div>
                                              ))}
                                          </div>
                                      </div>
@@ -1296,128 +1588,94 @@ const TasksView = ({ tasks, batteries, onEdit, onAdd, onAddBattery, onEditBatter
                 )}
 
                 {view === 'list' && (
-                    <div className="space-y-4">
-                        {allTasks.length === 0 ? (
-                            <div className="bg-white p-20 rounded-[40px] border border-dashed border-slate-200 text-center">
-                                <p className="text-slate-400 font-bold text-sm">No hay tareas programadas.</p>
-                            </div>
-                        ) : (
-                            allTasks.sort((a, b) => a.date.localeCompare(b.date)).map(t => (
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-10 animate-in fade-in duration-500">
+                        <div className="space-y-4 max-h-[900px] overflow-y-auto pr-4 custom-scrollbar">
+                            {allTasks.sort((a,b) => a.date.localeCompare(b.date)).map(t => (
                                 <div 
                                     key={t.id} 
                                     onClick={() => setSelectedTask(t)}
-                                    className={`bg-white p-6 rounded-[32px] border border-[#E2E8F0] shadow-sm hover:shadow-md transition-all cursor-pointer flex items-center gap-6 group ${t.isVirtual ? 'opacity-60 border-dashed' : ''}`}
+                                    className={`bg-white p-8 rounded-[48px] border border-[#E5E7EB] shadow-sm hover:shadow-2xl transition-all cursor-pointer flex items-center gap-8 group ${selectedTask?.id === t.id ? 'ring-4 ring-blue-500/10 bg-blue-50/10 border-blue-200' : ''}`}
                                 >
-                                    <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center shrink-0 ${isToday(parseISO(t.date)) ? 'bg-[#FF8C9D] text-white shadow-xl shadow-coral-100' : t.isVirtual ? 'bg-slate-50 text-slate-300' : 'bg-[#F4F7FA] text-slate-400'}`}>
-                                        <span className="text-xs font-black uppercase leading-none">{format(parseISO(t.date), 'MMM', { locale: es })}</span>
-                                        <span className="text-xl font-black leading-tight">{format(parseISO(t.date), 'd')}</span>
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className={`text-[8px] font-black px-2 py-0.5 rounded-md uppercase ${t.priority === 'Alta' ? 'bg-red-100 text-red-500' : 'bg-blue-100 text-[#1A365D]'}`}>{t.priority}</span>
-                                            {t.category && <span className="text-[8px] font-black px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 uppercase">{t.category}</span>}
-                                            {t.recurring && <span className="text-[8px] font-black px-2 py-0.5 rounded-md bg-coral-50 text-[#FF8C9D] flex items-center gap-1 uppercase"><Clock size={8}/> {t.isVirtual ? 'Proyectada' : 'Periódica'}</span>}
+                                    <div className={`min-w-0 flex-1`}>
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">{t.date ? format(parseISO(t.date), "EEEE d MMM", { locale: es }) : 'POR DEFINIR'}</span>
+                                            {t.status === 'Hecha' && <CheckCircle2 size={12} className="text-green-500"/>}
                                         </div>
-                                        <h4 className="text-sm font-black text-[#1A365D] uppercase truncate">{t.title}</h4>
-                                        <p className="text-[10px] text-slate-400 font-bold truncate mt-1">{t.description || 'Sin descripción'}</p>
+                                        <h4 className="text-lg font-black text-[#1A365D] uppercase truncate tracking-tighter leading-none">{t.title}</h4>
                                     </div>
-                                    <div className="shrink-0 flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button 
-                                            onClick={(e) => { e.stopPropagation(); toggleStatus(t); }}
-                                            className={`p-3 rounded-2xl transition-all ${t.status === 'Hecha' ? 'bg-green-100 text-green-600' : 'bg-slate-50 text-slate-300 hover:bg-green-50 hover:text-green-500'}`}
-                                        >
-                                            <CheckCircle2 size={20} />
-                                        </button>
+                                    <ChevronRight size={20} className={`text-slate-200 group-hover:text-blue-500 translate-x-0 group-hover:translate-x-2 transition-all`} />
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="sticky top-24 h-fit">
+                            {selectedTask ? (
+                                <div className="bg-[#1A365D] text-white p-12 rounded-[64px] shadow-2xl space-y-12 animate-in zoom-in-95 duration-500 border border-white/10">
+                                    <div className="flex justify-between items-start">
+                                        <div className="px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-white/10 text-white border border-white/20">
+                                            {selectedTask.status}
+                                        </div>
+                                        <button onClick={() => setSelectedTask(null)} className="p-4 hover:bg-white/10 rounded-full transition-colors"><X size={28}/></button>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-4xl font-[900] uppercase tracking-tighter leading-[1]">{selectedTask.title}</h3>
+                                        <div className="flex items-center gap-3 text-[12px] font-black text-blue-400 mt-8 bg-blue-500/10 w-fit px-6 py-3 rounded-3xl border border-blue-500/20 shadow-lg">
+                                            <CalendarIcon size={18} /> 
+                                            {selectedTask.date ? format(parseISO(selectedTask.date), "EEEE d MMMM yyyy", { locale: es }).toUpperCase() : 'PENDIENTE'}
+                                        </div>
+                                    </div>
+                                    <div className="space-y-6 bg-white/5 p-10 rounded-[56px] border border-white/5 backdrop-blur-sm">
+                                        <label className="text-[11px] font-black text-blue-300 uppercase tracking-[0.4em]">Especificaciones de Tarea</label>
+                                        <p className="text-lg font-medium leading-relaxed opacity-90 whitespace-pre-wrap tracking-tight">{selectedTask.description || 'No hay descripción detallada.'}</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-5 pt-4">
+                                        <button onClick={() => toggleStatus(selectedTask)} className={`py-7 rounded-[40px] font-black text-[12px] uppercase tracking-widest transition-all ${selectedTask.status === 'Hecha' ? 'bg-green-500 text-white shadow-2xl shadow-green-500/40' : 'bg-white text-[#1A365D] shadow-2xl shadow-black/20'}`}>{selectedTask.status === 'Hecha' ? 'Cerrar' : 'Confirmar'}</button>
+                                        <button onClick={() => selectedTask.isVirtual ? alert('Es proyectada') : onEdit(selectedTask)} className="py-7 bg-white/10 text-white rounded-[40px] font-black text-[12px] uppercase tracking-widest border border-white/20 hover:bg-white/20 transition-all font-black">Editar</button>
                                     </div>
                                 </div>
-                            ))
-                        )}
+                            ) : (
+                                <div className="h-[600px] border-2 border-dashed border-slate-200 rounded-[70px] flex flex-col items-center justify-center p-16 text-center text-slate-300 bg-white/40 backdrop-blur-sm">
+                                    <Layout size={64} className="mb-10 opacity-10" />
+                                    <p className="text-[12px] font-black uppercase tracking-[0.4em] opacity-40">Selecciona una entrada de lista</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                )}
-
-                {view === 'daily' && (
-                    <DailyTimelineView 
-                        tasks={allTasks} 
-                        employees={employees} 
-                        onEdit={onEdit} 
-                        onToggleStatus={toggleStatus} 
-                    />
                 )}
             </div>
 
-            {/* Side Panel: Task Details & Batteries */}
-            <div className="w-full xl:w-[450px] shrink-0 space-y-8">
-                {selectedTask && (
-                    <div className="bg-[#1A365D] text-white p-8 rounded-[40px] shadow-2xl space-y-6 border border-blue-800 animate-in slide-in-from-right duration-300">
-                        <div className="flex justify-between items-start">
-                             <div className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest ${selectedTask.status === 'Hecha' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-[#FF8C9D]/20 text-[#FF8C9D] border border-[#FF8C9D]/30'}`}>
-                                {selectedTask.isVirtual ? 'Programada' : selectedTask.status}
-                             </div>
-                             {selectedTask.category && (
-                                 <div className="px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-blue-500/20 text-blue-300 border border-blue-500/30 ml-2">
-                                     {selectedTask.category}
-                                 </div>
-                             )}
-                             <button onClick={() => setSelectedTask(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/50 ml-auto"><X size={20}/></button>
-                        </div>
-                        <div className="space-y-4">
-                            <h3 className="text-xl font-black uppercase tracking-tighter leading-tight">{selectedTask.title}</h3>
-                            <div className="flex flex-wrap gap-2">
-                                <div className="flex items-center gap-2 text-[10px] font-bold text-blue-200 bg-white/5 px-3 py-2 rounded-xl w-fit">
-                                    <CalendarIcon size={14} className="text-[#FF8C9D]" /> {format(parseISO(selectedTask.date), "EEEE, d 'de' MMMM", { locale: es })}
-                                </div>
-                                {selectedTask.assigned_to && (
-                                    <div className="flex items-center gap-2 text-[10px] font-bold text-blue-200 bg-white/5 px-3 py-2 rounded-xl w-fit capitalize">
-                                        <Users size={14} className="text-[#FF8C9D]" /> {selectedTask.assigned_to}
-                                    </div>
-                                )}
-                                {selectedTask.recurring && (
-                                    <div className="flex items-center gap-2 text-[10px] font-bold text-blue-200 bg-white/5 px-3 py-2 rounded-xl w-fit">
-                                        <Clock size={14} className="text-[#FF8C9D]" /> {selectedTask.periodicity}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                        <div className="space-y-4 border-t border-white/10 pt-6">
-                            <label className="text-[10px] font-black text-blue-300 uppercase tracking-widest block">Instrucciones</label>
-                            <div className="bg-white/5 p-6 rounded-[32px] min-h-[80px] text-xs font-bold leading-relaxed text-blue-100 whitespace-pre-wrap">
-                                {selectedTask.description || <span className="italic opacity-30">Sin instrucciones especiales...</span>}
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3 pt-4">
-                            <button onClick={() => toggleStatus(selectedTask)} className={`py-4 rounded-2xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2 ${selectedTask.status === 'Hecha' ? 'bg-green-500 text-white shadow-lg shadow-green-500/20' : 'bg-white text-[#1A365D]'}`}>
-                                <Check size={16}/> {selectedTask.status === 'Hecha' ? 'COMPLETADA' : 'COMPLETAR'}
-                            </button>
-                            <button onClick={() => { if(!selectedTask.isVirtual) { onEdit(selectedTask); setSelectedTask(null); } else { alert('Edita la tarea principal de la serie.'); } }} className={`py-4 bg-white/10 text-white rounded-2xl font-black text-[10px] uppercase ${selectedTask.isVirtual ? 'opacity-30' : ''}`}>EDITAR</button>
-                        </div>
-                    </div>
-                )}
-
-                <div className="bg-white/40 backdrop-blur-sm p-8 rounded-[40px] border border-white shadow-sm space-y-6">
-                    <div className="flex items-center justify-between">
-                        <h4 className="text-[10px] font-black text-[#1A365D] uppercase tracking-[0.3em]">Baterías Activas</h4>
-                        <Layers size={16} className="text-[#FF8C9D] animate-pulse" />
-                    </div>
+            {/* SIDEBAR DERECHO (25%) */}
+            <aside className="w-full lg:w-[320px] shrink-0 sticky top-24 space-y-10 animate-in fade-in slide-in-from-right-4 duration-1000">
+                <div className="bg-white rounded-[48px] border border-[#E5E7EB] shadow-sm p-10 space-y-12">
+                    <MiniCalendar currentMonth={month} onMonthChange={setMonth} tasks={allTasks} />
                     
-                    <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
-                        <BatteriesView 
-                            batteries={batteries} 
-                            hideHeader 
-                            isCompact 
-                            onCheck={onCheckBattery} 
-                            onEdit={onEditBattery}
-                            onAddItem={onAddBatteryItem}
-                            onDeleteItem={onDeleteBatteryItem}
-                            onDelete={onDeleteBattery} 
-                            onPostpone={onPostponeBattery}
-                        />
+                    <div className="pt-12 border-t border-slate-50">
+                        <h4 className="text-[11px] font-black text-[#1A365D] uppercase tracking-[0.4em] mb-12 flex items-center justify-center gap-4">
+                            <Clock size={20} className="text-[#FF8C9D]" />
+                            Lineal Temporal
+                        </h4>
+                        <UpcomingTimeline tasks={allTasks} onSelectTask={(t) => { setSelectedTask(t); setView('list'); }} />
                     </div>
                 </div>
-            </div>
-            <AccountStatusWidget partners={partners} />
+                
+                <div className="bg-[#1A365D] rounded-[48px] p-10 text-white space-y-6 shadow-2xl shadow-blue-900/40">
+                     <h5 className="text-[10px] font-black text-blue-300 uppercase tracking-[0.4em]">Propagación Rápida</h5>
+                     <div className="grid grid-cols-2 gap-3">
+                        <button onClick={onAdd} className="bg-white/10 h-28 rounded-[32px] flex flex-col items-center justify-center gap-3 hover:bg-white/20 transition-all border border-white/5">
+                            <Plus size={24} />
+                            <span className="text-[9px] font-black uppercase">Tarea</span>
+                        </button>
+                        <button onClick={onAddBattery} className="bg-white/10 h-28 rounded-[32px] flex flex-col items-center justify-center gap-3 hover:bg-white/20 transition-all border border-white/5">
+                            <Layers size={24} />
+                            <span className="text-[9px] font-black uppercase">Batería</span>
+                        </button>
+                     </div>
+                </div>
+            </aside>
         </div>
     );
 };
+
 
 const InventoryAdjustmentModal = ({ initialCategory, onSave, onCancel }) => {
     const [mode, setMode] = useState('direct'); // 'direct' or 'transfer'
@@ -1554,7 +1812,7 @@ const GoldsmithOrdersPanel = ({ orders, onReceive }) => {
     );
 };
 
-const JewelryView = ({ inventory, orders, partners, movements, onAddPartner, onEditPartner, onDeletePartner, onAddMovement, onDeleteMovement, onRefine, onAddOrder, onReceiveOrder, onAdjustInventory }) => {
+const JewelryView = ({ inventory, orders, partners, movements, onAddPartner, onEditPartner, onDeletePartner, onAddMovement, onDeleteMovement, onRefine, onAddOrder, onReceiveOrder, onAdjustInventory, activeZoneId }) => {
     const [viewMode, setViewMode] = useState('ops'); // 'ops' or 'report'
     const safeMovements = Array.isArray(movements) ? movements : [];
     const safePartners = Array.isArray(partners) ? partners : [];
@@ -1794,6 +2052,28 @@ const JewelryView = ({ inventory, orders, partners, movements, onAddPartner, onE
             ) : (
                 <JewelryReport movements={safeMovements} partners={safePartners} inventory={safeInventory} />
             )}
+
+            <div className="pt-10 border-t border-slate-100 mt-20">
+                <AccountStatusWidget partners={partners} activeZoneId={activeZoneId} />
+                
+                {/* JEWELRY ALERTS - Move here from Agenda */}
+                {orders.filter(o => o.status !== 'Recibido').length > 0 && (
+                    <div className="space-y-6">
+                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-3">
+                            <ShieldAlert className="text-rose-500" size={16}/> Recordatorios de Pedidos Críticos
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {orders.filter(o => o.status !== 'Recibido').map(order => (
+                                <OrderReminder 
+                                    key={order.id} 
+                                    order={order} 
+                                    onClick={() => onReceiveOrder(order)} 
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
@@ -1831,8 +2111,10 @@ const JewelryReport = ({ movements, partners, inventory }) => {
     const totalStats = useMemo(() => {
         const res = { totalWeight: 0, totalCost: 0, receivedVal: 0, benefit: 0 };
         filteredMovements.forEach(m => {
-            if (m.type === 'Envío' || m.type === 'Fundición') res.totalWeight += Number(m.weight || 0);
-            else if (m.type === 'Fundición' && m.status === 'Completado') {
+            if (m.type === 'Envío' || m.type === 'Fundición') {
+                res.totalWeight += Number(m.weight || 0);
+            }
+            if (m.type === 'Fundición' && m.status === 'Completado') {
                 const cost = Number(m.acquisition_cost || 0);
                 const received = Number(m.received_amount || 0);
                 res.totalCost += cost;
@@ -2080,8 +2362,8 @@ const JewelryReport = ({ movements, partners, inventory }) => {
     );
 };
 
-const ReportsView = ({ batteries, tasks, cashHistory, movements, partners }) => {
-    const safeBatteries = Array.isArray(batteries) ? batteries : [];
+const ReportsView = ({ batteries, tasks, cashHistory, movements, partners, activeZoneId }) => {
+    const safeBatteries = (Array.isArray(batteries) ? batteries : []).filter(b => !activeZoneId || b.zone_id == activeZoneId);
     const safeHistory = Array.isArray(cashHistory) ? cashHistory : [];
     const safeMovements = Array.isArray(movements) ? movements : [];
     const safePartners = Array.isArray(partners) ? partners : [];
@@ -2255,7 +2537,7 @@ const CashView = ({ history, onSave, employees, user, cumulativeCashDiff }) => {
                 <div className="space-y-4 w-full md:w-auto">
                     <div>
                         <h2 className="text-3xl font-black text-[#1A365D] tracking-tighter uppercase">Conteo de Caja</h2>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Registro diario de fondos y descuadres</p>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Registro diario de arqueos y cierre</p>
                     </div>
                     <input 
                         type="date" 
@@ -2385,62 +2667,6 @@ const CashView = ({ history, onSave, employees, user, cumulativeCashDiff }) => {
                         </div>
                     )}
                 </div>
-
-                {/* Calculadora de Fondos */}
-                <div className="bg-white p-10 rounded-[40px] border border-[#E2E8F0] shadow-sm">
-                    <h3 className="text-xs font-black text-[#1A365D] uppercase tracking-widest mb-8 flex items-center gap-2">
-                        Calculadora de Fondos <Euro size={16} className="text-[#FF8C9D]"/>
-                    </h3>
-                    <div className="grid grid-cols-2 gap-10">
-                        <div className="space-y-4">
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b pb-2">Billetes</p>
-                            {BILLS.map(b => (
-                                <div key={b} className="flex items-center gap-3 group">
-                                    <span className="w-10 text-[10px] font-black text-slate-400">{b}€</span>
-                                    <input 
-                                        type="number" min="0" 
-                                        disabled={data.is_closed}
-                                        placeholder="Qty"
-                                        className="flex-1 bg-slate-50 border-none rounded-xl p-3 font-black text-[#1A365D] text-sm focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all" 
-                                        value={counts.bills[b]} 
-                                        onChange={e => setCounts({...counts, bills: {...counts.bills, [b]: e.target.value}})}
-                                    />
-                                    <span className="text-[10px] font-black text-slate-300 w-16 text-right">{(Number(counts.bills[b] || 0) * b).toFixed(2)}€</span>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="space-y-4">
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b pb-2">Monedas</p>
-                            <div className="grid grid-cols-1 gap-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                                {COINS.map(c => (
-                                    <div key={c} className="flex items-center gap-3">
-                                        <span className="w-10 text-[10px] font-black text-slate-400">{c < 1 ? (c*100).toFixed(0)+'c' : c+'€'}</span>
-                                        <input 
-                                            type="number" min="0" 
-                                            disabled={data.is_closed}
-                                            placeholder="Qty"
-                                            className="flex-1 bg-slate-50 border-none rounded-xl p-3 font-black text-[#1A365D] text-sm focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all" 
-                                            value={counts.coins[c]} 
-                                            onChange={e => setCounts({...counts, coins: {...counts.coins, [c]: e.target.value}})}
-                                        />
-                                        <span className="text-[10px] font-black text-slate-300 w-16 text-right">{(Number(counts.coins[c] || 0) * c).toFixed(2)}€</span>
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="pt-4 mt-4 border-t border-dashed">
-                                <label className="text-[9px] font-black text-slate-400 uppercase block mb-2">Otros / Vales / Tarjetas</label>
-                                <input 
-                                    type="number" step="0.01" 
-                                    disabled={data.is_closed}
-                                    placeholder="Importe extra..."
-                                    className="w-full bg-slate-100 border-none rounded-2xl p-4 font-black text-xl text-[#1A365D]" 
-                                    value={counts.others} 
-                                    onChange={e => setCounts({...counts, others: e.target.value})}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             {/* Historial de Auditoría (Audit Trail) */}
@@ -2524,21 +2750,36 @@ const CashView = ({ history, onSave, employees, user, cumulativeCashDiff }) => {
 
 // --- FORMS ---
 
-const TaskForm = ({ initialData, employees, onSave, onCancel, onDelete }) => {
-    const [data, setData] = useState(initialData || { 
-        title: '', 
-        date: format(new Date(), 'yyyy-MM-dd'), 
-        time: '09:00',
-        priority: 'Media', 
-        periodicity: 'Manual', 
-        recurring: false, 
-        assigned_to: '', 
-        description: '',
-        category: 'General',
-        recurring_interval: 1,
-        recurring_type: 'simple',
-        recurring_days: [],
-        recurring_end_date: ''
+const TaskForm = ({ initialData, employees, zones, onSave, onCancel, onDelete }) => {
+    // Helper to safely format dates for input fields
+    const safeDate = (dateStr) => {
+        try {
+            if (!dateStr || typeof dateStr !== 'string') return format(new Date(), 'yyyy-MM-dd');
+            const d = parseISO(dateStr);
+            return isNaN(d) ? format(new Date(), 'yyyy-MM-dd') : format(d, 'yyyy-MM-dd');
+        } catch (e) {
+            console.error("TaskForm Date Error:", e);
+            return format(new Date(), 'yyyy-MM-dd');
+        }
+    };
+
+    const [data, setData] = useState({ 
+        title: initialData?.title || '', 
+        date: safeDate(initialData?.date),
+        time: initialData?.time || '09:00',
+        priority: initialData?.priority || 'Media', 
+        priority_level: initialData?.priority_level || initialData?.priority || 'Media',
+        periodicity: initialData?.periodicity || 'Manual', 
+        recurring: !!initialData?.recurring, 
+        assigned_to: initialData?.assigned_to || '', 
+        description: initialData?.description || '',
+        category: initialData?.category || 'Gerencia',
+        zone_id: initialData?.zone_id || '',
+        recurring_interval: initialData?.recurring_interval || 1,
+        recurring_type: initialData?.recurring_type || 'simple',
+        recurring_days: Array.isArray(initialData?.recurring_days) ? initialData?.recurring_days : [],
+        recurring_end_date: initialData?.recurring_end_date || '',
+        id: initialData?.id || null
     });
 
     const isEdit = !!initialData?.id;
@@ -2618,16 +2859,16 @@ const TaskForm = ({ initialData, employees, onSave, onCancel, onDelete }) => {
                         </div>
                     </div>
                     <div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-2 tracking-widest">Categoría</label>
+                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-2 tracking-widest">Departamento / Categoría</label>
                         <select 
                             className="w-full bg-[#F4F7FA] border-none rounded-2xl p-4 font-bold text-[#1A365D] appearance-none cursor-pointer text-xs" 
                             value={data.category} 
                             onChange={e => setData({...data, category: e.target.value})}
                         >
-                            <option value="General">General</option>
-                            <option value="Limpieza">Limpieza</option>
-                            <option value="Inventario">Inventario</option>
+                            <option value="Gerencia">Gerencia (Azul TikTak)</option>
+                            <option value="Ventas">Ventas (Verde Esmeralda)</option>
                             <option value="Joyería / Finanzas">Joyería / Finanzas</option>
+                            <option value="Limpieza">Limpieza</option>
                             <option value="Administración">Administración</option>
                         </select>
                     </div>
@@ -2635,15 +2876,29 @@ const TaskForm = ({ initialData, employees, onSave, onCancel, onDelete }) => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-2 tracking-widest">Prioridad</label>
+                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-2 tracking-widest">Nivel de Prioridad</label>
                         <select 
                             className="w-full bg-[#F4F7FA] border-none rounded-2xl p-4 font-bold text-[#1A365D] appearance-none cursor-pointer text-xs" 
-                            value={data.priority} 
-                            onChange={e => setData({...data, priority: e.target.value})}
+                            value={data.priority_level} 
+                            onChange={e => setData({...data, priority_level: e.target.value, priority: e.target.value})}
                         >
                             <option value="Baja">Baja</option>
                             <option value="Media">Media</option>
                             <option value="Alta">Alta</option>
+                            <option value="Urgente">Urgente (Resaltada)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase block mb-2 tracking-widest">Ubicación / Zona</label>
+                        <select 
+                            className="w-full bg-[#F4F7FA] border-none rounded-2xl p-4 font-bold text-[#1A365D] appearance-none cursor-pointer text-xs" 
+                            value={data.zone_id} 
+                            onChange={e => setData({...data, zone_id: e.target.value})}
+                        >
+                            <option value="">Sin Zona Específica</option>
+                            {(zones || []).map(z => (
+                                <option key={z.id} value={z.id}>{z.name}</option>
+                            ))}
                         </select>
                     </div>
                     <div>
@@ -2796,11 +3051,12 @@ const PartnerForm = ({ initialData, onSave, onCancel }) => {
     const [email, setEmail] = useState(initialData?.email || '');
     const [debtType, setDebtType] = useState(initialData?.debt_type || '18k');
     const [debtFormula, setDebtFormula] = useState(initialData?.debt_formula || 'x');
+    const [debtGrams, setDebtGrams] = useState(initialData?.debt_grams || 0);
 
     return (
-        <form onSubmit={(e) => { e.preventDefault(); onSave({ id: initialData?.id, name, contact_info: info, phone, email, debt_type: debtType, debt_formula: debtFormula }); }} className="space-y-6">
+        <form onSubmit={(e) => { e.preventDefault(); onSave({ id: initialData?.id, name, contact_info: info, phone, email, debt_type: debtType, debt_formula: debtFormula, debt_grams: debtGrams }); }} className="space-y-6">
             <div className="grid grid-cols-1 gap-6">
-                <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Nombre Comercial / Profesional</label><input type="text" required className="w-full bg-slate-50 border-none rounded-2xl p-4 font-black text-[#1A365D]" value={name} onChange={setName ? (e => setName(e.target.value)) : undefined} /></div>
+                <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Nombre Comercial / Profesional</label><input type="text" required className="w-full bg-slate-50 border-none rounded-2xl p-4 font-black text-[#1A365D]" value={name} onChange={e => setName(e.target.value)} /></div>
                 <div className="grid grid-cols-2 gap-4">
                     <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Teléfono</label><input type="tel" className="w-full bg-slate-50 border-none rounded-2xl p-4 font-black" value={phone} onChange={e => setPhone(e.target.value)}/></div>
                     <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Email</label><input type="email" className="w-full bg-slate-50 border-none rounded-2xl p-4 font-black" value={email} onChange={e => setEmail(e.target.value)}/></div>
@@ -2817,6 +3073,20 @@ const PartnerForm = ({ initialData, onSave, onCancel }) => {
                         <label className="text-[10px] font-black text-blue-400 uppercase block mb-2 pl-1">Fórmula de Cálculo (x = gr)</label>
                         <input type="text" className="w-full bg-white border-none rounded-xl p-3 font-black text-xs" placeholder="Ej: x * 0.95" value={debtFormula} onChange={e => setDebtFormula(e.target.value)} />
                     </div>
+                </div>
+                <div className="bg-amber-50/50 p-6 rounded-3xl border border-amber-100/50 space-y-2">
+                    <label className="text-[10px] font-black text-amber-600 uppercase block tracking-widest pl-1">Deuda Actual Ledger (Gramos)</label>
+                    <div className="relative">
+                        <Weight className="absolute left-4 top-1/2 -translate-y-1/2 text-amber-300" size={18} />
+                        <input 
+                            type="number" step="0.01"
+                            className="w-full bg-white border-2 border-transparent focus:border-amber-400 rounded-2xl p-4 pl-12 font-black text-xl text-amber-700 shadow-sm transition-all" 
+                            placeholder="0.00" 
+                            value={debtGrams} 
+                            onChange={e => setDebtGrams(e.target.value)} 
+                        />
+                    </div>
+                    <p className="text-[8px] text-amber-400 font-bold uppercase pl-1">* ESTE VALOR COMPUTA PARA EL SALDO GLOBAL CON EL JOYERO</p>
                 </div>
                 <div><label className="text-[10px] font-black text-slate-400 uppercase block mb-2">Notas / Dirección / Información Extra</label><textarea className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold resize-none" rows={3} value={info} onChange={e => setInfo(e.target.value)}/></div>
             </div>
@@ -3017,7 +3287,10 @@ const MovementForm = ({ type: movType, partners, onSave, onCancel }) => {
                 </div>
             </div>
             
-            <button type="submit" disabled={uploading} className="w-full py-5 bg-[#1A365D] text-white rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl hover:scale-[1.01] transition-all disabled:opacity-50">PROCESAR MOVIMIENTO</button>
+            <div className="flex gap-4 pt-4 shrink-0">
+                <button type="button" onClick={onCancel} className="flex-1 py-5 font-black text-[10px] text-slate-400 uppercase tracking-widest">CANCELAR</button>
+                <button type="submit" disabled={uploading} className="flex-1 py-5 bg-[#1A365D] text-white rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-900/10 hover:scale-[1.01] transition-all disabled:opacity-50">PROCESAR MOVIMIENTO</button>
+            </div>
         </form>
     );
 };
@@ -3052,9 +3325,12 @@ const RefineForm = ({ movement, onSave, onCancel }) => {
                 </div>
             </div>
 
-            <button type="submit" className="w-full py-5 bg-[#FF8C9D] text-white rounded-3xl font-black text-xs uppercase shadow-xl hover:scale-102 transition-all">
-                FINALIZAR Y ARCHIVAR
-            </button>
+            <div className="flex gap-4 pt-4 shrink-0">
+                <button type="button" onClick={onCancel} className="flex-1 py-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">CANCELAR</button>
+                <button type="submit" className="flex-1 py-4 bg-[#FF8C9D] text-white rounded-3xl font-black text-xs uppercase shadow-xl hover:scale-102 transition-all">
+                    FINALIZAR Y ARCHIVAR
+                </button>
+            </div>
         </form>
     );
 };
@@ -3132,8 +3408,8 @@ const OrderClosureModal = ({ order, onConfirm, onCancel }) => {
 };
 
 
-const BatteriesView = ({ batteries, onAdd, onCheck, onDelete, onEdit, onAddItem, onDeleteItem, onPostpone, hideHeader, isCompact }) => {
-    const safeBatteries = Array.isArray(batteries) ? batteries : [];
+const BatteriesView = ({ batteries, onAdd, onCheck, onDelete, onEdit, onAddItem, onDeleteItem, onPostpone, hideHeader, isCompact, activeZoneId }) => {
+    const safeBatteries = (Array.isArray(batteries) ? batteries : []).filter(b => !activeZoneId || b.zone_id == activeZoneId);
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -3217,33 +3493,23 @@ const BatteriesView = ({ batteries, onAdd, onCheck, onDelete, onEdit, onAddItem,
                                             
                                             <div className="pt-6 space-y-3">
                                                 {(b.items || []).map(item => (
-                                                    <div key={item.id} className="flex items-center justify-between p-4 bg-white rounded-2xl group/item shadow-sm border border-transparent hover:border-blue-100 transition-all">
-                                                        <div className="flex items-center gap-4 overflow-hidden">
-                                                            <button 
-                                                                onClick={() => onCheck(item)}
-                                                                className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all shrink-0 ${item.is_done ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-slate-200 text-transparent hover:border-blue-400'}`}
-                                                            >
-                                                                <Check size={14} strokeWidth={4}/>
-                                                            </button>
-                                                            <div className="min-w-0">
-                                                                <p className={`text-xs font-bold uppercase truncate transition-all ${item.is_done ? 'text-slate-300 line-through' : 'text-[#1A365D]'}`}>{item.description}</p>
-                                                                {item.is_done && (
-                                                                    <div className="flex items-center gap-2 mt-1">
-                                                                        <span className="text-[8px] font-black text-green-500 bg-green-50 px-2 py-0.5 rounded-md flex items-center gap-1 uppercase">
-                                                                            <CheckCircle2 size={8}/> {item.completed_by}
-                                                                        </span>
-                                                                    </div>
-                                                                )}
-                                                            </div>
+                                                    <div key={item.id} className="flex items-center gap-5 p-5 rounded-[32px] hover:bg-slate-50 transition-all group/item border border-transparent hover:border-slate-100 bg-white">
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); onCheck(item); }}
+                                                            className={`w-8 h-8 rounded-full border-2 transition-all shrink-0 flex items-center justify-center ${item.is_done ? 'bg-green-500 border-green-500 text-white shadow-xl shadow-green-500/20' : 'bg-white border-slate-200 text-transparent hover:border-blue-400'}`}
+                                                        >
+                                                            <Check size={16} strokeWidth={4}/>
+                                                        </button>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className={`text-[13px] font-black uppercase truncate transition-all tracking-tight ${item.is_done ? 'text-slate-300 line-through' : 'text-[#1A365D]'}`}>{item.description}</p>
+                                                            {item.is_done && <span className="text-[8px] font-black text-green-500 uppercase tracking-widest flex items-center gap-2 mt-1 italic"><Check size={8}/> {item.completed_by}</span>}
                                                         </div>
-                                                        <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
-                                                            <button 
-                                                                onClick={() => onDeleteItem(item.id)}
-                                                                className="p-2 text-slate-300 hover:text-red-400 transition-colors"
-                                                            >
-                                                                <Trash2 size={14}/>
-                                                            </button>
-                                                        </div>
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); onDeleteExtra(item.id); }}
+                                                            className="p-3 text-slate-100 hover:text-rose-500 opacity-0 group-hover/item:opacity-100 transition-all hover:bg-rose-50 rounded-xl"
+                                                        >
+                                                            <Trash2 size={16}/>
+                                                        </button>
                                                     </div>
                                                 ))}
                                                 <button 
@@ -3301,10 +3567,11 @@ const BatteriesView = ({ batteries, onAdd, onCheck, onDelete, onEdit, onAddItem,
     );
 };
 
-const BatteryForm = ({ initialData, onSave, onCancel }) => {
+const BatteryForm = ({ initialData, zones, onSave, onCancel }) => {
     const [title, setTitle] = useState(initialData?.title || '');
     const [startDate, setStartDate] = useState(initialData?.start_date || format(new Date(), 'yyyy-MM-dd'));
     const [endDate, setEndDate] = useState(initialData?.end_date || format(addMonths(new Date(), 1), 'yyyy-MM-dd'));
+    const [zoneId, setZoneId] = useState(initialData?.zone_id || '');
     
     // Support for editing items in existing batteries
     const [items, setItems] = useState(initialData?.items?.map(i => i.description) || ['', '', '']);
@@ -3329,6 +3596,7 @@ const BatteryForm = ({ initialData, onSave, onCancel }) => {
                 title, 
                 start_date: startDate, 
                 end_date: endDate, 
+                zone_id: zoneId || null,
                 items: filteredItems 
             });
         }} className="space-y-8">
@@ -3345,6 +3613,24 @@ const BatteryForm = ({ initialData, onSave, onCancel }) => {
                     <div>
                         <label className="text-[10px] font-black text-slate-400 uppercase block mb-3 pl-1 tracking-widest">Fecha Fin</label>
                         <input type="date" required className="w-full bg-slate-50 border-none rounded-2xl p-5 font-black text-[#1A365D] shadow-inner" value={endDate} onChange={e => setEndDate(e.target.value)}/>
+                    </div>
+                </div>
+
+                <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase block mb-3 pl-1 tracking-widest">Zona Responsable (Categoría)</label>
+                    <div className="flex flex-wrap gap-2">
+                        {zones.map(z => (
+                            <button 
+                                key={z.id}
+                                type="button"
+                                onClick={() => setZoneId(z.id)}
+                                className={`px-4 py-3 rounded-2xl text-[10px] font-black uppercase transition-all border
+                                    ${zoneId == z.id ? 'bg-[#1A365D] text-white border-transparent' : 'bg-slate-50 text-slate-400 border-slate-100 hover:bg-slate-100'}
+                                `}
+                            >
+                                {z.name}
+                            </button>
+                        ))}
                     </div>
                 </div>
 
@@ -3468,6 +3754,109 @@ const GlobalModal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-xl' }
             </div>
         </div>,
         document.body
+    );
+};
+
+const XPBonusForm = ({ employees, onSave, onCancel }) => {
+    const [data, setData] = useState({ employeeId: employees[0]?.id || '', xp: 100, reason: '' });
+
+    return (
+        <form onSubmit={(e) => { e.preventDefault(); onSave(data); }} className="space-y-6">
+            <div className="space-y-4">
+                <label className="text-[10px] font-black text-[#A0AEC0] uppercase tracking-widest">Empleado</label>
+                <select 
+                    value={data.employeeId} 
+                    onChange={e => setData({...data, employeeId: e.target.value})}
+                    className="w-full p-4 bg-slate-50 border border-[#E2E8F0] rounded-2xl font-bold text-sm text-[#1A365D]"
+                >
+                    {(employees || []).map(e => <option key={e.id} value={e.id}>{getEmpName(e)}</option>)}
+                </select>
+            </div>
+            <div className="space-y-4">
+                <label className="text-[10px] font-black text-[#A0AEC0] uppercase tracking-widest">Cantidad de Puntos</label>
+                <input 
+                    type="number" 
+                    className="w-full bg-slate-50 border-none rounded-2xl p-4 font-black text-center text-xl" 
+                    value={data.xp} 
+                    onChange={e => setData({...data, xp: e.target.value})}
+                    placeholder="0"
+                />
+            </div>
+            <div className="space-y-4">
+                <label className="text-[10px] font-black text-[#A0AEC0] uppercase tracking-widest">Motivo</label>
+                <input 
+                    type="text" 
+                    value={data.reason} 
+                    onChange={e => setData({...data, reason: e.target.value})}
+                    placeholder="Ej: Excelencia en cierre, Apoyo extra..."
+                    className="w-full p-4 bg-slate-50 border border-[#E2E8F0] rounded-2xl font-bold text-sm text-[#1A365D]"
+                />
+            </div>
+            <div className="flex gap-4 pt-4">
+                <button type="button" onClick={onCancel} className="flex-1 py-4 bg-slate-100 text-[#A0AEC0] rounded-2xl font-black text-[10px] uppercase">Cancelar</button>
+                <button type="submit" className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-blue-100">Cargar Bonus</button>
+            </div>
+        </form>
+    );
+};
+
+const ZoneManagerForm = ({ zones, employees, onSave, onDelete, onCancel }) => {
+    const [editZone, setEditZone] = useState({ name: '', responsible_id: '' });
+
+    return (
+        <div className="space-y-8 min-h-[400px]">
+            <div className="bg-slate-50 p-6 rounded-[32px] border border-slate-100 flex flex-col gap-4">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Nueva Zona Operativa</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <input 
+                        type="text" 
+                        placeholder="Nombre (Ej: Zona Sonido)"
+                        className="bg-white border-2 border-transparent focus:border-blue-400 rounded-2xl p-4 font-bold text-[#1A365D]"
+                        value={editZone.name}
+                        onChange={e => setEditZone({...editZone, name: e.target.value})}
+                    />
+                    <select 
+                        className="bg-white border-none rounded-2xl p-4 font-bold text-[#1A365D]"
+                        value={editZone.responsible_id}
+                        onChange={e => setEditZone({...editZone, responsible_id: e.target.value})}
+                    >
+                        <option value="">Responsable de Zona</option>
+                        {employees.map(e => (
+                            <option key={e.id} value={e.id}>{e.alias || e.first_name}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="flex gap-2">
+                    <button type="button" onClick={onCancel} className="flex-1 py-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">CERRAR</button>
+                    <button 
+                        onClick={() => { if(editZone.name) onSave(editZone); setEditZone({ name: '', responsible_id: '' }); }}
+                        className="flex-1 bg-[#1A365D] text-white p-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all font-black"
+                    >
+                        {editZone.id ? 'Guardar Cambios' : 'Crear Zona'}
+                    </button>
+                </div>
+            </div>
+
+            <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                {zones.map(zone => (
+                    <div key={zone.id} className="bg-white border border-slate-100 p-4 rounded-[24px] flex justify-between items-center group hover:border-blue-100 transition-all">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center font-black">
+                                {zone.name.charAt(0)}
+                            </div>
+                            <div>
+                                <div className="font-black text-[#1A365D] text-xs uppercase tracking-tighter">{zone.name}</div>
+                                <div className="text-[10px] text-slate-400 font-bold uppercase">Resp: {employees.find(e => e.id == zone.responsible_id)?.alias || '---'}</div>
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={() => setEditZone(zone)} className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"><FileText size={16}/></button>
+                            <button onClick={() => onDelete(zone.id)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"><Trash2 size={16}/></button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
     );
 };
 

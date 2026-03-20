@@ -12,7 +12,7 @@ const Reports = () => {
     const { user } = useAuth();
     const { currentStore } = useStore();
 
-    const isManagerial = user?.role === ROLES.MANAGER;
+    const isManagerial = [ROLES.MANAGER, ROLES.SUPERVISOR, ROLES.RESPONSIBLE].includes(user?.role);
 
     if (!dailyRecords || !dailyGroups || !employees) {
         return (

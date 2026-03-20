@@ -31,6 +31,7 @@ const EmployeeModal = ({
                     ...editingEmployee,
                     isBuyer: editingEmployee.isBuyer !== undefined ? editingEmployee.isBuyer : false,
                     canCountCash: editingEmployee.canCountCash !== undefined ? editingEmployee.canCountCash : false,
+                    isInterviewer: editingEmployee.isInterviewer !== undefined ? editingEmployee.isInterviewer : false,
                     alias: editingEmployee.alias || ''
                 });
             } else {
@@ -38,7 +39,7 @@ const EmployeeModal = ({
                     firstName: '', lastName: '', alias: '', email: '', phone: '', address: '',
                     role: (roles.length > 0 ? roles[0].name : 'Empleado'), contractType: 'Indefinido', contractHours: 40,
                     username: '', password: '',
-                    isBuyer: false, canCountCash: false
+                    isBuyer: false, canCountCash: false, isInterviewer: false
                 });
             }
         }
@@ -56,7 +57,8 @@ const EmployeeModal = ({
             ...formData,
             contractHours: Number(formData.contractHours),
             isBuyer: formData.isBuyer,
-            canCountCash: formData.canCountCash
+            canCountCash: formData.canCountCash,
+            isInterviewer: formData.isInterviewer
         };
         onSave(data);
     };
@@ -122,6 +124,20 @@ const EmployeeModal = ({
                                     <label className="flex items-center gap-3 cursor-pointer p-4 bg-white border border-blue-100 rounded-2xl hover:border-blue-300 transition-all shadow-sm group">
                                         <input type="checkbox" name="canCountCash" checked={formData.canCountCash === true} onChange={handleInputChange} className="accent-blue-400 w-5 h-5 rounded-md" />
                                         <span className="text-sm font-bold text-[#1A365D] group-hover:text-blue-500 transition-colors">Autorizado para Arqueo de Caja</span>
+                                    </label>
+                                    <label className={`flex items-center gap-3 p-4 bg-white border border-slate-100 rounded-2xl transition-all shadow-sm group ${['Gerente', 'Supervisor', 'Responsable'].includes(formData.role) ? 'cursor-pointer hover:border-[#1A365D]/30' : 'opacity-50 cursor-not-allowed'}`}>
+                                        <input 
+                                            type="checkbox" 
+                                            name="isInterviewer" 
+                                            checked={formData.isInterviewer === true && ['Gerente', 'Supervisor', 'Responsable'].includes(formData.role)} 
+                                            onChange={handleInputChange} 
+                                            disabled={!['Gerente', 'Supervisor', 'Responsable'].includes(formData.role)}
+                                            className="accent-[#1A365D] w-5 h-5 rounded-md" 
+                                        />
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-bold text-[#1A365D] transition-colors">Habilitar como Entrevistador 1:1</span>
+                                            {!['Gerente', 'Supervisor', 'Responsable'].includes(formData.role) && <span className="text-[8px] font-black text-red-400 uppercase">Solo para perfiles de gestión</span>}
+                                        </div>
                                     </label>
                                 </div>
                             </div>

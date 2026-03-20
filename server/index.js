@@ -1,5 +1,5 @@
 import 'dotenv/config';
-process.env.NODE_ENV = 'production'; // Forced Restart v3 (Migration)
+process.env.NODE_ENV = 'production'; // Forced Restart v4 (Interviewer Migration)
 
 import express from 'express';
 import cors from 'cors';
@@ -123,8 +123,9 @@ initDb().then(async () => {
 (async () => {
     try {
         await pool.query("ALTER TABLE employees ADD COLUMN IF NOT EXISTS gamification JSONB DEFAULT '{}'");
-        console.log('Schema: gamification column ensured.');
-    } catch (e) { console.error('Schema error (gamification):', e); }
+        await pool.query("ALTER TABLE employees ADD COLUMN IF NOT EXISTS is_interviewer BOOLEAN DEFAULT FALSE");
+        console.log('Schema: is_interviewer column ensured in employees table.');
+    } catch (e) { console.error('Schema error (is_interviewer):', e); }
 })();
 
 // ─── API Routes ───────────────────────────────────────────────────────────────

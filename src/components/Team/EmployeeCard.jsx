@@ -1,7 +1,7 @@
 import React from 'react';
-import { ShoppingBag, Edit2, Trash2, User, UserCheck } from 'lucide-react';
+import { ShoppingBag, Edit2, Trash2, User, UserCheck, Users } from 'lucide-react';
 
-const EmployeeCard = ({ emp, displayName, stats, onEdit, onDelete, onToggleInterviewer }) => {
+const EmployeeCard = ({ emp, displayName, stats, onEdit, onDelete, onToggleInterviewer, onToggle11 }) => {
     return (
         <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 hover:border-[#FF8C9D]/50 transition-all group relative overflow-hidden flex flex-col justify-between h-full min-h-[160px] shadow-sm hover:shadow-md">
             {/* Header: Avatar + Alias + Role */}
@@ -18,11 +18,20 @@ const EmployeeCard = ({ emp, displayName, stats, onEdit, onDelete, onToggleInter
                     {displayName !== emp.firstName && <p className="text-[10px] text-[#A0AEC0] truncate">{emp.firstName}</p>}
                 </div>
 
+                {/* 1:1 Meetings Toggle (Direct Action) */}
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onToggle11(emp.id, !emp.has11Meetings); }}
+                    className={`absolute top-3 right-20 p-2 rounded-xl transition-all border ${emp.has11Meetings ? 'bg-[#FF8C9D] text-white border-[#FF8C9D]' : 'bg-white text-slate-300 border-slate-100 hover:border-[#FF8C9D]/20'}`}
+                    title={emp.has11Meetings ? "Deshabilitar Reuniones 1:1" : "Habilitar Reuniones 1:1"}
+                >
+                    <Users size={14} />
+                </button>
+
                 {/* Interviewer Toggle (Direct Action) */}
                 {['Gerente', 'Supervisor', 'Responsable'].includes(emp.role) && (
                     <button 
                         onClick={(e) => { e.stopPropagation(); onToggleInterviewer(emp.id, !emp.isInterviewer); }}
-                        className={`absolute top-3 right-12 p-2 rounded-xl transition-all border ${emp.isInterviewer ? 'bg-[#1A365D] text-white border-[#1A365D]' : 'bg-white text-slate-300 border-slate-100 hover:border-[#1A365D]/20'}`}
+                        className={`absolute top-3 right-11 p-2 rounded-xl transition-all border ${emp.isInterviewer ? 'bg-[#1A365D] text-white border-[#1A365D]' : 'bg-white text-slate-300 border-slate-100 hover:border-[#1A365D]/20'}`}
                         title={emp.isInterviewer ? "Desmarcar como Entrevistador" : "Marcar como Entrevistador"}
                     >
                         <UserCheck size={14} />

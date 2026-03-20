@@ -15,7 +15,8 @@ router.get('/', async (req, res) => {
                 id, avatar, first_name as "firstName", last_name as "lastName", alias, email, 
                 role, contract_hours as "contractHours", contract_type as "contractType", 
                 username, is_buyer as "isBuyer", phone, address, "order", store_id, gamification,
-                can_count_cash as "canCountCash", is_interviewer as "isInterviewer"
+                can_count_cash as "canCountCash", is_interviewer as "isInterviewer",
+                has_1_1_meetings as "has11Meetings"
             FROM employees 
             WHERE store_id = $1
             ORDER BY "order" ASC, id ASC
@@ -25,7 +26,7 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-    const { firstName, lastName, alias, email, role, contractHours, contractType, username, password, isBuyer, phone, address, avatar, gamification } = req.body;
+    const { firstName, lastName, alias, email, role, contractHours, contractType, username, password, isBuyer, phone, address, avatar, gamification, has11Meetings } = req.body;
     const storeId = req.headers['x-store-id'] || 'store_1';
 
     try {
@@ -36,12 +37,13 @@ router.post('/', async (req, res) => {
             `INSERT INTO employees (
                 first_name, last_name, alias, email, role, contract_hours, contract_type, 
                 username, password, is_buyer, phone, address, avatar, store_id, gamification, 
-                can_count_cash, is_interviewer
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING id`,
+                can_count_cash, is_interviewer, has_1_1_meetings
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING id`,
             [
                 firstName, lastName, alias, email, role, contractHours, contractType, 
                 username, hashedPassword, isBuyer, phone, address, avatar, storeId, 
-                gamification || {}, req.body.canCountCash || false, req.body.isInterviewer || false
+                gamification || {}, req.body.canCountCash || false, req.body.isInterviewer || false,
+                has11Meetings !== undefined ? has11Meetings : true
             ]
         );
         // Return confirmed data but NO PASSWORD
@@ -49,14 +51,15 @@ router.post('/', async (req, res) => {
             id: result.rows[0].id, firstName, lastName, alias,
             email, role, contractHours, contractType,
             username, isBuyer, phone,
-            address, order: 0, avatar, storeId
+            address, order: 0, avatar, storeId,
+            has11Meetings: has11Meetings !== undefined ? has11Meetings : true
         });
     } catch (err) { res.status(500).json({ error: err.message }) }
 });
 
 router.put('/:id', async (req, res) => {
     const { id } = req.params;
-    const { firstName, lastName, alias, email, role, contractHours, contractType, username, password, isBuyer, phone, address, avatar, order, gamification } = req.body;
+    const { firstName, lastName, alias, email, role, contractHours, contractType, username, password, isBuyer, phone, address, avatar, order, gamification, has11Meetings } = req.body;
 
     try {
         // Fetch current data to prevent accidental wipes (simulating PATCH)
@@ -80,6 +83,7 @@ router.put('/:id', async (req, res) => {
         const newOrder = order !== undefined ? order : old.order;
         const newCanCount = req.body.canCountCash !== undefined ? req.body.canCountCash : old.can_count_cash;
         const newIsInterviewer = req.body.isInterviewer !== undefined ? req.body.isInterviewer : (old.is_interviewer || false);
+        const newHas11 = has11Meetings !== undefined ? has11Meetings : (old.has_1_1_meetings !== undefined ? old.has_1_1_meetings : true);
         let newGamification = gamification !== undefined ? gamification : (old.gamification || {});
 
         let hashedPassword = old.password;
@@ -152,9 +156,10 @@ router.put('/:id', async (req, res) => {
             `UPDATE employees SET 
                 first_name=$1, last_name=$2, alias=$3, email=$4, role=$5, contract_hours=$6, 
                 contract_type=$7, username=$8, password=$9, is_buyer=$10, phone=$11, address=$12, 
-                avatar=$13, "order"=$14, gamification=$15, can_count_cash=$16, is_interviewer=$17
-            WHERE id=$18 RETURNING *`,
-            [newFirstName, newLastName, newAlias, newEmail, newRole, newContractHours, newContractType, newUsername, hashedPassword, newIsBuyer, newPhone, newAddress, newAvatar, newOrder, newGamification, newCanCount, newIsInterviewer, id]
+                avatar=$13, "order"=$14, gamification=$15, can_count_cash=$16, is_interviewer=$17,
+                has_1_1_meetings=$18
+            WHERE id=$19 RETURNING *`,
+            [newFirstName, newLastName, newAlias, newEmail, newRole, newContractHours, newContractType, newUsername, hashedPassword, newIsBuyer, newPhone, newAddress, newAvatar, newOrder, newGamification, newCanCount, newIsInterviewer, newHas11, id]
         );
 
         const updated = result.rows[0];
@@ -175,7 +180,8 @@ router.put('/:id', async (req, res) => {
             avatar: updated.avatar,
             gamification: updated.gamification,
             canCountCash: updated.can_count_cash,
-            isInterviewer: updated.is_interviewer
+            isInterviewer: updated.is_interviewer,
+            has11Meetings: updated.has_1_1_meetings
         });
     } catch (err) { res.status(500).json({ error: err.message }) }
 });

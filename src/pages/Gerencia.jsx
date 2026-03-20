@@ -5,7 +5,7 @@ import { useAuth, ROLES } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
 import { useProductivity } from '../context/ProductivityContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import MeetingsView from '../components/Gerencia/MeetingsView';
+import MeetingForm from '../components/Gerencia/MeetingForm';
 import { 
     Pocket, 
     Calculator, 
@@ -498,8 +498,78 @@ const Gerencia = () => {
         { id: 'tasks', label: 'Agenda', icon: CalendarIcon },
         { id: 'reports', label: 'Informes', icon: FileText },
         { id: 'jewelry', label: 'Joyería', icon: Pocket },
-        { id: 'cash', label: 'Conteo', icon: Calculator }
+        { id: 'cash', label: 'Conteo', icon: Calculator },
+        { id: 'meetings', label: 'Reuniones 1:1', icon: Users }
     ];
+
+    // --- 1:1 MEETING STATES & HANDLERS ---
+    const [meetingSchedules, setMeetingSchedules] = useState([]);
+    const [evalCriteria, setEvalCriteria] = useState([]);
+
+    const loadMeetingData = async () => {
+        try {
+            const [schedRes, critRes] = await Promise.all([
+                fetch('/api/gerencia/meeting-schedules', { 
+                    headers: { 'x-store-id': currentStore, 'x-user-role': user?.role } 
+                }),
+                fetch('/api/gerencia/evaluation-criteria', { 
+                    headers: { 'x-store-id': currentStore, 'x-user-role': user?.role } 
+                })
+            ]);
+            if (schedRes.ok) setMeetingSchedules(await schedRes.json());
+            if (critRes.ok) setEvalCriteria(await critRes.json());
+        } catch (err) { console.error('Error loading meeting meta:', err); }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'meetings') loadMeetingData();
+    }, [activeTab, currentStore]);
+
+    const handleSaveCriterion = async (cData) => {
+        const method = cData.id ? 'PUT' : 'POST';
+        const url = cData.id ? `/api/gerencia/evaluation-criteria/${cData.id}` : '/api/gerencia/evaluation-criteria';
+        const res = await fetch(url, {
+            method, headers: { 
+                'Content-Type': 'application/json', 
+                'x-store-id': currentStore,
+                'x-user-role': user?.role 
+            },
+            body: JSON.stringify(cData)
+        });
+        if (res.ok) { loadMeetingData(); }
+    };
+
+    const handleDeleteCriterion = async (id) => {
+        if (!confirm('¿Eliminar criterio?')) return;
+        await fetch(`/api/gerencia/evaluation-criteria/${id}`, { 
+            method: 'DELETE', 
+            headers: { 'x-store-id': currentStore, 'x-user-role': user?.role } 
+        });
+        loadMeetingData();
+    };
+
+    const handleSaveSchedule = async (sData) => {
+        const method = sData.id ? 'PUT' : 'POST';
+        const url = sData.id ? `/api/gerencia/meeting-schedules/${sData.id}` : '/api/gerencia/meeting-schedules';
+        const res = await fetch(url, {
+            method, headers: { 
+                'Content-Type': 'application/json', 
+                'x-store-id': currentStore,
+                'x-user-role': user?.role
+            },
+            body: JSON.stringify(sData)
+        });
+        if (res.ok) { setModal({ type: null, data: null }); loadMeetingData(); }
+    };
+
+    const handleDeleteSchedule = async (id) => {
+        if (!confirm('¿Cancelar esta cita programada?')) return;
+        await fetch(`/api/gerencia/meeting-schedules/${id}`, { 
+            method: 'DELETE', 
+            headers: { 'x-store-id': currentStore, 'x-user-role': user?.role } 
+        });
+        loadMeetingData();
+    };
 
     if (![ROLES.MANAGER, ROLES.SUPERVISOR, ROLES.RESPONSIBLE].includes(user?.role)) {
         return (
@@ -749,11 +819,11 @@ const Gerencia = () => {
             </div>
 
             <div className="max-w-[1700px] mx-auto">
-                {activeTab === 'summary' && <GerenciaDashboard tasks={tasks} batteries={batteries} partners={partners} movements={movements} cashHistory={cashHistory} inventory={inventory} orders={orders} cumulativeCashDiff={cumulativeCashDiff} employees={employees} auditAlerts={auditAlerts} onXPBonus={() => setModal({ type: 'xp_bonus', data: null })} activeZoneId={activeZoneId} onTabSwitch={setActiveTab} />}
+                {activeTab === 'summary' && <GerenciaDashboard tasks={tasks} batteries={batteries} partners={partners} movements={movements} cashHistory={cashHistory} inventory={inventory} orders={orders} cumulativeCashDiff={cumulativeCashDiff} employees={employees} auditAlerts={auditAlerts} meetingSchedules={meetingSchedules} onXPBonus={() => setModal({ type: 'xp_bonus', data: null })} activeZoneId={activeZoneId} onTabSwitch={setActiveTab} />}
                 {activeTab === 'reports' && <ReportsView batteries={batteries} tasks={tasks} cashHistory={cashHistory} movements={movements} partners={partners} activeZoneId={activeZoneId} />}
                 {activeTab === 'tasks' && <TasksView tasks={tasks} batteries={batteries} employees={employees} partners={partners} zones={zones} activeZoneId={activeZoneId} onSelectZone={setActiveZoneId} onManageZones={() => setModal({ type: 'zone_manager', data: null })} onEdit={(t) => setModal({ type: 'task', data: t })} onAdd={() => setModal({ type: 'task', data: null })} onAddBattery={() => setModal({ type: 'battery', data: null })} onEditBattery={(b) => setModal({ type: 'battery', data: b })} onAddBatteryItem={(bId) => setModal({ type: 'battery_item', data: { battery_id: bId } })} onDeleteBatteryItem={handleDeleteBatteryItem} onCheckBattery={(item) => setModal({ type: 'battery_item_check', data: item })} onDeleteBattery={handleDeleteBattery} onPostponeBattery={handlePostponeBattery} loadData={loadData} currentStore={currentStore} />}
                 {activeTab === 'jewelry' && <JewelryView inventory={inventory} orders={orders} partners={partners} movements={movements} onAddPartner={() => setModal({ type: 'partner', data: null })} onEditPartner={(p) => setModal({ type: 'partner', data: p })} onDeletePartner={handleDeletePartner} onAddMovement={(type) => setModal({ type: 'movement', data: type })} onDeleteMovement={handleDeleteMovement} onRefine={(m) => setModal({ type: 'refine', data: m })} onAddOrder={() => setModal({ type: 'order', data: null })} onReceiveOrder={(o) => setModal({ type: 'order_receive', data: o })} onAdjustInventory={(cat) => setModal({ type: 'inventory_adjust', data: cat })} />}
-                {activeTab === 'meetings' && <MeetingsView storeId={currentStore} />}
+                {activeTab === 'meetings' && <MeetingsView storeId={currentStore} employees={employees} user={user} schedules={meetingSchedules} onSchedule={() => setModal({ type: 'meeting_scheduler', data: null })} onManageCriteria={() => setModal({ type: 'meeting_criteria_manager' })} onDeleteSchedule={handleDeleteSchedule} />}
                 {activeTab === 'cash' && <CashView history={Array.isArray(cashHistory) ? cashHistory : []} employees={employees} onSave={handleSaveCash} user={user} cumulativeCashDiff={cumulativeCashDiff} />}
             </div>
 
@@ -820,6 +890,26 @@ const Gerencia = () => {
                         <XPBonusForm employees={employees} onSave={handleGrantXP} onCancel={() => setModal({ type: null, data: null })} />
                     </GlobalModal>
                 )}
+                {modal.type === 'meeting_criteria_manager' && (
+                    <GlobalModal isOpen={true} onClose={() => setModal({ type: null, data: null })} title="Secciones y Criterios 1:1" maxWidth="max-w-4xl">
+                        <CriterionManager criteria={evalCriteria} onSave={handleSaveCriterion} onDelete={handleDeleteCriterion} />
+                    </GlobalModal>
+                )}
+                {modal.type === 'meeting_scheduler' && (
+                    <GlobalModal isOpen={true} onClose={() => setModal({ type: null, data: null })} title="Programar Nueva Reunión">
+                        <ScheduleForm employees={employees.filter(e => e.has11Meetings !== false)} onSave={handleSaveSchedule} onCancel={() => setModal({ type: null, data: null })} />
+                    </GlobalModal>
+                )}
+                {modal.type === 'meeting_criteria_manager' && (
+                    <GlobalModal isOpen={true} onClose={() => setModal({ type: null, data: null })} title="Secciones y Criterios 1:1" maxWidth="max-w-4xl">
+                        <CriterionManager criteria={evalCriteria} onSave={handleSaveCriterion} onDelete={handleDeleteCriterion} />
+                    </GlobalModal>
+                )}
+                {modal.type === 'meeting_scheduler' && (
+                    <GlobalModal isOpen={true} onClose={() => setModal({ type: null, data: null })} title="Programar Nueva Reunión">
+                        <ScheduleForm employees={employees.filter(e => e.has11Meetings !== false)} onSave={handleSaveSchedule} onCancel={() => setModal({ type: null, data: null })} />
+                    </GlobalModal>
+                )}
             </AnimatePresence>
         </div>
     );
@@ -827,7 +917,7 @@ const Gerencia = () => {
 
 // --- SUB-COMPONENTS/VIEWS ---
 
-const GerenciaDashboard = ({ tasks, batteries, partners, movements, cashHistory, inventory, orders, cumulativeCashDiff, employees, auditAlerts, activeZoneId, onXPBonus, onTabSwitch }) => {
+const GerenciaDashboard = ({ tasks, batteries, partners, movements, cashHistory, inventory, orders, cumulativeCashDiff, employees, auditAlerts, meetingSchedules, activeZoneId, onXPBonus, onTabSwitch }) => {
     const { dailyGroups } = useProductivity();
     
     // --- New States for Alerts Filtering ---
@@ -948,6 +1038,16 @@ const GerenciaDashboard = ({ tasks, batteries, partners, movements, cashHistory,
     // --- restored 5. JEWELRY DEBT ---
     const totalDebt = (partners || []).reduce((acc, p) => acc + Number(p.debt_grams || 0), 0);
 
+    // --- restored 6. MEETING REMINDERS ---
+    const meetingStats = useMemo(() => {
+        const active = (meetingSchedules || []).filter(s => s.status === 'Pendiente');
+        const done = (meetingSchedules || []).filter(s => s.status === 'Completado').length;
+        const total = (meetingSchedules || []).length;
+        const next = active.length > 0 ? active.sort((a,b) => new Date(a.scheduled_date) - new Date(b.scheduled_date))[0] : null;
+        const progress = total > 0 ? Math.round((done / total) * 100) : 0;
+        return { progress, total, next, done };
+    }, [meetingSchedules]);
+
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* KPI OVERVIEW GRID */}
@@ -978,52 +1078,17 @@ const GerenciaDashboard = ({ tasks, batteries, partners, movements, cashHistory,
                     <div className="mt-2 text-[10px] text-slate-400 font-bold uppercase">{batteryStats.active}/{batteryStats.total} Tareas de control completadas</div>
                 </GlassCard>
 
-                <GlassCard title="Alertas Compras" icon={ShieldAlert} description="Alertas por comprador" 
-                    className={buyingAlerts.length > 0 ? " ring-2 ring-rose-300 ring-offset-4 ring-offset-transparent shadow-rose-100 shadow-2xl" : ""}>
-                    
-                    <div className="flex items-center justify-between mb-4 mt-2">
-                        <div className="flex flex-col">
-                            <span className="text-[8px] font-black text-rose-300 uppercase tracking-widest mb-1">Período</span>
-                            <select 
-                                value={alertMonth} 
-                                onChange={(e) => setAlertMonth(e.target.value)}
-                                className="bg-rose-50 border-none text-[10px] font-black uppercase text-rose-600 rounded-xl px-3 py-2 focus:ring-2 focus:ring-rose-200 cursor-pointer transition-all"
-                            >
-                                {availableAlertMonths.map(m => <option key={m} value={m}>{format(parseISO(`${m}-01`), 'MMMM yyyy', { locale: es })}</option>)}
-                            </select>
-                        </div>
-                        <div className="text-right">
-                            <span className="text-[20px] font-black text-rose-500 block leading-none">{buyingAlerts.length}</span>
-                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">Compradores</span>
-                        </div>
+                <GlassCard title="Reuniones 1:1" icon={Users} description="Ciclo de evaluación de talento"
+                    action={<div onClick={() => onTabSwitch('meetings')} className="flex items-center gap-1 text-[10px] bg-indigo-100/50 text-indigo-600 px-2 py-1 rounded-full cursor-pointer"><ChevronRight size={10}/> Ver Más</div>}>
+                    <div className="mt-4 h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <motion.div initial={{ width: 0 }} animate={{ width: `${meetingStats.progress || 0}%` }} className="h-full bg-gradient-to-r from-indigo-400 to-indigo-600" />
                     </div>
-
-                    <div className="space-y-2 max-h-[120px] overflow-hidden">
-                        {buyingAlerts.slice(0, 2).map((a, i) => (
-                            <div key={i} className="flex justify-between items-center bg-rose-50/30 p-3 rounded-2xl border border-rose-100/50 group hover:bg-rose-50 transition-all">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-                                    <span className="text-[10px] font-black text-slate-700 uppercase tracking-tight truncate max-w-[100px]">{a.name}</span>
-                                </div>
-                                <span className="text-[10px] font-black text-rose-600 bg-white px-3 py-1 rounded-full shadow-sm border border-rose-100">{a.count} <span className="text-[8px] opacity-60">Alertas</span></span>
-                            </div>
-                        ))}
-                        {buyingAlerts.length === 0 && (
-                            <div className="py-6 flex flex-col items-center justify-center gap-2 opacity-50">
-                                <CheckCircle2 size={24} className="text-green-400" />
-                                <p className="text-[10px] text-slate-400 font-bold uppercase italic">Sin alertas este mes</p>
-                            </div>
+                    <div className="mt-2 flex justify-between items-center">
+                        <span className="text-[9px] text-slate-400 font-bold uppercase">{meetingStats.done}/{meetingStats.total} Completadas</span>
+                        {meetingStats.next && (
+                            <span className="text-[9px] font-black text-indigo-500 uppercase tracking-tighter">Prox: {format(parseISO(meetingStats.next.scheduled_date), 'dd/MM')}</span>
                         )}
                     </div>
-
-                    {buyingAlerts.length >= 3 && (
-                        <button 
-                            onClick={() => setShowAllAlerts(true)}
-                            className="w-full mt-4 py-3 bg-white border border-rose-100 text-[9px] font-black text-rose-500 hover:bg-rose-500 hover:text-white uppercase tracking-widest rounded-xl transition-all shadow-sm active:scale-95"
-                        >
-                            Ver todos los compradores ({buyingAlerts.length})
-                        </button>
-                    )}
                 </GlassCard>
             </div>
 
@@ -3411,7 +3476,7 @@ const OrderClosureModal = ({ order, onConfirm, onCancel }) => {
 };
 
 
-const BatteriesView = ({ batteries, onAdd, onCheck, onDelete, onEdit, onAddItem, onDeleteItem, onPostpone, hideHeader, isCompact, activeZoneId }) => {
+const BatteriesView = ({ batteries, onAdd, onCheck, onDelete, onEdit, onAddExtra, onDeleteExtra, onPostpone, hideHeader, isCompact, activeZoneId }) => {
     const safeBatteries = (Array.isArray(batteries) ? batteries : []).filter(b => !activeZoneId || b.zone_id == activeZoneId);
 
     return (
@@ -3516,7 +3581,7 @@ const BatteriesView = ({ batteries, onAdd, onCheck, onDelete, onEdit, onAddItem,
                                                     </div>
                                                 ))}
                                                 <button 
-                                                    onClick={() => onAddItem(b.id)}
+                                                    onClick={() => onAddExtra(b.id)}
                                                     className="w-full p-4 border-2 border-dashed border-slate-100 rounded-2xl text-[9px] font-black text-slate-400 uppercase hover:border-blue-200 hover:text-blue-400 transition-all flex items-center justify-center gap-2"
                                                 >
                                                     <PlusCircle size={14}/> Añadir Tarea Extra
@@ -3549,11 +3614,11 @@ const BatteriesView = ({ batteries, onAdd, onCheck, onDelete, onEdit, onAddItem,
                                                         </div>
                                                         <span className={`text-[10px] font-bold uppercase truncate ${item.is_done ? 'text-slate-300 line-through' : 'text-slate-600'}`}>{item.description}</span>
                                                     </button>
-                                                    <button onClick={() => onDeleteItem(item.id)} className="opacity-0 group-hover/compact:opacity-100 p-1 text-slate-200 hover:text-red-400 transition-all"><X size={10}/></button>
+                                                    <button onClick={() => onDeleteExtra(item.id)} className="opacity-0 group-hover/compact:opacity-100 p-1 text-slate-200 hover:text-red-400 transition-all"><X size={10}/></button>
                                                 </div>
                                             ))}
                                             <button 
-                                                onClick={() => onAddItem(b.id)}
+                                                onClick={() => onAddExtra(b.id)}
                                                 className="w-full mt-2 py-2 border border-dashed border-slate-100 rounded-lg text-[8px] font-black text-slate-300 uppercase hover:text-blue-400 hover:border-blue-100 transition-all"
                                             >
                                                 + EXTRA
@@ -3858,6 +3923,265 @@ const ZoneManagerForm = ({ zones, employees, onSave, onDelete, onCancel }) => {
                         </div>
                     </div>
                 ))}
+            </div>
+        </div>
+    );
+};
+
+const MeetingsView = ({ storeId, employees, user, schedules, onSchedule, onManageCriteria, onDeleteSchedule }) => {
+    const [selectedEmployee, setSelectedEmployee] = useState(null);
+    const [history, setHistory] = useState([]);
+
+    useEffect(() => {
+        const fetchHistory = async () => {
+            try {
+                const res = await fetch('/api/gerencia/meetings/history/all', { headers: { 'x-store-id': storeId } });
+                if (res.ok) setHistory(await res.json());
+            } catch (err) { console.error(err); }
+        };
+        fetchHistory();
+    }, [storeId]);
+
+    const activeEmployees = useMemo(() => employees.filter(e => e.has11Meetings !== false), [employees]);
+
+    if (selectedEmployee) {
+        return (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <button 
+                    onClick={() => setSelectedEmployee(null)}
+                    className="mb-6 flex items-center gap-2 text-slate-400 font-bold uppercase text-[10px] hover:text-[#1A365D] transition-colors"
+                >
+                    <ChevronLeft size={16}/> Volver al Organizador
+                </button>
+                <MeetingForm 
+                    employee={selectedEmployee} 
+                    interviewer={{ id: user.id || 'gerente', name: user.name || 'Gerente', role: user.role }}
+                    onFinish={() => {
+                        setSelectedEmployee(null);
+                        // Refresh history
+                        const fetchH = async () => {
+                            const res = await fetch('/api/gerencia/meetings/history/all', { headers: { 'x-store-id': storeId } });
+                            if (res.ok) setHistory(await res.json());
+                        };
+                        fetchH();
+                    }} 
+                />
+            </motion.div>
+        );
+    }
+
+    return (
+        <div className="space-y-8 animate-in fade-in duration-500 pb-10">
+            <div className="bg-white/40 backdrop-blur-md p-10 rounded-[40px] border border-white flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h2 className="text-3xl font-black text-[#1A365D] tracking-tighter uppercase">Organizador de <span className="text-indigo-500">Reuniones 1:1</span></h2>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Evaluación periódica de talento y compromiso</p>
+                </div>
+                <div className="flex gap-3">
+                    <button onClick={onManageCriteria} className="bg-white px-5 py-3 rounded-2xl border border-slate-100 text-[10px] font-black uppercase text-slate-500 hover:text-indigo-500 transition-all flex items-center gap-2 shadow-sm">
+                        <Layers size={14}/> Gestionar Criterios
+                    </button>
+                    <button onClick={onSchedule} className="bg-[#1A365D] px-6 py-3 rounded-2xl text-[10px] font-black uppercase text-white hover:bg-indigo-600 transition-all flex items-center gap-2 shadow-lg shadow-indigo-100">
+                        <PlusCircle size={14}/> Programar Cita
+                    </button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+                {/* MEMORANDUM SECTION */}
+                <div className="xl:col-span-1 space-y-6">
+                    <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm">
+                        <h3 className="text-xs font-black text-[#1A365D] uppercase tracking-widest mb-6 flex items-center gap-2">
+                             <Clock size={16} className="text-indigo-500"/> Memorandum de Citas
+                        </h3>
+                        <div className="space-y-4">
+                            {(schedules || []).filter(s => s.status === 'Pendiente').length === 0 && (
+                                <p className="text-[10px] text-slate-400 font-bold uppercase italic p-4 border border-dashed border-slate-100 rounded-2xl text-center">No hay citas programadas</p>
+                            )}
+                            {(schedules || []).filter(s => s.status === 'Pendiente').map(s => {
+                                const emp = employees.find(e => String(e.id) === String(s.employee_id));
+                                return (
+                                    <div key={s.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 group">
+                                        <div className="flex justify-between items-start mb-1">
+                                            <span className="text-xs font-black text-[#1A365D]">{emp?.firstName || 'Empleado'}</span>
+                                            <button onClick={() => onDeleteSchedule(s.id)} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 transition-all">
+                                                <X size={12}/>
+                                            </button>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-[10px] font-bold text-indigo-500">
+                                            <CalendarIcon size={12}/>
+                                            {format(parseISO(s.scheduled_date), 'dd/MM/yyyy HH:mm')}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+
+                {/* EMPLOYEES GRID */}
+                <div className="xl:col-span-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 h-fit">
+                    {activeEmployees.map(emp => {
+                        const lastMeeting = history.find(h => String(h.employee_id) === String(emp.id));
+                        const isDoneThisMonth = lastMeeting && format(parseISO(lastMeeting.date), 'yyyy-MM') === format(new Date(), 'yyyy-MM');
+                        const nextSched = (schedules || []).find(s => String(s.employee_id) === String(emp.id) && s.status === 'Pendiente');
+
+                        return (
+                            <div key={emp.id} className="bg-white p-8 rounded-[40px] border border-[#E2E8F0] shadow-sm hover:shadow-xl transition-all group flex flex-col justify-between">
+                                <div className="flex justify-between items-start mb-6">
+                                    <div className="flex items-center gap-4">
+                                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-xl ${isDoneThisMonth ? 'bg-emerald-50 text-emerald-500' : 'bg-indigo-50 text-indigo-500'}`}>
+                                            {emp.firstName.charAt(0)}
+                                        </div>
+                                        <div>
+                                            <h3 className="text-lg font-black text-[#1A365D] uppercase leading-tight">{emp.firstName}</h3>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase">{emp.role}</p>
+                                        </div>
+                                    </div>
+                                    {isDoneThisMonth ? (
+                                        <div className="bg-emerald-500 text-white p-1.5 rounded-full shadow-lg shadow-emerald-100">
+                                            <Check size={14}/>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-amber-50 text-amber-500 px-3 py-1 rounded-full text-[8px] font-black uppercase border border-amber-100 italic">Pendiente</div>
+                                    )}
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div className="p-4 bg-slate-50 rounded-[28px] border border-slate-100">
+                                        <div className="flex justify-between text-[9px] font-black text-slate-400 uppercase mb-2">
+                                            <span>Próxima Cita</span>
+                                            <span>Estado</span>
+                                        </div>
+                                        <p className="text-xs font-black text-[#1A365D]">
+                                            {nextSched ? format(parseISO(nextSched.scheduled_date), 'dd/MM/yyyy') : 'No programada'}
+                                        </p>
+                                    </div>
+
+                                    <button 
+                                        onClick={() => setSelectedEmployee(emp)}
+                                        className={`w-full py-4 rounded-2xl font-black text-[10px] uppercase flex items-center justify-center gap-3 transition-all ${isDoneThisMonth ? 'bg-slate-50 text-slate-400 hover:bg-slate-100' : 'bg-[#1A365D] text-white hover:bg-indigo-600 shadow-lg shadow-indigo-100'}`}
+                                    >
+                                        {isDoneThisMonth ? 'REVISAR FICHA' : 'EMPEZAR REUNIÓN'}
+                                        <ChevronRight size={16}/>
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const CriterionManager = ({ criteria, onSave, onDelete }) => {
+    const [editMode, setEditMode] = useState(null); // id of item being edited
+    const [formData, setFormData] = useState({ category: 'Actitud', title: '', description: '', order_index: 0 });
+
+    const handleEdit = (c) => {
+        setEditMode(c.id);
+        setFormData({ ...c });
+    };
+
+    const reset = () => {
+        setEditMode(null);
+        setFormData({ category: 'Actitud', title: '', description: '', order_index: 0 });
+    };
+
+    return (
+        <div className="p-8 space-y-8 max-h-[70vh] overflow-y-auto">
+            <div className={`p-6 rounded-3xl border transition-all ${editMode ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-100'}`}>
+                <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">
+                    {editMode ? 'Editar Apartado' : 'Añadir Nueva Sección'}
+                </h4>
+                <div className="space-y-4">
+                    <div className="grid grid-cols-4 gap-4">
+                        <div className="relative">
+                            <input 
+                                list="categories-list"
+                                value={formData.category} 
+                                onChange={e => setFormData({...formData, category: e.target.value})} 
+                                placeholder="Sección..."
+                                className="w-full bg-white p-3 rounded-xl border border-slate-100 text-xs font-bold outline-none" 
+                            />
+                            <datalist id="categories-list">
+                                {Array.from(new Set([...(criteria || []).map(c => c.category), 'Actitud', 'Productividad', 'Compromiso', 'Formación'])).map(cat => (
+                                    <option key={cat} value={cat} />
+                                ))}
+                            </datalist>
+                        </div>
+                        <input value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="Título del criterio" className="col-span-2 bg-white p-3 rounded-xl border border-slate-100 text-xs font-bold outline-none" />
+                        <div className="flex gap-2">
+                             <input type="number" value={formData.order_index} onChange={e => setFormData({...formData, order_index: parseInt(e.target.value) || 0})} className="w-16 bg-white p-3 rounded-xl border border-slate-100 text-xs font-bold outline-none" title="Índice de orden" />
+                             <button onClick={() => { if(formData.title) { onSave(formData); reset(); } }} className={`${editMode ? 'bg-amber-500' : 'bg-indigo-500'} text-white font-black text-[10px] rounded-xl hover:opacity-80 transition-all uppercase flex-1 shadow-md`}>
+                                {editMode ? 'Guardar' : 'Añadir'}
+                            </button>
+                        </div>
+                    </div>
+                    {editMode && (
+                        <button onClick={reset} className="text-[10px] font-black text-slate-400 uppercase hover:text-rose-500">Cancelar edición</button>
+                    )}
+                </div>
+            </div>
+
+            <div className="space-y-6">
+                {Array.from(new Set([...(criteria || []).map(c => c.category), 'Actitud', 'Productividad', 'Compromiso', 'Formación'])).sort().map(cat => {
+                    const filtered = (criteria || []).filter(c => c.category === cat);
+                    if (filtered.length === 0 && !['Actitud', 'Productividad', 'Compromiso', 'Formación'].includes(cat)) return null;
+                    return (
+                        <div key={cat} className="space-y-3">
+                            <h5 className="text-[10px] font-black text-indigo-500 uppercase tracking-tighter ml-2">{cat}</h5>
+                            {filtered.sort((a,b) => a.order_index - b.order_index).map(c => (
+                                <div key={c.id} className={`p-4 rounded-2xl border flex justify-between items-center group transition-all ${editMode === c.id ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-100 hover:border-slate-300'}`}>
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-8 h-8 rounded-lg bg-white border border-slate-100 flex items-center justify-center text-slate-400 font-black text-[10px] shadow-sm">
+                                            {c.order_index}
+                                        </div>
+                                        <div>
+                                            <span className="text-xs font-black text-[#1A365D] tracking-tight uppercase">{c.title}</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-1">
+                                        <button onClick={() => handleEdit(c)} className="p-2 text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 rounded-xl transition-all">
+                                            <FileText size={14}/>
+                                        </button>
+                                        <button onClick={() => onDelete(c.id)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all">
+                                            <Trash2 size={14}/>
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                            {filtered.length === 0 && (
+                                <p className="ml-2 text-[9px] text-slate-300 font-bold uppercase italic">Sin criterios en esta sección</p>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
+const ScheduleForm = ({ employees, onSave, onCancel }) => {
+    const [data, setData] = useState({ employee_id: '', scheduled_date: format(new Date(), "yyyy-MM-dd'T'HH:mm") });
+
+    return (
+        <div className="p-8 space-y-6">
+            <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Seleccionar Empleado</label>
+                <select value={data.employee_id} onChange={e => setData({...data, employee_id: e.target.value})} className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-xs font-bold text-[#1A365D] outline-none">
+                    <option value="">Elegir de la lista...</option>
+                    {employees.map(e => <option key={e.id} value={e.id}>{e.firstName} {e.lastName}</option>)}
+                </select>
+            </div>
+            <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Fecha y Hora</label>
+                <input type="datetime-local" value={data.scheduled_date} onChange={e => setData({...data, scheduled_date: e.target.value})} className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-xs font-bold text-[#1A365D] outline-none" />
+            </div>
+            <div className="flex gap-4 pt-4">
+                <button onClick={onCancel} className="flex-1 py-4 rounded-2xl font-black text-[10px] text-slate-400 uppercase bg-slate-50 hover:bg-slate-100 transition-all">Cancelar</button>
+                <button onClick={() => { if(data.employee_id) onSave(data); }} className="flex-1 py-4 rounded-2xl font-black text-[10px] text-white uppercase bg-[#1A365D] hover:bg-indigo-600 shadow-lg shadow-indigo-100 transition-all">Confirmar Cita</button>
             </div>
         </div>
     );

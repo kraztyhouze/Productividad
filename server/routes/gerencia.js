@@ -844,4 +844,192 @@ router.delete('/metrics/purge', isManager, async (req, res) => {
     }
 });
 
+
+// --- INDIVIDUAL MEETINGS (1:1) ---
+
+router.get('/evaluation-criteria', isManager, async (req, res) => {
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    try {
+        const result = await pool.query('SELECT * FROM evaluation_criteria WHERE store_id = $1 ORDER BY category ASC, order_index ASC', [storeId]);
+        res.json(result.rows);
+    } catch (err) {
+        logError(err, 'GET /evaluation-criteria');
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/meetings/draft/:employeeId', isManager, async (req, res) => {
+    const { employeeId } = req.params;
+    try {
+        const result = await pool.query('SELECT * FROM meeting_drafts WHERE employee_id = $1', [employeeId]);
+        res.json(result.rows[0] || null);
+    } catch (err) {
+        logError(err, 'GET /meetings/draft');
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/meetings/draft', isManager, async (req, res) => {
+    const { employee_id, interviewer_id, data } = req.body;
+    try {
+        const result = await pool.query(
+            `INSERT INTO meeting_drafts (employee_id, interviewer_id, data, last_saved) 
+             VALUES ($1, $2, $3, NOW()) 
+             ON CONFLICT (employee_id) DO UPDATE SET 
+             interviewer_id = EXCLUDED.interviewer_id, 
+             data = EXCLUDED.data, 
+             last_saved = EXCLUDED.last_saved 
+             RETURNING *`,
+            [employee_id, interviewer_id, JSON.stringify(data)]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        logError(err, 'POST /meetings/draft');
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/meetings/finalize', isManager, async (req, res) => {
+    const { employee_id, interviewer_id, summary, date } = req.body;
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 1. Insert Final Record
+        const finalRes = await client.query(
+            'INSERT INTO final_meetings (employee_id, interviewer_id, date, summary) VALUES ($1, $2, $3, $4) RETURNING id',
+            [employee_id, interviewer_id, date, JSON.stringify(summary)]
+        );
+
+        // 2. Delete Draft
+        await client.query('DELETE FROM meeting_drafts WHERE employee_id = $1', [employee_id]);
+
+        // 3. Update Schedule if exists
+        await client.query(
+            "UPDATE meeting_schedules SET status = 'Completado' WHERE employee_id = $1 AND status = 'Pendiente' AND scheduled_date <= $2",
+            [employee_id, date]
+        );
+
+        await client.query('COMMIT');
+        res.json({ success: true, id: finalRes.rows[0].id });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        logError(err, 'POST /meetings/finalize');
+        res.status(500).json({ error: err.message });
+    } finally {
+        client.release();
+    }
+});
+
+router.get('/meetings/history/all', isManager, async (req, res) => {
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    try {
+        const result = await pool.query(
+            `SELECT fm.* 
+             FROM final_meetings fm
+             JOIN employees e ON fm.employee_id::int = e.id
+             WHERE e.store_id = $1
+             ORDER BY fm.date DESC`, 
+            [storeId]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        logError(err, 'GET /meetings/history/all');
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- CRITERIA MANAGEMENT ---
+
+router.post('/evaluation-criteria', isManager, async (req, res) => {
+    const { category, title, description, order_index } = req.body;
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    try {
+        const result = await pool.query(
+            'INSERT INTO evaluation_criteria (category, title, description, order_index, store_id) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+            [category, title, description, order_index || 0, storeId]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.put('/evaluation-criteria/:id', isManager, async (req, res) => {
+    const { id } = req.params;
+    const { category, title, description, order_index } = req.body;
+    try {
+        const result = await pool.query(
+            'UPDATE evaluation_criteria SET category = $1, title = $2, description = $3, order_index = $4 WHERE id = $5 RETURNING *',
+            [category, title, description, order_index, id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.delete('/evaluation-criteria/:id', isManager, async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.query('DELETE FROM evaluation_criteria WHERE id = $1', [id]);
+        res.json({ message: 'Criterion deleted' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- MEETING SCHEDULES ---
+
+router.get('/meeting-schedules', isManager, async (req, res) => {
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    try {
+        const result = await pool.query(
+            'SELECT * FROM meeting_schedules WHERE store_id = $1 ORDER BY scheduled_date ASC',
+            [storeId]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/meeting-schedules', isManager, async (req, res) => {
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    const { employee_id, scheduled_date } = req.body;
+    try {
+        const result = await pool.query(
+            'INSERT INTO meeting_schedules (employee_id, scheduled_date, store_id) VALUES ($1, $2, $3) RETURNING *',
+            [employee_id, scheduled_date, storeId]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.put('/meeting-schedules/:id', isManager, async (req, res) => {
+    const { id } = req.params;
+    const { scheduled_date, status } = req.body;
+    try {
+        const result = await pool.query(
+            'UPDATE meeting_schedules SET scheduled_date = $1, status = $2 WHERE id = $3 RETURNING *',
+            [scheduled_date, status, id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.delete('/meeting-schedules/:id', isManager, async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.query('DELETE FROM meeting_schedules WHERE id = $1', [id]);
+        res.json({ message: 'Schedule deleted' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 export default router;

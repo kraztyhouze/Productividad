@@ -112,6 +112,10 @@ const Team = () => {
         updateEmployee(id, { isInterviewer: value });
     };
 
+    const handleToggle11 = (id, value) => {
+        updateEmployee(id, { has11Meetings: value });
+    };
+
     return (
         <div className="space-y-6 pb-10 animate-in">
             {/* Header & Controls */}
@@ -182,6 +186,7 @@ const Team = () => {
                         onEdit={(e) => { setEditingEmployee(e); setIsModalOpen(true); }}
                         onDelete={handleDelete}
                         onToggleInterviewer={handleToggleInterviewer}
+                        onToggle11={handleToggle11}
                     />
                 ))}
             </div>

@@ -139,6 +139,10 @@ const EmployeeModal = ({
                                             {!['Gerente', 'Supervisor', 'Responsable'].includes(formData.role) && <span className="text-[8px] font-black text-red-400 uppercase">Solo para perfiles de gestión</span>}
                                         </div>
                                     </label>
+                                    <label className="flex items-center gap-3 cursor-pointer p-4 bg-white border border-[#FF8C9D]/20 rounded-2xl hover:border-[#FF8C9D]/50 transition-all shadow-sm group">
+                                        <input type="checkbox" name="has11Meetings" checked={formData.has11Meetings !== false} onChange={handleInputChange} className="accent-[#FF8C9D] w-5 h-5 rounded-md" />
+                                        <span className="text-sm font-bold text-[#1A365D] group-hover:text-[#FF8C9D] transition-colors">Participa en Reuniones Individuales</span>
+                                    </label>
                                 </div>
                             </div>
                         </div>

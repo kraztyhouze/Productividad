@@ -451,3 +451,106 @@ export const generateMeetingPDF = (meetingData) => {
 
     doc.save(`Reunion_1_1_${employeeName.replace(/\s+/g, '_')}_${date}.pdf`);
 };
+
+export const generateTalentMeetingPDF = (employeeName, interviewerName, data, criteriaByZone) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
+    const margin = 20;
+    let currentY = 25;
+
+    // Header
+    doc.setFontSize(18);
+    doc.setTextColor(31, 41, 55); // Dark text
+    doc.text('ACTA DE REUNIÓN INDIVIDUAL - TIKTAK SUITE', margin, currentY);
+    currentY += 10;
+    
+    doc.setFontSize(10);
+    doc.setTextColor(107, 114, 128); // Gray text
+    doc.text(`Fecha: ${new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`, margin, currentY);
+    currentY += 15;
+
+    // Participants
+    doc.setFontSize(11);
+    doc.setTextColor(31, 41, 55);
+    doc.text(`Empleado: ${employeeName}`, margin, currentY);
+    doc.text(`Entrevistador: ${interviewerName}`, pageWidth / 2, currentY);
+    currentY += 10;
+    doc.setDrawColor(229, 231, 235);
+    doc.line(margin, currentY, pageWidth - margin, currentY);
+    currentY += 10;
+
+    // Criteria Summary
+    doc.setFontSize(14);
+    doc.text('Evaluación por Zonas', margin, currentY);
+    currentY += 8;
+
+    Object.entries(criteriaByZone).forEach(([zone, criteria]) => {
+        const tableData = criteria.map(c => {
+            const val = data.evaluation?.[c.id] || 'N/A';
+            const color = val === 'Verde' ? 'CORRECTO' : val === 'Ámbar' ? 'A MEJORAR' : val === 'Rojo' ? 'CRÍTICO' : 'N/A';
+            return [c.title, color, data.comments?.[c.id] || ''];
+        });
+
+        autoTable(doc, {
+            startY: currentY,
+            head: [[zone, 'Estado', 'Observaciones']],
+            body: tableData,
+            theme: 'striped',
+            headStyles: { fillColor: [55, 65, 81], textColor: [255, 255, 255] },
+            margin: { left: margin, right: margin },
+            columnStyles: {
+                0: { cellWidth: 60 },
+                1: { cellWidth: 30, halign: 'center' },
+                2: { cellWidth: 'auto' }
+            },
+            didDrawPage: (data) => {
+                currentY = data.cursor.y;
+            }
+        });
+        currentY += 5;
+    });
+
+    // Final Summary
+    if (currentY + 60 > pageHeight) doc.addPage();
+    currentY += 10;
+    doc.setFontSize(14);
+    doc.text('Compromisos y Acuerdos', margin, currentY);
+    currentY += 10;
+
+    const sections = [
+        { label: 'Fortalezas Identificadas', value: data.summary?.strengths },
+        { label: 'Puntos de Mejora', value: data.summary?.improvements },
+        { label: 'Acciones de Compromiso', value: data.summary?.commitments }
+    ];
+
+    sections.forEach(sec => {
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "bold");
+        doc.text(`${sec.label}:`, margin, currentY);
+        currentY += 6;
+        doc.setFont("helvetica", "normal");
+        const splitText = doc.splitTextToSize(sec.value || 'No se han definido puntos específicos en esta sección.', pageWidth - (margin * 2));
+        doc.text(splitText, margin, currentY);
+        currentY += (splitText.length * 6) + 6;
+    });
+
+    // Signatures
+    currentY = Math.max(currentY, pageHeight - 40);
+    doc.setDrawColor(31, 41, 55);
+    doc.line(margin, currentY, margin + 70, currentY);
+    doc.line(pageWidth - margin - 70, currentY, pageWidth - margin, currentY);
+    
+    doc.setFontSize(9);
+    doc.text('Firma Empleado', margin + 35, currentY + 5, { align: "center" });
+    doc.text('Firma Entrevistador', pageWidth - margin - 35, currentY + 5, { align: "center" });
+
+    // Footer
+    doc.setFontSize(8);
+    doc.setTextColor(156, 163, 175);
+    doc.text(`Documento generado por TikTak Suite 2.1 - Página 1 de 1`, pageWidth / 2, pageHeight - 10, { align: "center" });
+
+    // Download
+    const fileName = `Acta_Talento_${employeeName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+};

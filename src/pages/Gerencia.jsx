@@ -869,7 +869,8 @@ const GerenciaDashboard = ({ tasks, batteries, partners, movements, cashHistory,
         const today = new Date();
         const last7Days = Array.from({ length: 7 }, (_, i) => format(addDays(today, -i), 'yyyy-MM-dd'));
 
-        return [...employees]
+        return [...(employees || [])]
+            .filter(emp => emp.isBuyer)
             .map(emp => {
                 const empId = String(emp.id).trim();
                 let weeklyTotal = 0;
@@ -898,7 +899,7 @@ const GerenciaDashboard = ({ tasks, batteries, partners, movements, cashHistory,
         for (let i = 6; i >= 0; i--) {
             const dStr = format(addDays(today, -i), 'yyyy-MM-dd');
             let dayTotal = 0;
-            (employees || []).forEach(emp => {
+            (employees || []).filter(emp => emp.isBuyer).forEach(emp => {
                 const stats = dailyGroups[`${String(emp.id).trim()}-${dStr}`];
                 if (stats) dayTotal += (Number(stats.standard || 0) + Number(stats.jewelry || 0) + Number(stats.recoverable || 0));
             });
@@ -914,7 +915,9 @@ const GerenciaDashboard = ({ tasks, batteries, partners, movements, cashHistory,
     // --- restored 3. MIX DATA ---
     const mixData = useMemo(() => {
         const today = format(new Date(), 'yyyy-MM-dd');
-        return (employees || []).map(emp => {
+        return (employees || [])
+            .filter(emp => emp.isBuyer)
+            .map(emp => {
             const stats = dailyGroups[`${String(emp.id).trim()}-${today}`] || {};
             return {
                 name: emp.alias || emp.first_name,

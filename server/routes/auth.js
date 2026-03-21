@@ -2,6 +2,7 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
 import { pool } from '../db.js';
+import { generateBlindIndex } from '../utils/crypto.js';
 
 const router = express.Router();
 
@@ -20,9 +21,10 @@ router.post('/login', loginLimiter, async (req, res) => {
     const storeId = req.headers['x-store-id'] || 'store_1';
 
     try {
+        const bindex = generateBlindIndex(username);
         const result = await pool.query(
-            'SELECT * FROM employees WHERE username = $1 AND store_id = $2',
-            [username, storeId]
+            'SELECT * FROM employees WHERE username_bindex = $1 AND store_id = $2',
+            [bindex, storeId]
         );
 
         if (result.rows.length > 0) {

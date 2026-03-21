@@ -1,392 +1,188 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { 
-    Users, 
-    Zap, 
-    ShieldAlert, 
+    Lock, 
+    UserCheck, 
+    PlusCircle, 
+    Layers, 
+    Clock, 
+    Calendar as CalendarIcon, 
+    X, 
+    ChevronRight, 
+    ChevronLeft, 
+    Check, 
+    Save, 
     FileText, 
-    Trash2, 
-    CheckCircle2, 
-    UserCheck,
-    Calendar,
-    ArrowRight,
-    AlertCircle,
-    Download,
-    Upload
+    Trash2 
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useAuth, ROLES } from '../../context/AuthContext';
-import { generateMeetingPDF } from '../../utils/pdfGenerator';
+import { format, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
+import MeetingForm from './MeetingForm';
 
-const MeetingsView = ({ storeId }) => {
-    const { user } = useAuth();
-    const [employees, setEmployees] = useState([]);
-    const [interviews, setInterviews] = useState([]); // Roles authorized to interview
-    const [selectedEmployee, setSelectedEmployee] = useState('');
-    const [selectedInterviewer, setSelectedInterviewer] = useState(user?.id || '');
-    const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0].substring(0, 7)); // Monthly default
-    const [category, setCategory] = useState('Ventas');
-    const [metrics, setMetrics] = useState([]);
-    const [summary, setSummary] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [purgeStep, setPurgeStep] = useState(0); // 0: Open, 1: Confirm 1, 2: Confirm 2
-    const [statusMsg, setStatusMsg] = useState({ type: '', text: '' });
+const MeetingsView = ({ storeId, employees, user, schedules, onSchedule, onManageCriteria, onDeleteSchedule, meetings }) => {
+    const [selectedInterviewer, setSelectedInterviewer] = useState(user?.nombre || 'Gerente');
+    
+    const safeEmployees = Array.isArray(employees) ? employees : [];
+    const activeEmployees = useMemo(() => safeEmployees.filter(e => e.has11Meetings !== false), [safeEmployees]);
+    const safeHistory = Array.isArray(meetings.history) ? meetings.history : [];
+    const safeSchedules = Array.isArray(schedules) ? schedules : [];
 
-    useEffect(() => {
-        fetchEmployees();
-    }, []);
-
-    useEffect(() => {
-        if (employees.length > 0) {
-            setInterviews(employees.filter(e => e.isInterviewer));
-        }
-    }, [employees]);
-
-    useEffect(() => {
-        if (selectedEmployee && reportDate) {
-            fetchEmployeeMetrics();
-        }
-    }, [selectedEmployee, reportDate, category]);
-
-    const fetchEmployees = async () => {
-        try {
-            const res = await fetch('/api/employees', {
-                headers: { 'x-store-id': storeId }
-            });
-            const data = await res.json();
-            setEmployees(data);
-            setInterviews(data.filter(e => ['Gerente', 'Supervisor', 'Responsable'].includes(e.role)));
-        } catch (e) { console.error(e); }
-    };
-
-    const fetchEmployeeMetrics = async () => {
-        try {
-            setLoading(true);
-            const res = await fetch(`/api/gerencia/metrics?report_date=${reportDate}&category=${category}`, {
-                headers: { 
-                    'x-store-id': storeId,
-                    'x-user-role': user?.role
-                }
-            });
-            const data = await res.json();
-            // Filter metrics for this specific employee
-            const empMetrics = data.filter(m => m.employee_id === selectedEmployee);
-            setMetrics(empMetrics);
-        } catch (e) { console.error(e); }
-        finally { setLoading(false); }
-    };
-
-    const handleGeneratePDF = async () => {
-        if (!selectedEmployee || !selectedInterviewer) {
-            setStatusMsg({ type: 'error', text: 'Selecciona empleado y entrevistador' });
-            return;
-        }
-
-        const employee = employees.find(e => e.id === selectedEmployee);
-        const interviewer = employees.find(e => e.id === selectedInterviewer);
-
-        const meetingData = {
-            employeeName: `${employee?.first_name} ${employee?.last_name || ''}`,
-            interviewerName: `${interviewer?.first_name} ${interviewer?.last_name || ''}`,
-            date: new Date().toLocaleDateString(),
-            category,
-            metrics: metrics,
-            summary
-        };
-
-        generateMeetingPDF(meetingData);
-
-        // Optional: Save meeting record to DB
-        try {
-            await fetch('/api/gerencia/meetings', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'x-store-id': storeId,
-                    'x-user-role': user?.role
-                },
-                body: JSON.stringify({
-                    employee_id: selectedEmployee,
-                    interviewer_id: selectedInterviewer,
-                    date: new Date().toISOString().split('T')[0],
-                    category,
-                    summary: { text: summary, metrics_count: metrics.length }
-                })
-            });
-            setStatusMsg({ type: 'success', text: 'Acta generada y registrada correctamente.' });
-        } catch (e) { console.error(e); }
-    };
-
-    const handlePurge = async () => {
-        try {
-            const res = await fetch('/api/gerencia/metrics/purge', {
-                method: 'DELETE',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'x-store-id': storeId,
-                    'x-user-role': user?.role
-                },
-                body: JSON.stringify({ report_date: reportDate, category })
-            });
-            const data = await res.json();
-            if (data.success) {
-                setStatusMsg({ type: 'success', text: data.message });
-                setPurgeStep(0);
-                setMetrics([]);
-                setSelectedEmployee('');
-            }
-        } catch (e) {
-            setStatusMsg({ type: 'error', text: 'Error al purgar datos' });
-        }
-    };
-
-    const handleImportCSV = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-            const text = event.target.result;
-            const lines = text.split('\n');
-            const dataToImport = [];
-            
-            // Expected CSV: employee_id, metric_name, metric_value
-            // Skipping header
-            for (let i = 1; i < lines.length; i++) {
-                const parts = lines[i].split(',');
-                if (parts.length >= 3) {
-                    dataToImport.push({
-                        employee_id: parts[0].trim(),
-                        metric_name: parts[1].trim(),
-                        metric_value: parseFloat(parts[2].trim()) || 0,
-                        report_date: reportDate,
-                        category: category
-                    });
-                }
-            }
-
-            if (dataToImport.length > 0) {
-                try {
-                    const res = await fetch('/api/gerencia/metrics/bulk', {
-                        method: 'POST',
-                        headers: { 
-                            'Content-Type': 'application/json',
-                            'x-store-id': storeId,
-                            'x-user-role': user?.role
-                        },
-                        body: JSON.stringify({ metrics: dataToImport })
-                    });
-                    const result = await res.json();
-                    if (result.success) {
-                        setStatusMsg({ type: 'success', text: `${result.count} métricas importadas correctamente.` });
-                        if (selectedEmployee) fetchEmployeeMetrics();
-                    }
-                } catch (err) {
-                    setStatusMsg({ type: 'error', text: 'Error en la importación bulk.' });
-                }
-            }
-        };
-        reader.readAsText(file);
-    };
+    if (meetings.selectedEmployee) {
+        return (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <div className="flex justify-between items-center mb-6">
+                    <button 
+                        onClick={() => meetings.setSelectedEmployee(null)}
+                        className="flex items-center gap-2 text-slate-400 font-bold uppercase text-[10px] hover:text-[#1A365D] transition-colors"
+                    >
+                        <ChevronLeft size={16}/> Volver al Organizador
+                    </button>
+                    {meetings.isSaving ? (
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-amber-500 bg-amber-50 px-3 py-1.5 rounded-full animate-pulse">
+                            <Save size={12}/> Autoguardando...
+                        </div>
+                    ) : meetings.lastSaved && (
+                        <div className="text-[10px] font-bold text-emerald-500 bg-emerald-50 px-3 py-1.5 rounded-full flex items-center gap-2">
+                             <Check size={12}/> Guardado {format(meetings.lastSaved, 'HH:mm:ss')}
+                        </div>
+                    )}
+                </div>
+                <MeetingForm 
+                    employee={meetings.selectedEmployee} 
+                    interviewer={{ id: user.id || 'gerente', name: selectedInterviewer, role: user.role }}
+                    onFinish={async () => {
+                        const success = await meetings.finishMeeting(meetings.selectedEmployee.id);
+                        if (success) meetings.refresh();
+                    }} 
+                />
+            </motion.div>
+        );
+    }
 
     return (
-        <div className="space-y-6">
-            {/* Header Section */}
-            <div className="flex justify-between items-end">
+        <div className="space-y-8 animate-in fade-in duration-500 pb-10">
+            {/* Header with Security Banner */}
+            <div className="bg-white/40 backdrop-blur-md p-10 rounded-[40px] border border-white flex flex-col lg:flex-row justify-between items-start gap-8">
                 <div>
-                    <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2">
-                        <Users className="text-[#FF8C9D]" />
-                        REUNIONES 1:1
-                    </h2>
-                    <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">
-                        Seguimiento de desempeño y firma de actas
-                    </p>
-                </div>
-
-                <div className="flex gap-2">
-                    <div className="bg-white p-2 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-3">
-                        <select 
-                            value={category} 
-                            onChange={e => setCategory(e.target.value)}
-                            className="text-[10px] font-black uppercase border-none focus:ring-0 bg-transparent"
-                        >
-                            <option>Ventas</option>
-                            <option>Compras</option>
-                        </select>
-                        <input 
-                            type="month" 
-                            value={reportDate}
-                            onChange={e => setReportDate(e.target.value)}
-                            className="text-[10px] font-black border-none focus:ring-0 bg-transparent"
-                        />
+                    <div className="flex items-center gap-2 mb-2">
+                        <span className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5">
+                            <Lock size={10} className="fill-indigo-600"/> Blindaje Criptográfico Activo
+                        </span>
+                        <h2 className="text-3xl font-black text-[#1A365D] tracking-tighter uppercase">Organizador <span className="text-indigo-500">1:1</span></h2>
                     </div>
-                    <label className="bg-[#1A365D] hover:bg-[#2a4a7a] text-white px-4 py-2 rounded-2xl text-[10px] font-black uppercase cursor-pointer flex items-center gap-2 transition-all shadow-md active:scale-95">
-                        <Upload size={14}/> Cargar Excel/CSV
-                        <input type="file" accept=".csv" onChange={handleImportCSV} className="hidden" />
-                    </label>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Evaluación de talento con persistencia segura AES-256</p>
+                </div>
+                
+                <div className="flex flex-wrap gap-4 items-center">
+                    {/* Interviewer Selector */}
+                    <div className="bg-white rounded-2xl border border-slate-100 p-2 flex items-center gap-3 pr-4 shadow-sm">
+                        <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center text-white"><UserCheck size={20}/></div>
+                        <div>
+                            <p className="text-[8px] font-black text-slate-400 uppercase">Entrevistador actual</p>
+                            <input 
+                                className="bg-transparent border-none p-0 text-xs font-black text-[#1A365D] outline-none" 
+                                value={selectedInterviewer}
+                                onChange={e => setSelectedInterviewer(e.target.value)}
+                                placeholder="Escribe tu nombre..."
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                        <button onClick={onManageCriteria} className="bg-white px-5 py-3 rounded-2xl border border-slate-100 text-[10px] font-black uppercase text-slate-500 hover:text-indigo-500 transition-all flex items-center gap-2 shadow-sm">
+                            <Layers size={14}/> Criterios
+                        </button>
+                        <button onClick={onSchedule} className="bg-[#1A365D] px-6 py-3 rounded-2xl text-[10px] font-black uppercase text-white hover:bg-indigo-600 transition-all flex items-center gap-2 shadow-lg shadow-indigo-100">
+                            <PlusCircle size={14}/> Programar
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            {statusMsg.text && (
-                <motion.div 
-                    initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-                    className={`p-4 rounded-2xl text-[10px] font-black uppercase flex items-center gap-3 ${statusMsg.type === 'success' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}
-                >
-                    {statusMsg.type === 'success' ? <CheckCircle2 size={16}/> : <AlertCircle size={16}/>}
-                    {statusMsg.text}
-                </motion.div>
-            )}
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Selector Panel */}
-                <div className="lg:col-span-1 space-y-6">
-                    <div className="bg-white p-6 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100">
-                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                            <Zap size={14} className="text-amber-400"/> CONFIGURACIÓN SESIÓN
+            <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+                {/* MEMORANDUM SECTION */}
+                <div className="xl:col-span-1 space-y-6">
+                    <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm">
+                        <h3 className="text-xs font-black text-[#1A365D] uppercase tracking-widest mb-6 flex items-center gap-2">
+                             <Clock size={16} className="text-indigo-500"/> Próximas Citas
                         </h3>
-                        
                         <div className="space-y-4">
-                            <div>
-                                <label className="text-[9px] font-black text-slate-400 uppercase ml-2 mb-1 block">Entrevistador</label>
-                                <select 
-                                    value={selectedInterviewer}
-                                    onChange={e => setSelectedInterviewer(e.target.value)}
-                                    className="w-full bg-slate-50 border-none rounded-2xl p-4 text-xs font-bold focus:ring-2 focus:ring-[#1A365D]/10"
-                                >
-                                    <option value="">Seleccionar responsable...</option>
-                                    {interviews.map(e => (
-                                        <option key={e.id} value={e.id}>{e.firstName} {e.lastName || ''}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="text-[9px] font-black text-slate-400 uppercase ml-2 mb-1 block">Empleado a entrevistar</label>
-                                <select 
-                                    value={selectedEmployee}
-                                    onChange={e => setSelectedEmployee(e.target.value)}
-                                    className="w-full bg-slate-50 border-none rounded-2xl p-4 text-xs font-bold focus:ring-2 focus:ring-[#1A365D]/10"
-                                >
-                                    <option value="">Seleccionar empleado...</option>
-                                    {employees.map(e => (
-                                        <option key={e.id} value={e.id}>{e.first_name} {e.last_name || ''}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Destruction Mode Card */}
-                    <div className="bg-slate-900 p-6 rounded-[2.5rem] text-white overflow-hidden relative group">
-                        <div className="absolute -right-4 -top-4 opacity-10 group-hover:rotate-12 transition-transform">
-                            <ShieldAlert size={120} />
-                        </div>
-                        
-                        <h3 className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                            <Trash2 size={14}/> MODO DESTRUCCIÓN
-                        </h3>
-                        <p className="text-[10px] text-slate-400 font-bold mb-4">
-                            Cierra el ciclo mensual y elimina los datos brutos de Excel permanentemente.
-                        </p>
-
-                        {purgeStep === 0 ? (
-                            <button 
-                                onClick={() => setPurgeStep(1)}
-                                className="w-full py-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-[10px] font-black uppercase transition-all"
-                            >
-                                Finalizar Ciclo y Purgar
-                            </button>
-                        ) : purgeStep === 1 ? (
-                            <div className="space-y-2">
-                                <p className="text-[8px] font-black text-amber-400 uppercase animate-pulse">¿Confirmar primera destrucción?</p>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <button onClick={() => setPurgeStep(0)} className="py-2 bg-slate-800 rounded-lg text-[8px] font-bold">CANCELAR</button>
-                                    <button onClick={() => setPurgeStep(2)} className="py-2 bg-red-600 rounded-lg text-[8px] font-bold">CONFIRMAR (1/2)</button>
+                            {safeSchedules.filter(s => s.status === 'Pendiente').length === 0 && (
+                                <div className="text-center p-8 border border-dashed border-slate-200 rounded-3xl">
+                                    <CalendarIcon className="mx-auto w-8 h-8 text-slate-200 mb-2"/>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase italic">Sin citas esta semana</p>
                                 </div>
-                            </div>
-                        ) : (
-                            <div className="space-y-2">
-                                <p className="text-[8px] font-black text-red-500 uppercase animate-bounce">⚠️ ACCIÓN IRREVERSIBLE ⚠️</p>
-                                <button 
-                                    onClick={handlePurge}
-                                    className="w-full py-3 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg shadow-red-900/50"
-                                >
-                                    ELIMINAR TODO PARA {reportDate.split('-')[1]}/{reportDate.split('-')[0]}
-                                </button>
-                                <button onClick={() => setPurgeStep(0)} className="w-full text-[8px] font-bold text-slate-500 uppercase mt-1">Me he arrepentido</button>
-                            </div>
-                        )}
+                            )}
+                            {safeSchedules.filter(s => s.status === 'Pendiente').map(s => {
+                                const emp = safeEmployees.find(e => String(e.id) === String(s.employee_id));
+                                return (
+                                    <div key={s.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 group transition-all hover:bg-white hover:border-indigo-100">
+                                        <div className="flex justify-between items-start mb-1">
+                                            <span className="text-xs font-black text-[#1A365D] truncate pr-2">{emp?.nombre || emp?.firstName || 'Empleado'}</span>
+                                            <button onClick={() => onDeleteSchedule(s.id)} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 transition-all">
+                                                <X size={12}/>
+                                            </button>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-[10px] font-bold text-indigo-500">
+                                            {format(parseISO(s.scheduled_date), 'dd MMM, HH:mm', { locale: es })}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
 
-                {/* Metrics & Meeting Content */}
-                <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 min-h-[400px] flex flex-col">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                <FileText size={14} className="text-[#1A365D]"/> PANEL DE REUNIÓN
-                            </h3>
-                            {selectedEmployee && (
-                                <span className="bg-[#1A365D]/5 text-[#1A365D] px-3 py-1 rounded-full text-[9px] font-black uppercase">
-                                    Empleado: {employees.find(e => e.id === selectedEmployee)?.first_name}
-                                </span>
-                            )}
-                        </div>
+                {/* EMPLOYEES GRID */}
+                <div className="xl:col-span-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 h-fit">
+                    {activeEmployees.map(emp => {
+                        const lastMeeting = safeHistory.find(h => String(h.employee_id) === String(emp.id));
+                        const isDoneThisMonth = lastMeeting && format(parseISO(lastMeeting.date), 'yyyy-MM') === format(new Date(), 'yyyy-MM');
+                        const nextSched = safeSchedules.find(s => String(s.employee_id) === String(emp.id) && s.status === 'Pendiente');
 
-                        {!selectedEmployee ? (
-                            <div className="flex-1 flex flex-col items-center justify-center text-slate-300 space-y-4 py-20">
-                                <UserCheck size={48} strokeWidth={1}/>
-                                <p className="text-[10px] font-black uppercase">Selecciona un empleado para ver sus métricas</p>
-                            </div>
-                        ) : loading ? (
-                            <div className="flex-1 flex items-center justify-center py-20">
-                                <div className="w-8 h-8 border-4 border-[#1A365D]/20 border-t-[#1A365D] rounded-full animate-spin"></div>
-                            </div>
-                        ) : metrics.length === 0 ? (
-                            <div className="flex-1 flex flex-col items-center justify-center text-slate-300 space-y-2 py-20">
-                                <AlertCircle size={32} />
-                                <p className="text-[10px] font-black uppercase">No hay datos cargados para este periodo</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-6">
-                                {/* Metrics Table */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {metrics.map((m, i) => (
-                                        <div key={i} className="bg-slate-50 p-4 rounded-2xl flex justify-between items-center border border-slate-100">
-                                            <div>
-                                                <p className="text-[8px] font-black text-slate-400 uppercase">{m.metric_name}</p>
-                                                <p className="text-sm font-black text-slate-800">{m.metric_value}</p>
-                                            </div>
-                                            <div className="text-right">
-                                                <span className={`text-[9px] font-black py-1 px-2 rounded-lg ${Number(m.metric_value) > 100 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                                                    {Number(m.metric_value) > 100 ? '+100%' : 'MÉTRICA OK'}
-                                                </span>
-                                            </div>
+                        return (
+                            <div key={emp.id} className={`bg-white p-8 rounded-[40px] border transition-all group flex flex-col justify-between ${isDoneThisMonth ? 'border-emerald-100 shadow-sm opacity-80' : 'border-[#E2E8F0] shadow-sm hover:shadow-xl'}`}>
+                                <div className="flex justify-between items-start mb-6">
+                                    <div className="flex items-center gap-4">
+                                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-xl transition-colors ${isDoneThisMonth ? 'bg-emerald-50 text-emerald-500' : 'bg-slate-50 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-500'}`}>
+                                            {(emp.nombre || emp.firstName || 'E').charAt(0)}
                                         </div>
-                                    ))}
+                                        <div>
+                                            <h3 className="text-lg font-black text-[#1A365D] uppercase leading-tight">{emp.nombre || `${emp.firstName} ${emp.lastName}` || 'Empleado'}</h3>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase">{emp.role}</p>
+                                        </div>
+                                    </div>
+                                    {isDoneThisMonth ? (
+                                        <div className="flex flex-col items-end">
+                                            <div className="bg-emerald-500 text-white p-1.5 rounded-full shadow-lg shadow-emerald-100 mb-1"><Check size={14}/></div>
+                                            <span className="text-[8px] font-black text-emerald-500 uppercase">Hecha</span>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-amber-50 text-amber-500 px-3 py-1 rounded-full text-[8px] font-black uppercase border border-amber-100 italic">Pendiente</div>
+                                    )}
                                 </div>
 
-                                {/* Meeting Notes */}
-                                <div>
-                                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2 mb-2 block">Acuerdos y Compromisos</label>
-                                    <textarea 
-                                        value={summary}
-                                        onChange={e => setSummary(e.target.value)}
-                                        placeholder="Escribe aquí las notas de la reunión, puntos de mejora y compromisos adquiridos..."
-                                        className="w-full bg-slate-50 border-none rounded-3xl p-6 text-xs font-medium min-h-[150px] focus:ring-2 focus:ring-[#1A365D]/10"
-                                    />
-                                </div>
+                                <div className="space-y-4">
+                                    <div className="p-4 bg-slate-50 rounded-[28px] border border-slate-100">
+                                        <div className="flex justify-between text-[9px] font-black text-slate-400 uppercase mb-2">
+                                            <span>Estado Mensual</span>
+                                        </div>
+                                        <p className="text-xs font-black text-[#1A365D]">
+                                            {isDoneThisMonth ? 'Completado este mes' : (nextSched ? `Cita: ${format(parseISO(nextSched.scheduled_date), 'dd/MM')}` : 'Sin programar')}
+                                        </p>
+                                    </div>
 
-                                <div className="flex gap-4">
                                     <button 
-                                        onClick={handleGeneratePDF}
-                                        className="flex-1 py-4 bg-[#1A365D] text-white rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 hover:bg-[#2a4a7a] transition-all shadow-lg shadow-[#1A365D]/20"
+                                        onClick={() => meetings.setSelectedEmployee(emp)}
+                                        className={`w-full py-4 rounded-2xl font-black text-[10px] uppercase flex items-center justify-center gap-3 transition-all ${isDoneThisMonth ? 'bg-slate-50 text-slate-400 hover:bg-slate-100' : 'bg-[#1A365D] text-white hover:bg-indigo-600 shadow-lg shadow-indigo-100'}`}
                                     >
-                                        <Download size={14}/> Generar Acta y Descargar PDF
+                                        {isDoneThisMonth ? 'REVISAR' : 'EVALUAR'}
+                                        <ChevronRight size={16}/>
                                     </button>
                                 </div>
                             </div>
-                        )}
-                    </div>
+                        );
+                    })}
                 </div>
             </div>
         </div>

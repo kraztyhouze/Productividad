@@ -15,7 +15,7 @@ router.get('/', async (req, res) => {
     const storeId = req.headers['x-store-id'] || 'store_1';
     try {
         const batteries = await pool.query(
-            'SELECT * FROM task_batteries WHERE store_id = $1 ORDER BY start_date ASC',
+            'SELECT * FROM task_batteries WHERE store_id = $1 ORDER BY sort_order ASC, start_date ASC',
             [storeId]
         );
         
@@ -183,6 +183,18 @@ router.delete('/:id', async (req, res) => {
         res.json({ success: true });
     } catch (err) {
         logError(err, `DELETE /api/task-batteries/${id}`);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// PUT update battery sort order
+router.put('/:id/sort-order', async (req, res) => {
+    const { id } = req.params;
+    const { sort_order } = req.body;
+    try {
+        await pool.query('UPDATE task_batteries SET sort_order = $1 WHERE id = $2', [sort_order, id]);
+        res.json({ success: true });
+    } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });

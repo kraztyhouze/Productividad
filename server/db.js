@@ -18,7 +18,7 @@ export const initDb = async () => {
         // Employees & Auth
         await client.query(`
             CREATE TABLE IF NOT EXISTS employees (
-                id TEXT PRIMARY KEY,
+                id SERIAL PRIMARY KEY,
                 username TEXT UNIQUE,
                 password TEXT,
                 first_name TEXT,
@@ -32,7 +32,7 @@ export const initDb = async () => {
         await client.query(`
             CREATE TABLE IF NOT EXISTS active_sessions (
                 id SERIAL PRIMARY KEY,
-                employee_id TEXT REFERENCES employees(id),
+                employee_id INTEGER REFERENCES employees(id),
                 start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 store_id TEXT DEFAULT 'store_1'
             );
@@ -41,7 +41,7 @@ export const initDb = async () => {
         await client.query(`
             CREATE TABLE IF NOT EXISTS daily_records (
                 id SERIAL PRIMARY KEY,
-                employee_id TEXT REFERENCES employees(id),
+                employee_id INTEGER REFERENCES employees(id),
                 date TEXT,
                 store_id TEXT DEFAULT 'store_1',
                 total_purchases INTEGER DEFAULT 0,
@@ -200,7 +200,7 @@ export const initDb = async () => {
         await client.query(`
             CREATE TABLE IF NOT EXISTS excel_metrics (
                 id SERIAL PRIMARY KEY,
-                employee_id TEXT REFERENCES employees(id),
+                employee_id INTEGER REFERENCES employees(id),
                 report_date TEXT NOT NULL,
                 category TEXT NOT NULL, 
                 metric_name TEXT NOT NULL,
@@ -213,8 +213,8 @@ export const initDb = async () => {
         await client.query(`
             CREATE TABLE IF NOT EXISTS meeting_records (
                 id SERIAL PRIMARY KEY,
-                employee_id TEXT REFERENCES employees(id),
-                interviewer_id TEXT REFERENCES employees(id),
+                employee_id INTEGER REFERENCES employees(id),
+                interviewer_id INTEGER REFERENCES employees(id),
                 date TEXT NOT NULL,
                 category TEXT NOT NULL,
                 summary JSONB,

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useStore } from './StoreContext';
 
-const AuthContext = createContext(null);
+export const AuthContext = createContext(null);
 
 export const ROLES = {
     MANAGER: 'Gerente',
@@ -80,4 +80,5 @@ export const AuthProvider = ({ children }) => {
     );
 };
 
-export const useAuth = () => useContext(AuthContext);
+
+export { useAuth } from '../hooks/useAuth';

@@ -671,7 +671,12 @@ router.put('/cash-control/:id/reopen', isManager, async (req, res) => {
 router.get('/store-zones', isManager, async (req, res) => {
     const storeId = req.headers['x-store-id'] || 'store_1';
     try {
-        const result = await pool.query('SELECT * FROM store_zones WHERE store_id = $1 ORDER BY name ASC', [storeId]);
+        const result = await pool.query(`
+            SELECT z.*, e.first_name as responsible_name 
+            FROM store_zones z 
+            LEFT JOIN employees e ON z.responsible_id = e.id 
+            WHERE z.store_id = $1 
+            ORDER BY z.name ASC`, [storeId]);
         res.json(result.rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -679,29 +684,31 @@ router.get('/store-zones', isManager, async (req, res) => {
 });
 
 router.post('/store-zones', isManager, async (req, res) => {
-    const { name, responsible_id } = req.body;
+    const { name, responsible_id, color, description } = req.body;
     const storeId = req.headers['x-store-id'] || 'store_1';
     try {
         const result = await pool.query(
-            'INSERT INTO store_zones (name, store_id, responsible_id) VALUES ($1, $2, $3) RETURNING *',
-            [name, storeId, responsible_id]
+            'INSERT INTO store_zones (name, store_id, responsible_id, color, description) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+            [name, storeId, responsible_id || null, color || '#1A365D', description || '']
         );
         res.json(result.rows[0]);
     } catch (err) {
+        logError(err, 'POST /store-zones');
         res.status(500).json({ error: err.message });
     }
 });
 
 router.put('/store-zones/:id', isManager, async (req, res) => {
     const { id } = req.params;
-    const { name, responsible_id } = req.body;
+    const { name, responsible_id, color, description } = req.body;
     try {
         const result = await pool.query(
-            'UPDATE store_zones SET name=$1, responsible_id=$2 WHERE id=$3 RETURNING *',
-            [name, responsible_id, id]
+            'UPDATE store_zones SET name=$1, responsible_id=$2, color=$3, description=$4 WHERE id=$5 RETURNING *',
+            [name, responsible_id || null, color, description, id]
         );
         res.json(result.rows[0]);
     } catch (err) {
+        logError(err, 'PUT /store-zones');
         res.status(500).json({ error: err.message });
     }
 });

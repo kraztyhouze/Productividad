@@ -24,11 +24,18 @@ import operationalRouter from './routes/operational.js';
 import gerenciaRouter from './routes/gerencia.js';
 import taskBatteriesRouter from './routes/task-batteries.js';
 
+// --- Cryptographic Shielding (Fail-Fast) ---
+import './utils/crypto.js'; 
+import { decryptResponseMiddleware } from './middleware/decryptResponse.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Intercept and decrypt responses automatically
+app.use(decryptResponseMiddleware);
 
 // ─── CORS ─────────────────────────────────────────────────────────────────────
 const allowedOrigins = [
@@ -51,6 +58,8 @@ app.use(cors({
 app.use(express.json());
 
 // ─── DB Init & Password Migration ─────────────────────────────────────────────
+import { encrypt, decrypt, generateBlindIndex } from './utils/crypto.js';
+
 async function migratePasswords() {
     try {
         const res = await pool.query('SELECT id, password FROM employees');
@@ -66,9 +75,51 @@ async function migratePasswords() {
     } catch (e) { console.error('Password migration error:', e); }
 }
 
+async function migrateEncryptedData() {
+    try {
+        const res = await pool.query('SELECT * FROM employees');
+        let migratedCount = 0;
+        for (const emp of res.rows) {
+            const fields = ['first_name', 'last_name', 'alias', 'email', 'username', 'phone', 'address'];
+            const bindexes = ['first_name', 'last_name', 'email', 'username'];
+            
+            let needsUpdate = false;
+            const values = [];
+            const setClauses = [];
+            let argIdx = 1;
+
+            for (const f of fields) {
+                if (emp[f] && typeof emp[f] === 'string' && !emp[f].includes(':')) {
+                    setClauses.push(`${f} = $${argIdx++}`);
+                    values.push(encrypt(emp[f]));
+                    needsUpdate = true;
+                }
+            }
+            
+            for (const f of bindexes) {
+                const currentVal = emp[f];
+                if (currentVal && !emp[`${f}_bindex`]) {
+                    const clearText = currentVal.includes(':') ? decrypt(currentVal) : currentVal;
+                    setClauses.push(`${f}_bindex = $${argIdx++}`);
+                    values.push(generateBlindIndex(clearText));
+                    needsUpdate = true;
+                }
+            }
+
+            if (needsUpdate) {
+                values.push(emp.id);
+                await pool.query(`UPDATE employees SET ${setClauses.join(', ')} WHERE id = $${argIdx}`, values);
+                migratedCount++;
+            }
+        }
+        if (migratedCount > 0) console.log(`[SECURITY] Encrypted/Indexed ${migratedCount} employee records.`);
+    } catch (e) { console.error('Data migration error:', e); }
+}
+
 initDb().then(async () => {
     console.log('Database initialized successfully');
     await migratePasswords();
+    await migrateEncryptedData();
 }).catch(err => {
     console.error('CRITICAL: DB Initialization failed!', err);
 });

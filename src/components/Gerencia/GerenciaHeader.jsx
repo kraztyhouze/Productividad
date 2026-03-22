@@ -25,6 +25,7 @@ const GerenciaHeader = ({
     const tabs = [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, color: 'text-blue-500' },
         { id: 'tasks', label: 'Agenda & Planes', icon: Calendar, color: 'text-[#FF8C9D]' },
+        { id: 'tracking', label: 'Seguimiento', icon: Activity, color: 'text-rose-500' },
         { id: 'jewelry', label: 'Operativa Joyería', icon: Activity, color: 'text-amber-500' },
         { id: 'team', label: 'Equipo & Zonas', icon: Users, color: 'text-indigo-500' },
         { id: 'meetings', label: 'Organizador 1:1', icon: Navigation, color: 'text-indigo-600' },

@@ -220,7 +220,19 @@ export const initDb = async () => {
                 summary JSONB,
                 pdf_url TEXT,
                 store_id TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
+        // Daily Organization (War Room)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS daily_organization (
+                id SERIAL PRIMARY KEY,
+                date TEXT NOT NULL,
+                organization_data JSONB DEFAULT '{}',
+                store_id TEXT NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(date, store_id)
             );
         `);
 

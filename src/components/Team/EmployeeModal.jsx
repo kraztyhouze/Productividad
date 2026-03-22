@@ -33,6 +33,7 @@ const EmployeeModal = ({
                     canCountCash: editingEmployee.canCountCash !== undefined ? editingEmployee.canCountCash : false,
                     isInterviewer: editingEmployee.isInterviewer !== undefined ? editingEmployee.isInterviewer : false,
                     isActive: editingEmployee.isActive !== undefined ? editingEmployee.isActive : true,
+                    showInWarRoom: editingEmployee.showInWarRoom !== undefined ? editingEmployee.showInWarRoom : true,
                     alias: editingEmployee.alias || ''
                 });
             } else {
@@ -40,7 +41,8 @@ const EmployeeModal = ({
                     firstName: '', lastName: '', alias: '', email: '', phone: '', address: '',
                     role: (roles.length > 0 ? roles[0].name : 'Empleado'), contractType: 'Indefinido', contractHours: 40,
                     username: '', password: '',
-                    isBuyer: false, canCountCash: false, isInterviewer: false, isActive: true
+                    isBuyer: false, canCountCash: false, isInterviewer: false, isActive: true,
+                    showInWarRoom: true
                 });
             }
         }
@@ -60,7 +62,8 @@ const EmployeeModal = ({
             isBuyer: formData.isBuyer,
             canCountCash: formData.canCountCash,
             isInterviewer: formData.isInterviewer,
-            isActive: formData.isActive
+            isActive: formData.isActive,
+            showInWarRoom: formData.showInWarRoom
         };
         onSave(data);
     };
@@ -148,6 +151,13 @@ const EmployeeModal = ({
                                     <label className="flex items-center gap-3 cursor-pointer p-4 bg-white border border-green-100 rounded-2xl hover:border-green-300 transition-all shadow-sm group">
                                         <input type="checkbox" name="isActive" checked={formData.isActive !== false} onChange={handleInputChange} className="accent-green-500 w-5 h-5 rounded-md" />
                                         <span className="text-sm font-bold text-[#1A365D] group-hover:text-green-600 transition-colors">Empleado Activo</span>
+                                    </label>
+                                    <label className="flex items-center gap-3 cursor-pointer p-4 bg-white border border-indigo-100 rounded-2xl hover:border-indigo-300 transition-all shadow-sm group">
+                                        <input type="checkbox" name="showInWarRoom" checked={formData.showInWarRoom !== false} onChange={handleInputChange} className="accent-indigo-500 w-5 h-5 rounded-md" />
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-bold text-[#1A365D] group-hover:text-indigo-600 transition-colors">Visible en War Room</span>
+                                            <span className="text-[8px] font-black text-indigo-400 uppercase">Aparece en el banco de staff para asignar tareas</span>
+                                        </div>
                                     </label>
                                 </div>
                             </div>

@@ -19,7 +19,8 @@ import {
     Calculator,
     BarChart3,
     ArrowLeftRight,
-    UserCheck
+    UserCheck,
+    Activity
 } from 'lucide-react';
 
 const Sidebar = ({ expanded, setExpanded }) => {
@@ -45,6 +46,7 @@ const Sidebar = ({ expanded, setExpanded }) => {
         { section: 'Control', items: [
             { to: '/gerencia?tab=tasks', label: 'Agenda', icon: Calendar, roles: [ROLES.MANAGER, ROLES.SUPERVISOR, ROLES.RESPONSIBLE] },
             { to: '/team', label: 'Equipo', icon: Users, roles: [ROLES.MANAGER, ROLES.SUPERVISOR, ROLES.RESPONSIBLE] },
+            { to: '/gerencia?tab=tracking', label: 'Seguimiento', icon: Activity, roles: [ROLES.MANAGER, ROLES.SUPERVISOR, ROLES.RESPONSIBLE] },
             { to: '/gerencia?tab=jewelry', label: 'Joyería', icon: Pocket, roles: [ROLES.MANAGER, ROLES.SUPERVISOR, ROLES.RESPONSIBLE] },
             { to: '/gerencia?tab=meetings', label: 'Reuniones 1:1', icon: UserCheck, roles: [ROLES.MANAGER, ROLES.SUPERVISOR, ROLES.RESPONSIBLE] },
             { to: '/gerencia?tab=cash', label: 'Conteo', icon: Calculator, roles: [ROLES.MANAGER, ROLES.SUPERVISOR, ROLES.RESPONSIBLE] },

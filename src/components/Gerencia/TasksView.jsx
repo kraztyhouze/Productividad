@@ -8,7 +8,8 @@ import {
     ChevronRight, 
     X,
     Clock,
-    Layout
+    Layout,
+    Swords
 } from 'lucide-react';
 import { 
     format, 
@@ -27,6 +28,7 @@ import BatteriesView from './BatteriesView';
 import MiniCalendar from './MiniCalendar';
 import UpcomingTimeline from './UpcomingTimeline';
 import { projectTasksForHorizon } from '../../utils/dateUtils';
+import WarRoomOrganizer from './WarRoomOrganizer';
 
 const TasksView = ({ 
     tasks, 
@@ -51,7 +53,7 @@ const TasksView = ({
     const safeTasks = Array.isArray(tasks) ? tasks : [];
     const [month, setMonth] = useState(new Date());
     const [selectedTask, setSelectedTask] = useState(null);
-    const [view, setView] = useState('batteries'); // 'batteries', 'calendar', 'list'
+    const [view, setView] = useState('batteries'); // 'batteries', 'calendar', 'list', 'organizer'
 
     const startDate = startOfWeek(startOfMonth(month), { weekStartsOn: 1 });
     const endDate = endOfWeek(endOfMonth(month), { weekStartsOn: 1 });
@@ -70,7 +72,8 @@ const TasksView = ({
                         {[
                             { id: 'batteries', label: 'Baterías', icon: Layers },
                             { id: 'calendar', label: 'Agenda', icon: CalendarIcon },
-                            { id: 'list', label: 'Lista', icon: List }
+                            { id: 'list', label: 'Lista', icon: List },
+                            { id: 'organizer', label: 'Organizador', icon: Swords }
                         ].map(v => (
                             <button 
                                 key={v.id} onClick={() => setView(v.id)}
@@ -190,6 +193,15 @@ const TasksView = ({
                             })}
                         </div>
                     </div>
+                )}
+
+                {view === 'organizer' && (
+                    <WarRoomOrganizer 
+                        tasks={tasks}
+                        batteries={batteries}
+                        date={format(month, 'yyyy-MM-dd')}
+                        currentStore={localStorage.getItem('tiktak_current_store')}
+                    />
                 )}
 
                 {view === 'list' && (

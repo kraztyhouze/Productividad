@@ -14,6 +14,7 @@ import JewelryView from '../components/Gerencia/JewelryView';
 import MeetingsView from '../components/Gerencia/MeetingsView';
 import CashView from '../components/Gerencia/CashView';
 import ReportsView from '../components/Gerencia/ReportsView';
+import TrackingView from '../components/Gerencia/TrackingView';
 import TaskForm from '../components/Gerencia/TaskForm';
 import BatteryForm from '../components/Gerencia/BatteryForm';
 import BatteryItemForm from '../components/Gerencia/BatteryItemForm';
@@ -463,6 +464,10 @@ const Gerencia = () => {
                         onCheckTask={(t) => agenda.toggleTaskStatus(t.id, t.status)}
                         onDeleteTask={handleDeleteTask}
                     />
+                )}
+
+                {activeTab === 'tracking' && (
+                    <TrackingView currentStore={currentStore} employees={data.employees} />
                 )}
 
                 {activeTab === 'jewelry' && (

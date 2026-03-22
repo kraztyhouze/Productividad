@@ -23,6 +23,7 @@ import dashboardRouter from './routes/dashboard.js';
 import operationalRouter from './routes/operational.js';
 import gerenciaRouter from './routes/gerencia.js';
 import taskBatteriesRouter from './routes/task-batteries.js';
+import dailyOrganizerRouter from './routes/daily-organizer.js';
 
 // --- Cryptographic Shielding (Fail-Fast) ---
 import './utils/crypto.js'; 
@@ -55,7 +56,8 @@ app.use(cors({
     }
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // ─── DB Init & Password Migration ─────────────────────────────────────────────
 import { encrypt, decrypt, generateBlindIndex } from './utils/crypto.js';
@@ -195,6 +197,7 @@ app.use('/api/dashboard', dashboardRouter);          // /api/dashboard
 app.use('/api', operationalRouter);                  // /api/day-incidents, /api/no-deals, /api/locations, /api/market/search, /api/diagnostics/*, /api/security/*
 app.use('/api/gerencia', gerenciaRouter);
 app.use('/api/task-batteries', taskBatteriesRouter);
+app.use('/api/daily-organizer', dailyOrganizerRouter);
 
 // ─── Auto-Close Shifts Cron (every 60s) ───────────────────────────────────────
 setInterval(async () => {

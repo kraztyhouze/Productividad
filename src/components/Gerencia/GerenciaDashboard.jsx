@@ -14,7 +14,9 @@ import {
     ChevronRight, 
     X,
     FileText,
-    Layers
+    Layers,
+    Smartphone,
+    QrCode
 } from 'lucide-react';
 import { format, addDays, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -27,7 +29,7 @@ import {
 const GlassCard = ({ title, icon: Icon, description, children, action, className = "" }) => (
     <motion.div 
         whileHover={{ y: -5 }}
-        className={`bg-white/70 backdrop-blur-xl p-8 rounded-[40px] border border-white shadow-xl shadow-slate-200/50 flex flex-col justify-between group transition-all ${className}`}
+        className={`bg-white/70 backdrop-blur-xl p-8 rounded-[40px] border border-white shadow-xl shadow-slate-200/50 flex flex-col group transition-all ${className}`}
     >
         <div className="flex justify-between items-start mb-4">
             <div className="flex items-center gap-3">
@@ -212,6 +214,16 @@ const GerenciaDashboard = ({ tasks, batteries, partners, movements, cashHistory,
                         {meetingStats.next && <span className="text-indigo-500">Prox: {format(parseISO(meetingStats.next.scheduled_date), 'dd/MM')}</span>}
                     </div>
                 </GlassCard>
+
+                <GlassCard title="Consola Móvil" icon={Smartphone} description="Acceso a tareas desde smartphone"
+                    action={<div onClick={() => window.open('/mobile/tasks', '_blank')} className="flex items-center gap-1 text-[10px] bg-slate-100 text-[#1A365D] px-2 py-1 rounded-full cursor-pointer hover:bg-[#1A365D] hover:text-white transition-all"><QrCode size={10}/> Abrir</div>}>
+                    <div className="mt-4 flex flex-col items-center justify-center py-2">
+                        <div className="p-4 bg-slate-50 border-2 border-dashed border-slate-100 rounded-[32px] flex flex-col items-center gap-2 group hover:border-[#FF8C9D]/30 transition-all cursor-pointer" onClick={() => window.open('/mobile/tasks', '_blank')}>
+                            <QrCode size={48} className="text-slate-200 group-hover:text-[#FF8C9D] transition-colors" />
+                            <span className="text-[8px] font-black text-slate-300 uppercase tracking-[0.3em] group-hover:text-[#FF8C9D]">ESCANEAR PARA MÓVIL</span>
+                        </div>
+                    </div>
+                </GlassCard>
             </div>
 
             {/* CHARTS & RANKING SECTION */}
@@ -224,7 +236,7 @@ const GerenciaDashboard = ({ tasks, batteries, partners, movements, cashHistory,
 
                 <div className="xl:col-span-4">
                     <GlassCard title="Ranking Semanal" icon={Award} description="Productividad acumulada en compras" className="h-full">
-                        <div className="space-y-6 mt-4">
+                        <div className="space-y-6 mt-6 flex-1">
                             {prodRanking.map((emp, index) => (
                                 <div key={emp.id} className="flex items-center justify-between group">
                                     <div className="flex items-center gap-4">
@@ -247,7 +259,12 @@ const GerenciaDashboard = ({ tasks, batteries, partners, movements, cashHistory,
                                     </div>
                                 </div>
                             ))}
-                            {prodRanking.length === 0 && <p className="text-center text-slate-300 text-xs italic mt-10">Sin datos esta semana</p>}
+                            {prodRanking.length === 0 && (
+                                <div className="flex flex-col items-center justify-center py-12 text-slate-300 text-xs italic">
+                                    <Award size={24} className="mb-2 opacity-20" />
+                                    Sin datos esta semana
+                                </div>
+                            )}
                         </div>
                     </GlassCard>
                 </div>

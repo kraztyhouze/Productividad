@@ -8,7 +8,6 @@ import { useAgenda } from '../hooks/useAgenda';
 import { AnimatePresence } from 'framer-motion';
 
 // Components
-import GerenciaHeader from '../components/Gerencia/GerenciaHeader';
 import GerenciaDashboard from '../components/Gerencia/GerenciaDashboard';
 import TasksView from '../components/Gerencia/TasksView';
 import JewelryView from '../components/Gerencia/JewelryView';
@@ -24,6 +23,15 @@ import XPBonusForm from '../components/Gerencia/XPBonusForm';
 import GenericModal from '../components/Gerencia/GenericModal';
 import CriterionManager from '../components/Gerencia/CriterionManager';
 import ScheduleForm from '../components/Gerencia/ScheduleForm';
+import { GOLDSMITH_CATEGORIES } from '../constants/gerenciaConstants';
+
+// Jewelry Components
+import PartnerForm from '../components/Gerencia/PartnerForm';
+import MovementForm from '../components/Gerencia/MovementForm';
+import OrderForm from '../components/Gerencia/OrderForm';
+import RefineForm from '../components/Gerencia/RefineForm';
+import InventoryAdjustmentModal from '../components/Gerencia/InventoryAdjustmentModal';
+import OrderClosureModal from '../components/Gerencia/OrderClosureModal';
 
 const Gerencia = () => {
     const { user } = useAuth();
@@ -38,7 +46,13 @@ const Gerencia = () => {
     // Tab and Sidebar State - sync with URL
     const activeTab = searchParams.get('tab') || 'dashboard';
     const setActiveTab = (tab) => setSearchParams({ tab });
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+    useEffect(() => {
+        const isMobile = window.innerWidth < 1024;
+        if (isMobile && !searchParams.get('tab')) {
+            setActiveTab('tasks');
+        }
+    }, []);
     const [activeZoneId, setActiveZoneId] = useState('');
 
     // Modal States
@@ -47,7 +61,7 @@ const Gerencia = () => {
     const openModal = (type, modalData = null) => setModal({ type, data: modalData });
     const closeModal = () => setModal({ type: null, data: null });
 
-    // Actions
+    // --- AGENDA & TASKS ACTIONS ---
     const handleSaveTask = async (taskData) => {
         const res = await agenda.saveTask(taskData);
         if (res.success) {
@@ -191,27 +205,18 @@ const Gerencia = () => {
             const currentBattery = zoneBatteries[currentIndex];
             const otherBattery = zoneBatteries[newIndex];
 
-            // Swap sort_order
             const currentOrder = currentBattery.sort_order || currentIndex;
             const otherOrder = otherBattery.sort_order || newIndex;
 
             await Promise.all([
                 fetch(`/api/task-batteries/${currentBattery.id}/sort-order`, {
                     method: 'PUT',
-                    headers: { 
-                        'Content-Type': 'application/json', 
-                        'x-store-id': currentStore,
-                        'x-user-role': user?.role === ROLES.MANAGER ? 'Gerente' : user?.role
-                    },
+                    headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore },
                     body: JSON.stringify({ sort_order: otherOrder })
                 }),
                 fetch(`/api/task-batteries/${otherBattery.id}/sort-order`, {
                     method: 'PUT',
-                    headers: { 
-                        'Content-Type': 'application/json', 
-                        'x-store-id': currentStore,
-                        'x-user-role': user?.role === ROLES.MANAGER ? 'Gerente' : user?.role
-                    },
+                    headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore },
                     body: JSON.stringify({ sort_order: currentOrder })
                 })
             ]);
@@ -232,6 +237,131 @@ const Gerencia = () => {
         }
     };
 
+    // --- JEWELRY ACTIONS ---
+    const handleSavePartner = async (partnerData) => {
+        try {
+            const method = partnerData.id ? 'PUT' : 'POST';
+            const url = partnerData.id ? `/api/gerencia/goldsmith/partners/${partnerData.id}` : '/api/gerencia/goldsmith/partners';
+            const res = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore },
+                body: JSON.stringify(partnerData)
+            });
+            if (res.ok) {
+                data.refresh();
+                closeModal();
+            }
+        } catch (e) { console.error(e); }
+    };
+
+    const handleDeletePartner = async (id) => {
+        if (!window.confirm('¿Eliminar socio y todo su historial?')) return;
+        try {
+            const res = await fetch(`/api/gerencia/goldsmith/partners/${id}`, {
+                method: 'DELETE',
+                headers: { 'x-store-id': currentStore }
+            });
+            if (res.ok) data.refresh();
+        } catch (e) { console.error(e); }
+    };
+
+    const handleSaveMovement = async (moveData) => {
+        try {
+            const res = await fetch('/api/gerencia/goldsmith/movements', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore },
+                body: JSON.stringify(moveData)
+            });
+            if (res.ok) {
+                data.refresh();
+                closeModal();
+            }
+        } catch (e) { console.error(e); }
+    };
+
+    const handleDeleteMovement = async (id) => {
+        if (!window.confirm('¿Borrar este movimiento? El stock se revertirá.')) return;
+        try {
+            const res = await fetch(`/api/gerencia/goldsmith/movements/${id}`, {
+                method: 'DELETE',
+                headers: { 'x-store-id': currentStore }
+            });
+            if (res.ok) data.refresh();
+        } catch (e) { console.error(e); }
+    };
+
+    const handleRefineFinish = async (refineData) => {
+        try {
+            const res = await fetch(`/api/gerencia/goldsmith/movements/${refineData.movementId}/refine`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore },
+                body: JSON.stringify(refineData)
+            });
+            if (res.ok) {
+                data.refresh();
+                closeModal();
+            }
+        } catch (e) { console.error(e); }
+    };
+
+    const handleSaveOrder = async (orderData) => {
+        try {
+            const res = await fetch('/api/gerencia/goldsmith/orders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore },
+                body: JSON.stringify(orderData)
+            });
+            if (res.ok) {
+                data.refresh();
+                closeModal();
+            }
+        } catch (e) { console.error(e); }
+    };
+
+    const handleCloseOrder = async (closureData) => {
+        try {
+            const res = await fetch(`/api/gerencia/goldsmith/orders/${closureData.orderId}/receive`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore },
+                body: JSON.stringify(closureData)
+            });
+            if (res.ok) {
+                data.refresh();
+                closeModal();
+            }
+        } catch (e) { console.error(e); }
+    };
+
+    const handleAdjustInventory = async (adjustData) => {
+        try {
+            const res = await fetch('/api/gerencia/goldsmith/inventory/adjust', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore },
+                body: JSON.stringify(adjustData)
+            });
+            if (res.ok) {
+                data.refresh();
+                closeModal();
+            }
+        } catch (e) { console.error(e); }
+    };
+
+    // --- CASH ACTIONS ---
+    const handleSaveCash = async (cashData) => {
+        try {
+            const res = await fetch('/api/gerencia/cash-control', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore },
+                body: JSON.stringify(cashData)
+            });
+            if (res.ok) {
+                data.refresh();
+                alert(cashData.is_closed ? 'Cierre de caja completado con éxito.' : 'Borrador de caja guardado.');
+            }
+        } catch (e) { console.error(e); }
+    };
+
+    // --- OTHER ACTIONS ---
     const handleGiveXP = async (xpData) => {
         try {
             const res = await fetch('/api/employees/reward-xp', {
@@ -243,9 +373,7 @@ const Gerencia = () => {
                 data.refresh();
                 closeModal();
             }
-        } catch (e) {
-            console.error(e);
-        }
+        } catch (e) { console.error(e); }
     };
 
     const handleManageCriteria = async (criteriaData) => {
@@ -257,12 +385,8 @@ const Gerencia = () => {
                 headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore },
                 body: JSON.stringify(criteriaData)
             });
-            if (res.ok) {
-                meetings.refresh();
-            }
-        } catch (e) {
-            console.error(e);
-        }
+            if (res.ok) meetings.refresh();
+        } catch (e) { console.error(e); }
     };
 
     const handleDeleteCriterion = async (id) => {
@@ -273,9 +397,7 @@ const Gerencia = () => {
                 headers: { 'x-store-id': currentStore }
             });
             if (res.ok) meetings.refresh();
-        } catch (e) {
-            console.error(e);
-        }
+        } catch (e) { console.error(e); }
     };
 
     const handleScheduleMeeting = async (scheduleData) => {
@@ -289,9 +411,7 @@ const Gerencia = () => {
                 meetings.refresh();
                 closeModal();
             }
-        } catch (e) {
-            console.error(e);
-        }
+        } catch (e) { console.error(e); }
     };
 
     const handleDeleteMeetingSchedule = async (id) => {
@@ -302,9 +422,7 @@ const Gerencia = () => {
                 headers: { 'x-store-id': currentStore }
             });
             if (res.ok) meetings.refresh();
-        } catch (e) {
-            console.error(e);
-        }
+        } catch (e) { console.error(e); }
     };
 
     const cumulativeCashDiff = useMemo(() => {
@@ -314,29 +432,16 @@ const Gerencia = () => {
 
     return (
         <div className="min-h-screen bg-[#F8F9FB] flex flex-col font-sans selection:bg-[#FF8C9D]/20">
-            <GerenciaHeader 
-                activeTab={activeTab} setActiveTab={setActiveTab}
-                isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen}
-                alerts={data.auditAlerts}
-            />
-
-            <main className="flex-1 px-4 md:px-10 max-w-[1920px] mx-auto w-full">
+            <main className="flex-1 px-4 md:px-10 max-w-[1920px] mx-auto w-full pt-10">
                 {activeTab === 'dashboard' && (
                     <GerenciaDashboard 
-                        tasks={data.tasks} 
-                        batteries={data.batteries}
-                        employees={data.employees} 
-                        inventory={data.inventory}
-                        orders={data.orders} 
-                        partners={data.partners}
-                        movements={data.movements}
-                        cashHistory={data.cashHistory}
-                        auditAlerts={data.auditAlerts}
-                        cumulativeCashDiff={cumulativeCashDiff}
-                        meetingSchedules={meetings.schedules}
-                        activeZoneId={activeZoneId}
-                        onRefresh={data.refresh}
-                        onXPBonus={(emp) => openModal('xp_bonus', emp)}
+                        tasks={data.tasks} batteries={data.batteries}
+                        employees={data.employees} inventory={data.inventory}
+                        orders={data.orders} partners={data.partners}
+                        movements={data.movements} cashHistory={data.cashHistory}
+                        auditAlerts={data.auditAlerts} cumulativeCashDiff={cumulativeCashDiff}
+                        meetingSchedules={meetings.schedules} activeZoneId={activeZoneId}
+                        onRefresh={data.refresh} onXPBonus={(emp) => openModal('xp_bonus', emp)}
                         onTabSwitch={setActiveTab}
                     />
                 )}
@@ -365,6 +470,15 @@ const Gerencia = () => {
                         inventory={data.inventory} partners={data.partners}
                         movements={data.movements} orders={data.orders}
                         onRefresh={data.refresh}
+                        onAddMovement={(type) => openModal('movement_form', { type })}
+                        onRefine={(m) => openModal('refine_form', m)}
+                        onDeleteMovement={handleDeleteMovement}
+                        onAddOrder={() => openModal('order_form')}
+                        onReceiveOrder={(o) => openModal('order_closure', o)}
+                        onAddPartner={() => openModal('partner_form')}
+                        onEditPartner={(p) => openModal('partner_form', p)}
+                        onDeletePartner={handleDeletePartner}
+                        onAdjustInventory={(item) => openModal('inventory_adjust', item)}
                     />
                 )}
 
@@ -373,7 +487,6 @@ const Gerencia = () => {
                         <div className="xl:col-span-3">
                              <h2 className="text-3xl font-black text-[#1A365D] tracking-tighter uppercase mb-2">Nuestro Equipo</h2>
                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-10 italic">Seguimiento de rendimiento y gestión de talento operativo</p>
-                             
                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {data.employees.map(emp => (
                                     <div key={emp.id} className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm hover:shadow-xl transition-all group">
@@ -407,18 +520,8 @@ const Gerencia = () => {
                         <aside className="space-y-6">
                             <div className="bg-[#1A365D] text-white p-8 rounded-[40px] shadow-2xl">
                                 <h3 className="text-sm font-black uppercase tracking-widest mb-6 border-b border-white/10 pb-4">Ajustes Rápidos</h3>
-                                <button 
-                                    onClick={() => openModal('zone_manager')}
-                                    className="w-full py-4 bg-white/10 rounded-2xl font-black text-[10px] uppercase hover:bg-white/20 transition-all mb-4"
-                                >
-                                    Gestionar Zonas
-                                </button>
-                                <button 
-                                    className="w-full py-4 bg-white/10 rounded-2xl font-black text-[10px] uppercase hover:bg-white/20 transition-all"
-                                    onClick={() => setActiveTab('reports')}
-                                >
-                                    Ver Historial XP
-                                </button>
+                                <button onClick={() => openModal('zone_manager')} className="w-full py-4 bg-white/10 rounded-2xl font-black text-[10px] uppercase hover:bg-white/20 transition-all mb-4">Gestionar Zonas</button>
+                                <button className="w-full py-4 bg-white/10 rounded-2xl font-black text-[10px] uppercase hover:bg-white/20 transition-all" onClick={() => setActiveTab('reports')}>Ver Historial XP</button>
                             </div>
                         </aside>
                     </div>
@@ -426,131 +529,107 @@ const Gerencia = () => {
 
                 {activeTab === 'meetings' && (
                     <MeetingsView 
-                        storeId={currentStore} 
-                        employees={data.employees} 
-                        user={user}
-                        schedules={meetings.schedules}
-                        onSchedule={() => openModal('meeting_schedule')}
+                        storeId={currentStore} employees={data.employees} user={user}
+                        schedules={meetings.schedules} onSchedule={() => openModal('meeting_schedule')}
                         onManageCriteria={() => openModal('criterion_manager')}
-                        onDeleteSchedule={handleDeleteMeetingSchedule}
-                        meetings={meetings}
+                        onDeleteSchedule={handleDeleteMeetingSchedule} meetings={meetings}
                     />
                 )}
 
                 {activeTab === 'cash' && (
                     <CashView 
-                        history={data.cashHistory || []} 
-                        storeId={currentStore}
-                        onSaveSuccess={data.refresh}
-                        employees={data.employees}
-                        user={user}
-                        cumulativeCashDiff={cumulativeCashDiff}
+                        history={data.cashHistory || []} storeId={currentStore}
+                        onSave={handleSaveCash} employees={data.employees}
+                        user={user} cumulativeCashDiff={cumulativeCashDiff}
                     />
                 )}
 
                 {activeTab === 'reports' && (
                     <ReportsView 
-                        tasks={data.tasks}
-                        cashHistory={data.cashHistory}
-                        movements={data.movements}
-                        partners={data.partners}
-                        batteries={data.batteries}
-                        activeZoneId={activeZoneId}
+                        tasks={data.tasks} cashHistory={data.cashHistory}
+                        movements={data.movements} partners={data.partners}
+                        batteries={data.batteries} activeZoneId={activeZoneId}
                     />
                 )}
             </main>
 
-            {/* Modals Container */}
             <AnimatePresence>
                 {modal.type === 'task_form' && (
                     <GenericModal isOpen={true} onClose={closeModal} title={modal.data ? "Editar Tarea" : "Nueva Tarea"}>
-                        <TaskForm 
-                            initialData={modal.data} 
-                            zones={data.zones} 
-                            employees={data.employees}
-                            onSave={handleSaveTask} 
-                            onCancel={closeModal}
-                            onDelete={handleDeleteTask}
-                        />
+                        <TaskForm initialData={modal.data} zones={data.zones} employees={data.employees} onSave={handleSaveTask} onCancel={closeModal} onDelete={handleDeleteTask} />
                     </GenericModal>
                 )}
-
                 {modal.type === 'battery_form' && (
-                    <GenericModal isOpen={true} onClose={closeModal} title={modal.data ? "Editar Plan de Acción" : "Nuevo Plan de Acción"}>
-                        <BatteryForm 
-                            initialData={modal.data} 
-                            zones={data.zones} 
-                            onSave={handleSaveBattery} 
-                            onCancel={closeModal}
-                        />
+                    <GenericModal isOpen={true} onClose={closeModal} title={modal.data ? "Editar Plan" : "Nuevo Plan"}>
+                        <BatteryForm initialData={modal.data} zones={data.zones} onSave={handleSaveBattery} onCancel={closeModal} />
                     </GenericModal>
                 )}
-
                 {modal.type === 'battery_item_form' && (
                     <GenericModal isOpen={true} onClose={closeModal} title="Añadir Tarea Extra">
-                        <BatteryItemForm 
-                            batteryId={modal.data.id} 
-                            onSave={handleAddBatteryItem} 
-                            onCancel={closeModal}
-                        />
+                        <BatteryItemForm batteryId={modal.data.id} onSave={handleAddBatteryItem} onCancel={closeModal} />
                     </GenericModal>
                 )}
-
                 {modal.type === 'battery_check_form' && (
                     <GenericModal isOpen={true} onClose={closeModal} title="Confirmar Tarea">
-                        <BatteryCheckForm 
-                            item={modal.data} 
-                            onConfirm={handleCheckBatteryItem} 
-                            onCancel={closeModal}
-                        />
+                        <BatteryCheckForm item={modal.data} onConfirm={handleCheckBatteryItem} onCancel={closeModal} />
                     </GenericModal>
                 )}
-
                 {modal.type === 'zone_manager' && (
                     <GenericModal isOpen={true} onClose={closeModal} title="Gestionar Espacios Operativos">
-                        <ZoneManagerForm 
-                            zones={data.zones}
-                            employees={data.employees}
-                            onSave={handleSaveZone}
-                            onDelete={handleDeleteZone}
-                        />
+                        <ZoneManagerForm zones={data.zones} employees={data.employees} onSave={handleSaveZone} onDelete={handleDeleteZone} />
                     </GenericModal>
                 )}
-
                 {modal.type === 'xp_bonus' && (
                     <GenericModal isOpen={true} onClose={closeModal} title={`Bono XP para ${modal.data.nombre}`}>
-                        <XPBonusForm 
-                            employee={modal.data}
-                            onSave={handleGiveXP}
-                            onCancel={closeModal}
-                        />
+                        <XPBonusForm employee={modal.data} onSave={handleGiveXP} onCancel={closeModal} />
                     </GenericModal>
                 )}
-
                 {modal.type === 'criterion_manager' && (
-                    <GenericModal isOpen={true} onClose={closeModal} title="Criterios de Evaluación 1:1">
-                        <CriterionManager 
-                            criteria={meetings.criteria} 
-                            onSave={handleManageCriteria} 
-                            onDelete={handleDeleteCriterion} 
-                        />
+                    <GenericModal isOpen={true} onClose={closeModal} title="Criterios Evaluación">
+                        <CriterionManager criteria={meetings.criteria} onSave={handleManageCriteria} onDelete={handleDeleteCriterion} />
+                    </GenericModal>
+                )}
+                {modal.type === 'meeting_schedule' && (
+                    <GenericModal isOpen={true} onClose={closeModal} title="Programar Reunión">
+                        <ScheduleForm employees={data.employees} onSave={handleScheduleMeeting} onCancel={closeModal} />
                     </GenericModal>
                 )}
 
-                {modal.type === 'meeting_schedule' && (
-                    <GenericModal isOpen={true} onClose={closeModal} title="Programar Nueva Reunión">
-                        <ScheduleForm 
-                            employees={data.employees} 
-                            onSave={handleScheduleMeeting} 
-                            onCancel={closeModal} 
-                        />
+                {/* JEWELRY MODALS */}
+                {modal.type === 'partner_form' && (
+                    <GenericModal isOpen={true} onClose={closeModal} title={modal.data ? "Editar Socio" : "Nuevo Socio"}>
+                        <PartnerForm initialData={modal.data} onSave={handleSavePartner} onCancel={closeModal} />
+                    </GenericModal>
+                )}
+                {modal.type === 'movement_form' && (
+                    <GenericModal isOpen={true} onClose={closeModal} title={`Nuevo Movimiento: ${modal.data.type}`}>
+                        <MovementForm type={modal.data.type} partners={data.partners} categories={GOLDSMITH_CATEGORIES} onSave={handleSaveMovement} onCancel={closeModal} />
+                    </GenericModal>
+                )}
+                {modal.type === 'order_form' && (
+                    <GenericModal isOpen={true} onClose={closeModal} title="Lanzar Nuevo Pedido">
+                        <OrderForm partners={data.partners} categories={GOLDSMITH_CATEGORIES} onSave={handleSaveOrder} onCancel={closeModal} />
+                    </GenericModal>
+                )}
+                {modal.type === 'order_closure' && (
+                    <GenericModal isOpen={true} onClose={closeModal} title="Recepción de Pedido">
+                        <OrderClosureModal order={modal.data} onConfirm={handleCloseOrder} onCancel={closeModal} />
+                    </GenericModal>
+                )}
+                {modal.type === 'refine_form' && (
+                    <GenericModal isOpen={true} onClose={closeModal} title="Cierre de Fundición / Refinado">
+                        <RefineForm movement={modal.data} onSave={handleRefineFinish} onCancel={closeModal} />
+                    </GenericModal>
+                )}
+                {modal.type === 'inventory_adjust' && (
+                    <GenericModal isOpen={true} onClose={closeModal} title="Ajuste de Stock">
+                        <InventoryAdjustmentModal item={modal.data} onSave={handleAdjustInventory} onCancel={closeModal} />
                     </GenericModal>
                 )}
             </AnimatePresence>
 
-            {/* Global Refresh Indicator */}
             {data.isRefreshing && (
-                <div className="fixed bottom-10 right-10 bg-white/80 backdrop-blur-md px-6 py-3 rounded-full shadow-2xl border border-white flex items-center gap-3 animate-bounce">
+                <div className="fixed bottom-10 right-10 bg-white/80 backdrop-blur-md px-6 py-3 rounded-full shadow-2xl border border-white flex items-center gap-3 animate-bounce z-50">
                     <div className="w-2 h-2 bg-indigo-500 rounded-full animate-ping"></div>
                     <span className="text-[10px] font-black text-[#1A365D] uppercase tracking-widest">Sincronizando...</span>
                 </div>

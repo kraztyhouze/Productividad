@@ -17,7 +17,7 @@ router.get('/', async (req, res) => {
                 role, contract_hours as "contractHours", contract_type as "contractType", 
                 username, is_buyer as "isBuyer", phone, address, "order", store_id, gamification,
                 can_count_cash as "canCountCash", is_interviewer as "isInterviewer",
-                has_1_1_meetings as "has11Meetings"
+                has_1_1_meetings as "has11Meetings", is_active as "isActive"
             FROM employees 
             WHERE store_id = $1
             ORDER BY "order" ASC, id ASC
@@ -53,14 +53,15 @@ router.post('/', async (req, res) => {
             `INSERT INTO employees (
                 first_name, last_name, alias, email, role, contract_hours, contract_type, 
                 username, password, is_buyer, phone, address, avatar, store_id, gamification, 
-                can_count_cash, is_interviewer, has_1_1_meetings,
+                can_count_cash, is_interviewer, has_1_1_meetings, is_active,
                 first_name_bindex, last_name_bindex, email_bindex
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) RETURNING id`,
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22) RETURNING id`,
             [
                 dbData.first_name, dbData.last_name, dbData.alias, dbData.email, body.role, body.contractHours, body.contractType, 
                 dbData.username, hashedPassword, body.isBuyer, dbData.phone, dbData.address, body.avatar, storeId, 
                 body.gamification || {}, body.canCountCash || false, body.isInterviewer || false,
                 body.has11Meetings !== undefined ? body.has11Meetings : true,
+                body.isActive !== undefined ? body.isActive : true,
                 dbData.first_name_bindex || null, dbData.last_name_bindex || null, dbData.email_bindex || null
             ]
         );
@@ -126,14 +127,15 @@ router.put('/:id', async (req, res) => {
                 first_name=$1, last_name=$2, alias=$3, email=$4, role=$5, contract_hours=$6, 
                 contract_type=$7, username=$8, password=$9, is_buyer=$10, phone=$11, address=$12, 
                 avatar=$13, "order"=$14, gamification=$15, can_count_cash=$16, is_interviewer=$17,
-                has_1_1_meetings=$18, first_name_bindex=$19, last_name_bindex=$20, email_bindex=$21
-            WHERE id=$22 RETURNING *`,
+                has_1_1_meetings=$18, is_active=$19, first_name_bindex=$20, last_name_bindex=$21, email_bindex=$22
+            WHERE id=$23 RETURNING *`,
             [
                 dbData.first_name, dbData.last_name, dbData.alias, dbData.email, newRole, body.contractHours !== undefined ? body.contractHours : old.contract_hours, 
                 body.contractType !== undefined ? body.contractType : old.contract_type, dbData.username, hashedPassword, body.isBuyer !== undefined ? body.isBuyer : old.is_buyer, 
                 dbData.phone, dbData.address, body.avatar !== undefined ? body.avatar : old.avatar, body.order !== undefined ? body.order : old.order, 
                 newGamification, body.canCountCash !== undefined ? body.canCountCash : old.can_count_cash, body.isInterviewer !== undefined ? body.isInterviewer : (old.is_interviewer || false),
                 body.has11Meetings !== undefined ? body.has11Meetings : (old.has_1_1_meetings !== undefined ? old.has_1_1_meetings : true),
+                body.isActive !== undefined ? body.isActive : (old.is_active !== undefined ? old.is_active : true),
                 dbData.first_name_bindex || null, dbData.last_name_bindex || null, dbData.email_bindex || null,
                 id
             ]
@@ -148,7 +150,8 @@ router.put('/:id', async (req, res) => {
             isBuyer: updated.is_buyer, phone: updated.phone, address: updated.address,
             order: updated.order, avatar: updated.avatar, gamification: updated.gamification,
             canCountCash: updated.can_count_cash, isInterviewer: updated.is_interviewer,
-            has11Meetings: updated.has_1_1_meetings
+            has11Meetings: updated.has_1_1_meetings,
+            isActive: updated.is_active
         });
     } catch (err) { res.status(500).json({ error: err.message }) }
 });
@@ -159,20 +162,8 @@ router.post('/:id/reset-gamification', async (req, res) => {
 
     // Reset State
     const initialGamification = {
-        xp: 0,
-        level: 1,
-        maxLevel: 1,
-        coins: 0,
-        pendingRewards: 0,
-        unlockedAvatars: [],
-        unlockedEffects: [],
-        currentAvatar: null,
-        avatarUrl: null,
-        medals: []
-        // We keep medals? User said "resetear el perfil... start from 0". 
-        // "Reset profile... back to level 1... remove unlocked avatars".
-        // Medals are achievements, usually kept, but "experience 0 and level 1" implies hard reset.  
-        // I'll reset everything for a complete "fresh start" as requested.
+        xp: 0, level: 1, maxLevel: 1, coins: 0, pendingRewards: 0,
+        unlockedAvatars: [], unlockedEffects: [], currentAvatar: null, avatarUrl: null, medals: []
     };
 
     try {
@@ -196,6 +187,5 @@ router.delete('/:id', async (req, res) => {
         res.json({ message: 'Deleted' });
     } catch (err) { res.status(500).json({ error: err.message }) }
 });
-
 
 export default router;

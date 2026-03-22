@@ -8,6 +8,8 @@ import {
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { CATEGORY_COLORS, GOLDSMITH_CATEGORIES } from '../../constants/gerenciaConstants';
+import { downloadJewelryPDF } from '../../utils/reportUtils';
+import { FileText } from 'lucide-react';
 
 const JewelryReport = ({ movements, partners, inventory }) => {
     const [filterPartner, setFilterPartner] = useState('all');
@@ -107,14 +109,23 @@ const JewelryReport = ({ movements, partners, inventory }) => {
                 <div className="flex items-center gap-4">
                     <div className="flex flex-col items-end">
                         <span className="text-[8px] font-black text-slate-300 uppercase mb-1">Joyero Seleccionado</span>
-                        <select 
-                            className="bg-[#F4F7FA] border-none rounded-2xl p-3 pr-10 font-black text-[10px] uppercase text-[#1A365D]"
-                            value={filterPartner}
-                            onChange={(e) => setFilterPartner(e.target.value)}
-                        >
-                            <option value="all">Todos los Socios</option>
-                            {safePartners.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
+                        <div className="flex gap-2">
+                            <select 
+                                className="bg-[#F4F7FA] border-none rounded-2xl p-3 pr-10 font-black text-[10px] uppercase text-[#1A365D]"
+                                value={filterPartner}
+                                onChange={(e) => setFilterPartner(e.target.value)}
+                            >
+                                <option value="all">Todos los Socios</option>
+                                {safePartners.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                            <button 
+                                onClick={() => downloadJewelryPDF(filteredMovements)}
+                                className="p-3 bg-[#1A365D] text-white rounded-2xl hover:bg-[#2D4B7A] transition-all shadow-lg shadow-blue-100"
+                                title="Exportar PDF"
+                            >
+                                <FileText size={16} />
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

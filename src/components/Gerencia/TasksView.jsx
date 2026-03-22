@@ -62,14 +62,14 @@ const TasksView = ({
     const allTasks = [...displayTasks, ...projectTasksForHorizon(displayTasks)];
 
     return (
-        <div className="flex flex-col lg:flex-row gap-10 items-start pb-10">
+        <div className="flex flex-col lg:flex-row gap-4 lg:gap-10 items-start pb-10 px-0 sm:px-4">
             {/* PANEL CENTRAL (75%) */}
             <div className="flex-1 w-full lg:max-w-[calc(100%-360px)] space-y-8 animate-in fade-in slide-in-from-left-4 duration-700">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div className="bg-white p-1 rounded-2xl border border-[#E5E7EB] shadow-sm flex gap-1">
                         {[
                             { id: 'batteries', label: 'Baterías', icon: Layers },
-                            { id: 'calendar', label: 'Calendario', icon: CalendarIcon },
+                            { id: 'calendar', label: 'Agenda', icon: CalendarIcon },
                             { id: 'list', label: 'Lista', icon: List }
                         ].map(v => (
                             <button 
@@ -87,7 +87,7 @@ const TasksView = ({
                 </div>
 
                 {view === 'batteries' && (
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 lg:gap-10">
                         {(Array.isArray(zones) && zones.length > 0 ? zones : [{id: 'general', name: 'ZONA GENERAL'}]).map(zone => {
                             const zoneBatteries = (Array.isArray(batteries) ? batteries : []).filter(b => b.zone_id == zone.id);
                             const zoneTasks = (Array.isArray(tasks) ? tasks : []).filter(t => t.zone_id == zone.id && t.status !== 'Hecha');
@@ -97,7 +97,7 @@ const TasksView = ({
                             const progress = total > 0 ? Math.round((done / total) * 100) : 0;
 
                             return (
-                                <div key={zone.id} className="bg-white rounded-[48px] border border-[#E5E7EB] shadow-sm flex flex-col overflow-hidden hover:shadow-2xl hover:translate-y-[-4px] transition-all duration-700">
+                                <div key={zone.id} className="bg-white rounded-[24px] lg:rounded-[48px] border border-[#E5E7EB] shadow-sm flex flex-col overflow-hidden hover:shadow-2xl lg:hover:translate-y-[-4px] transition-all duration-700">
                                     <header className="p-10 border-b border-[#F8F9FA] flex justify-between items-center bg-slate-50/10">
                                         <div className="flex items-center gap-6">
                                             <div className="relative w-16 h-16 flex items-center justify-center">

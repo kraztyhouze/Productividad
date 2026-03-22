@@ -20,7 +20,7 @@ const Team = () => {
 
     // States
     const [searchTerm, setSearchTerm] = useState('');
-    const [activeFilter, setActiveFilter] = useState('all'); // all, buyers, responsibles, staff
+    const [activeFilter, setActiveFilter] = useState('all'); // all, buyers, responsibles, store, inactive
 
     // Modals
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -92,6 +92,11 @@ const Team = () => {
 
         if (!matchesSearch) return false;
 
+        if (activeFilter === 'inactive') return emp.isActive === false;
+        
+        // Default: If not specifically filtered for inactive, only show active
+        if (!emp.isActive && activeFilter !== 'inactive') return false;
+
         if (activeFilter === 'buyers') return emp.isBuyer;
         if (activeFilter === 'responsibles') return role.includes('Responsable') || role === 'Gerente';
         if (activeFilter === 'store') return !role.includes('Responsable') && role !== 'Gerente' && role !== 'Puesto Compras';
@@ -159,13 +164,19 @@ const Team = () => {
                 </div>
 
                 <div className="flex gap-1 overflow-x-auto w-full pb-1 md:pb-0">
-                    {[{ id: 'all', label: 'Todos' }, { id: 'buyers', label: 'Compradores' }, { id: 'responsibles', label: 'Responsables' }, { id: 'store', label: 'Tienda' }].map(filter => (
+                    {[
+                        { id: 'all', label: 'Todos Activos' }, 
+                        { id: 'buyers', label: 'Compradores' }, 
+                        { id: 'responsibles', label: 'Responsables' }, 
+                        { id: 'store', label: 'Tienda' },
+                        { id: 'inactive', label: 'Inactivos' }
+                    ].map(filter => (
                         <button
                             key={filter.id}
                             onClick={() => setActiveFilter(filter.id)}
                             className={`px-5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${activeFilter === filter.id
-                                    ? 'text-white'
-                                    : 'text-[#718096] hover:text-[#1A365D] hover:bg-[#F4F7FA]'
+                                     ? 'text-white'
+                                     : 'text-[#718096] hover:text-[#1A365D] hover:bg-[#F4F7FA]'
                                 }`}
                             style={activeFilter === filter.id ? { background: '#FF8C9D' } : {}}
                         >

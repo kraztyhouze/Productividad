@@ -5,6 +5,7 @@ import { useAuth, ROLES } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
 import { BarChart, FileText, Filter, Download, Trash2, Loader, Search, Gem, Package, FileSpreadsheet, Calendar as CalendarIcon, ChevronDown, Info, X } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays, subWeeks, subMonths } from 'date-fns';
+import { downloadPerformancePDF } from '../utils/reportUtils';
 
 const Reports = () => {
     const { dailyRecords, dailyGroups, activeSessions, deleteNoDeal } = useProductivity();
@@ -739,12 +740,20 @@ const Reports = () => {
                         )}
                     </h2>
                     {reportType === 'performance' && (
-                        <button
-                            onClick={exportPerformanceExcel}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-green-600/10 hover:bg-green-600/20 text-green-400 border border-green-600/30 font-bold rounded-xl transition-all text-xs hover:scale-105 active:scale-95"
-                        >
-                            <FileSpreadsheet size={16} /> Exportar Excel
-                        </button>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={exportPerformanceExcel}
+                                className="flex items-center gap-2 px-4 py-2.5 bg-green-600/10 hover:bg-green-600/20 text-green-400 border border-green-600/30 font-bold rounded-xl transition-all text-xs hover:scale-105 active:scale-95"
+                            >
+                                <FileSpreadsheet size={16} /> Excel
+                            </button>
+                            <button
+                                onClick={() => downloadPerformancePDF(stats, employees, startDate, endDate)}
+                                className="flex items-center gap-2 px-4 py-2.5 bg-[#1A365D] hover:bg-[#2D4B7A] text-white font-bold rounded-xl transition-all text-xs hover:scale-105 active:scale-95 shadow-lg shadow-blue-100"
+                            >
+                                <FileText size={16} /> Descargar PDF
+                            </button>
+                        </div>
                     )}
                 </div>
 

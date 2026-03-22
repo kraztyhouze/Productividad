@@ -175,8 +175,9 @@ initDb().then(async () => {
     try {
         await pool.query("ALTER TABLE employees ADD COLUMN IF NOT EXISTS gamification JSONB DEFAULT '{}'");
         await pool.query("ALTER TABLE employees ADD COLUMN IF NOT EXISTS is_interviewer BOOLEAN DEFAULT FALSE");
-        console.log('Schema: is_interviewer column ensured in employees table.');
-    } catch (e) { console.error('Schema error (is_interviewer):', e); }
+        await pool.query("ALTER TABLE employees ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE");
+        console.log('Schema: gamification, is_interviewer and is_active columns ensured in employees table.');
+    } catch (e) { console.error('Schema error (employees migration):', e); }
 })();
 
 // ─── API Routes ───────────────────────────────────────────────────────────────

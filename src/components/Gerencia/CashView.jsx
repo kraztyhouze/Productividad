@@ -6,9 +6,11 @@ import {
     Lock, 
     ShieldCheck, 
     AlertCircle, 
-    Info 
+    Info,
+    FileText
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { downloadCashPDF } from '../../utils/reportUtils';
 import { BILLS, COINS } from '../../constants/gerenciaConstants';
 
 const CashView = ({ history, onSave, employees, user, cumulativeCashDiff }) => {
@@ -36,10 +38,8 @@ const CashView = ({ history, onSave, employees, user, cumulativeCashDiff }) => {
     });
 
     useEffect(() => {
-        const total = Object.entries(counts.bills).reduce((acc, [val, qty]) => acc + (Number(val) * Number(qty || 0)), 0) +
-                      Object.entries(counts.coins).reduce((acc, [val, qty]) => acc + (Number(val) * Number(qty || 0)), 0) +
-                      Number(counts.others || 0);
-        setData(prev => ({ ...prev, real_total: total, details: counts }));
+        // We no longer auto-calculate based on counts
+        // setData(prev => ({ ...prev, details: counts }));
     }, [counts]);
 
     useEffect(() => {
@@ -99,9 +99,19 @@ const CashView = ({ history, onSave, employees, user, cumulativeCashDiff }) => {
         <div className="space-y-8 animate-in fade-in duration-500 pb-10">
             <div className="bg-white p-10 rounded-[40px] border border-[#E2E8F0] shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
                 <div className="space-y-4 w-full md:w-auto">
-                    <div>
-                        <h2 className="text-3xl font-black text-[#1A365D] tracking-tighter uppercase">Conteo de Caja</h2>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Registro diario de arqueos y cierre</p>
+                    <div className="flex justify-between items-center mb-10">
+                        <div>
+                            <h2 className="text-4xl font-black text-[#1A365D] tracking-tighter uppercase">Conteo Diario</h2>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-2 flex items-center gap-2">
+                                <span className="w-8 h-0.5 bg-blue-500"/> Registro de arqueo seguro AES-256
+                            </p>
+                        </div>
+                        <button 
+                            onClick={() => downloadCashPDF(safeHistory)}
+                            className="px-6 py-3 bg-white border border-slate-100 rounded-2xl flex items-center gap-3 text-[10px] font-black text-[#1A365D] uppercase hover:shadow-xl transition-all shadow-sm"
+                        >
+                            <FileText size={16} className="text-blue-500"/> Descargar Histórico PDF
+                        </button>
                     </div>
                     <input 
                         type="date" 
@@ -136,70 +146,47 @@ const CashView = ({ history, onSave, employees, user, cumulativeCashDiff }) => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
-                {/* 1. Conteo Desglosado (8 Cols) */}
+                {/* 1. Resumen Principal del Arqueo (8 Cols) */}
                 <div className="lg:col-span-8 space-y-8">
-                    {/* Billetes Section */}
-                    <div className="bg-white p-10 rounded-[48px] border border-[#E2E8F0] shadow-sm">
-                        <h4 className="text-xs font-black text-[#1A365D] uppercase tracking-[0.3em] mb-10 flex items-center gap-4">
-                            <span className="w-10 h-1 rounded-full bg-blue-500"/>
-                             Billetes en Efectivo
-                        </h4>
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
-                            {BILLS.map(b => (
-                                <div key={b} className="group">
-                                    <label className="text-[10px] font-black text-slate-300 uppercase text-center block mb-2">{b}€</label>
-                                    <input 
-                                        type="number" 
-                                        className="w-full bg-[#F4F7FA] border-2 border-transparent focus:border-blue-400 rounded-2xl p-5 text-center font-black text-[#1A365D] transition-all group-hover:scale-105"
-                                        placeholder="0"
-                                        value={counts.bills[b]}
-                                        onChange={e => setCounts({ ...counts, bills: { ...counts.bills, [b]: e.target.value } })}
-                                    />
-                                </div>
-                            ))}
+                    <div className="bg-white p-12 rounded-[56px] border border-[#E2E8F0] shadow-sm flex flex-col items-center text-center justify-center min-h-[400px]">
+                        <div className="w-20 h-20 bg-blue-50 text-[#1A365D] rounded-[32px] flex items-center justify-center mb-8">
+                            <Calculator size={40}/>
                         </div>
-                    </div>
-
-                    {/* Monedas Section */}
-                    <div className="bg-white p-10 rounded-[48px] border border-[#E2E8F0] shadow-sm">
-                        <h4 className="text-xs font-black text-[#1A365D] uppercase tracking-[0.3em] mb-10 flex items-center gap-4">
-                            <span className="w-10 h-1 rounded-full bg-amber-400"/>
-                             Fraccionado y Monedas
-                        </h4>
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-                            {COINS.map(c => (
-                                <div key={c} className="group">
-                                    <label className="text-[10px] font-black text-slate-300 uppercase text-center block mb-2">{c}€</label>
-                                    <input 
-                                        type="number" 
-                                        className="w-full bg-[#F4F7FA] border-2 border-transparent focus:border-amber-400 rounded-xl p-4 text-center font-black text-[#1A365D] text-xs transition-all group-hover:scale-105"
-                                        placeholder="0"
-                                        value={counts.coins[c]}
-                                        onChange={e => setCounts({ ...counts, coins: { ...counts.coins, [c]: e.target.value } })}
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Others Section */}
-                    <div className="bg-[#1A365D] p-10 rounded-[48px] shadow-xl text-white flex flex-col md:flex-row items-center gap-10">
-                        <div className="w-20 h-20 bg-white/10 rounded-[32px] flex items-center justify-center shrink-0">
-                            <Calculator size={32} className="text-blue-300"/>
-                        </div>
-                        <div className="flex-1 space-y-4">
-                            <h4 className="text-[11px] font-[900] text-blue-300 uppercase tracking-[0.3em]">Otros Importes y Varios</h4>
-                            <p className="text-[12px] opacity-60 leading-relaxed font-black uppercase tracking-tight">Introduce el total acumulado en otros soportes o tickets pendientes de cuadrar.</p>
-                        </div>
-                        <div className="w-full md:w-60">
-                             <input 
-                                type="number" step="0.01" 
-                                className="w-full bg-white/10 border-2 border-white/20 focus:border-white rounded-3xl p-6 text-center font-black text-3xl text-white transition-all outline-none"
+                        <h3 className="text-xl font-black text-[#1A365D] uppercase tracking-tighter mb-4">Ingreso de Importe Final</h3>
+                        <p className="max-w-md text-slate-400 font-bold text-xs uppercase leading-relaxed mb-10">
+                            Introduce directamente el total contado en caja física. El sistema calculará el descuadre automáticamente frente al cierre teórico del día.
+                        </p>
+                        
+                        <div className="relative group">
+                            <span className="absolute -left-12 top-1/2 -translate-y-1/2 text-4xl font-black text-slate-200">€</span>
+                            <input 
+                                type="number" 
+                                step="0.01"
+                                className="bg-transparent border-b-4 border-slate-100 focus:border-blue-500 text-7xl font-black text-[#1A365D] text-center w-full max-w-[400px] outline-none transition-all py-4"
                                 placeholder="0.00"
-                                value={counts.others}
-                                onChange={e => setCounts({ ...counts, others: e.target.value })}
-                             />
+                                value={data.real_total || ''}
+                                onChange={e => setData(prev => ({ ...prev, real_total: parseFloat(e.target.value) || 0 }))}
+                            />
                         </div>
+                    </div>
+
+                    <div className="bg-[#1A365D] p-10 rounded-[48px] shadow-2xl text-white relative overflow-hidden">
+                        <div className="relative z-10">
+                            <h4 className="text-xs font-black text-blue-300 uppercase tracking-[0.3em] mb-6">Comentarios y Hallazgos por Día</h4>
+                            <div className="space-y-4 max-h-[250px] overflow-y-auto pr-4 custom-scrollbar">
+                                {safeHistory.slice(0, 5).map(log => (
+                                    <div key={log.id} className="p-5 bg-white/5 rounded-3xl border border-white/5 flex gap-4 items-start">
+                                        <div className="px-3 py-2 bg-white/10 rounded-xl text-[10px] font-black text-blue-100">{format(new Date(log.date), 'dd/MM')}</div>
+                                        <div>
+                                            <p className="text-[10px] font-black text-blue-400 uppercase">{log.responsible_1 || 'Sistema'}</p>
+                                            <p className="text-xs font-bold text-slate-200 mt-1">{log.observations || 'Sin observaciones registradas.'}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                                {safeHistory.length === 0 && <p className="text-xs text-blue-300 italic opacity-50">No hay histórico de cierres.</p>}
+                            </div>
+                        </div>
+                        <Info className="absolute -bottom-10 -right-10 text-white/5 w-64 h-64 rotate-12" />
                     </div>
                 </div>
 
@@ -208,17 +195,17 @@ const CashView = ({ history, onSave, employees, user, cumulativeCashDiff }) => {
                      <div className="bg-white p-10 rounded-[48px] border border-[#E2E8F0] shadow-sm space-y-10">
                         <div className="space-y-6">
                             <div className="flex justify-between items-end border-b-2 border-slate-50 pb-6">
-                                <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Total Teórico</span>
+                                <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Saldo Teórico</span>
                                 <input 
                                     type="number" step="0.01"
                                     className="text-2xl font-black text-[#1A365D] bg-slate-50 rounded-xl px-4 py-2 border-none w-40 text-right focus:bg-blue-50 transition-colors"
                                     value={data.expected_total}
-                                    onChange={e => setData({ ...data, expected_total: e.target.value })}
+                                    onChange={e => setData({ ...data, expected_total: parseFloat(e.target.value) || 0 })}
                                 />
                             </div>
                             <div className="flex justify-between items-end">
-                                <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Total Real</span>
-                                <span className="text-4xl font-black text-[#1A365D] tracking-tighter tabular-nums">{data.real_total.toFixed(2)}€</span>
+                                <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Saldo Real (Actual)</span>
+                                <span className="text-4xl font-black text-[#1A365D] tracking-tighter tabular-nums">{Number(data.real_total || 0).toFixed(2)}€</span>
                             </div>
                         </div>
 

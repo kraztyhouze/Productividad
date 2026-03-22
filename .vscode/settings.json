@@ -1,0 +1,13 @@
+{
+    "haskell.hlint.run": "onType",
+    "haskell.hlint.executablePath": "c:\\Users\\Juanma\\.gemini\\antigravity\\TikTak 2.1\\.bin\\hlint-3.10\\hlint.exe",
+    "haskell.hlint.hints": [
+        "Default",
+        "Dollar",
+        "Generalise"
+    ],
+    "haskell.hlint.ignore": [
+        "Redundant do"
+    ],
+    "haskell.hlint.logLevel": "log"
+}

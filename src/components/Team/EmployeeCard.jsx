@@ -21,7 +21,7 @@ const EmployeeCard = ({ emp, displayName, stats, onEdit, onDelete, onToggleInter
                 {/* 1:1 Meetings Toggle (Direct Action) */}
                 <button 
                     onClick={(e) => { e.stopPropagation(); onToggle11(emp.id, !emp.has11Meetings); }}
-                    className={`absolute top-3 right-20 p-2 rounded-xl transition-all border ${emp.has11Meetings ? 'bg-[#FF8C9D] text-white border-[#FF8C9D]' : 'bg-white text-slate-300 border-slate-100 hover:border-[#FF8C9D]/20'}`}
+                    className={`absolute top-3 right-28 p-2 rounded-xl transition-all border ${emp.has11Meetings ? 'bg-[#FF8C9D] text-white border-[#FF8C9D]' : 'bg-white text-slate-300 border-slate-100 hover:border-[#FF8C9D]/20'}`}
                     title={emp.has11Meetings ? "Deshabilitar Reuniones 1:1" : "Habilitar Reuniones 1:1"}
                 >
                     <Users size={14} />
@@ -31,12 +31,21 @@ const EmployeeCard = ({ emp, displayName, stats, onEdit, onDelete, onToggleInter
                 {['Gerente', 'Supervisor', 'Responsable'].includes(emp.role) && (
                     <button 
                         onClick={(e) => { e.stopPropagation(); onToggleInterviewer(emp.id, !emp.isInterviewer); }}
-                        className={`absolute top-3 right-11 p-2 rounded-xl transition-all border ${emp.isInterviewer ? 'bg-[#1A365D] text-white border-[#1A365D]' : 'bg-white text-slate-300 border-slate-100 hover:border-[#1A365D]/20'}`}
+                        className={`absolute top-3 right-12 p-2 rounded-xl transition-all border ${emp.isInterviewer ? 'bg-[#1A365D] text-white border-[#1A365D]' : 'bg-white text-slate-300 border-slate-100 hover:border-[#1A365D]/20'}`}
                         title={emp.isInterviewer ? "Desmarcar como Entrevistador" : "Marcar como Entrevistador"}
                     >
                         <UserCheck size={14} />
                     </button>
                 )}
+                
+                {/* Status Toggle (Direct Action) */}
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onEdit({ ...emp, isActive: !emp.isActive }); }}
+                    className={`absolute top-3 right-20 p-2 rounded-xl transition-all border ${!emp.isActive ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-slate-300 border-slate-100 hover:border-amber-500/20'}`}
+                    title={emp.isActive ? "Desactivar Empleado" : "Activar Empleado"}
+                >
+                    <Trash2 size={14} />
+                </button>
                 
                 {/* Actions Overlay */}
                 <div className="flex flex-col gap-1 absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm rounded-lg border border-[#E2E8F0] shadow-sm p-1">
@@ -49,29 +58,14 @@ const EmployeeCard = ({ emp, displayName, stats, onEdit, onDelete, onToggleInter
                     </button>
                     <button 
                         onClick={(e) => { e.stopPropagation(); onDelete(emp.id); }} 
-                        className="p-1.5 text-[#A0AEC0] hover:text-red-500 hover:bg-red-50 rounded-md transition-all" 
-                        title="Eliminar"
+                        className="p-1.5 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-md transition-all" 
+                        title="Eliminar por Completo"
                     >
                         <Trash2 size={14} />
                     </button>
                 </div>
             </div>
 
-            {/* Footer: Stats Indicators */}
-            <div className="grid grid-cols-3 gap-1 pt-4 border-t border-[#F1F5F9]">
-                <div className="flex flex-col items-center">
-                    <span className="text-sm font-black text-[#FF8C9D]">{stats.totalGroups}</span>
-                    <span className="text-[9px] text-[#A0AEC0] uppercase font-bold tracking-wider">Grupos</span>
-                </div>
-                <div className="flex flex-col items-center border-l border-[#F1F5F9]">
-                    <span className={`text-xs font-bold ${parseFloat(stats.gph) >= 10 ? 'text-[#38A169]' : 'text-[#718096]'}`}>{stats.gph}</span>
-                    <span className="text-[9px] text-[#A0AEC0] uppercase font-bold tracking-wider">Media</span>
-                </div>
-                <div className="flex flex-col items-center border-l border-[#F1F5F9]">
-                    <span className="text-sm font-bold text-[#4A5568]">{stats.activeDays}</span>
-                    <span className="text-[9px] text-[#A0AEC0] uppercase font-bold tracking-wider">Días</span>
-                </div>
-            </div>
         </div>
     );
 };

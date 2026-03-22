@@ -5,7 +5,7 @@ const AccountStatusWidget = ({ partners }) => {
     const totalGrams = (partners || []).reduce((acc, p) => acc + Number(p.debt_grams || 0), 0);
     
     return (
-        <div className="bg-[#1A365D] p-10 rounded-[60px] shadow-2xl text-white relative overflow-hidden flex flex-col md:flex-row items-center gap-12 group transition-all hover:scale-[1.01]">
+        <div className="bg-[#1A365D] p-8 rounded-[40px] shadow-2xl text-white relative overflow-hidden flex flex-col md:flex-row items-center gap-10 group transition-all hover:scale-[1.005]">
             <div className="relative z-10 space-y-4">
                 <div className="flex items-center gap-3">
                     <div className="bg-white/20 p-4 rounded-[28px] text-white backdrop-blur-xl group-hover:scale-110 transition-transform">

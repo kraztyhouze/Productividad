@@ -25,6 +25,7 @@ const BatteryForm = ({ initialData, zones, onSave, onCancel }) => {
     return (
         <form onSubmit={async (e) => { 
             e.preventDefault(); 
+            if (!zoneId) return alert('Debes seleccionar una zona para esta batería.');
             const filteredItems = items.filter(i => i.trim() !== '');
             if (filteredItems.length === 0) return alert('Debes añadir al menos una tarea.');
             
@@ -33,7 +34,7 @@ const BatteryForm = ({ initialData, zones, onSave, onCancel }) => {
                 title, 
                 start_date: startDate, 
                 end_date: endDate, 
-                zone_id: zoneId || null,
+                zone_id: zoneId,
                 items: filteredItems 
             });
         }} className="space-y-8">
@@ -54,7 +55,9 @@ const BatteryForm = ({ initialData, zones, onSave, onCancel }) => {
                 </div>
 
                 <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase block mb-3 pl-1 tracking-widest">Zona Responsable (Categoría)</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase block mb-3 pl-1 tracking-widest">
+                        Zona Responsable (Categoría) <span className="text-red-500">* Requerido</span>
+                    </label>
                     <div className="flex flex-wrap gap-2">
                         {safeZones.map(z => (
                             <button 

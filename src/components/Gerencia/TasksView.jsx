@@ -9,6 +9,7 @@ import {
     X,
     Clock,
     Layout,
+    ShieldAlert,
     Swords
 } from 'lucide-react';
 import { 
@@ -92,7 +93,7 @@ const TasksView = ({
                 {view === 'batteries' && (
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 lg:gap-10">
                         {(Array.isArray(zones) && zones.length > 0 ? zones : [{id: 'general', name: 'ZONA GENERAL'}]).map(zone => {
-                            const zoneBatteries = (Array.isArray(batteries) ? batteries : []).filter(b => b.zone_id == zone.id);
+                            const zoneBatteries = (Array.isArray(batteries) ? batteries : []).filter(b => String(b.zone_id) === String(zone.id));
                             const zoneTasks = (Array.isArray(tasks) ? tasks : []).filter(t => t.zone_id == zone.id && t.status !== 'Hecha');
                             
                             let total = 0, done = 0;
@@ -148,11 +149,34 @@ const TasksView = ({
                                     
                                     <footer className="p-6 bg-slate-50/50 border-t border-[#F8F9FA] flex justify-between items-center">
                                          <button onClick={() => setView('list')} className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-[#1A365D] px-4 py-2 transition-colors">Auditar Zona</button>
-                                         <button onClick={onAddBattery} className="px-6 py-3 bg-white border border-slate-200 text-[#1A365D] rounded-2xl text-[10px] font-black uppercase shadow-sm hover:shadow-xl transition-all">Nuevo Despliegue</button>
+                                         <button onClick={() => onAddBattery()} className="px-6 py-3 bg-white border border-slate-200 text-[#1A365D] rounded-2xl text-[10px] font-black uppercase shadow-sm hover:shadow-xl transition-all">Nuevo Despliegue</button>
                                     </footer>
                                 </div>
                             );
                         })}
+
+                        {/* SECCIÓN ESPECIAL PARA BATERÍAS HUÉRFANAS (SIN ZONA ASIGNADA) */}
+                        {((Array.isArray(batteries) ? batteries : []).some(b => !b.zone_id || !zones.some(z => z.id == b.zone_id))) && (
+                            <div className="bg-red-50 rounded-[48px] border-2 border-dashed border-red-200 flex flex-col overflow-hidden animate-pulse">
+                                <header className="p-10 border-b border-red-100 flex justify-between items-center">
+                                    <div className="flex items-center gap-4 text-red-600">
+                                        <ShieldAlert size={28} />
+                                        <div>
+                                            <h3 className="text-lg font-black uppercase tracking-tighter leading-none">Baterías sin Zona</h3>
+                                            <p className="text-[9px] font-black uppercase tracking-widest mt-2 opacity-60">Asigna estas baterías para que sean visibles en el panel</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-xl font-black text-red-600 opacity-30">!</div>
+                                </header>
+                                <div className="p-8 space-y-4">
+                                    <BatteriesView 
+                                        batteries={(Array.isArray(batteries) ? batteries : []).filter(b => !b.zone_id || !zones.some(z => z.id == b.zone_id))} 
+                                        onEdit={onEditBattery} onAddExtra={onAddBatteryItem} onDeleteExtra={onDeleteBatteryItem} onCheck={onCheckBattery} onDelete={onDeleteBattery}
+                                        hideHeader={true} isCompact={true}
+                                    />
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 

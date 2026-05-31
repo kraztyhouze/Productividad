@@ -4,10 +4,66 @@ import { recalculateGamification } from './helpers/gamification.js';
 
 const router = express.Router();
 
+// --- GHOST SESSION CLEANUP: Auto-close sessions from previous days ---
+async function cleanupGhostSessions(storeId) {
+    try {
+        // Find sessions that started before today (Madrid timezone)
+        const ghostResult = await pool.query(
+            `SELECT TRIM(employee_id) as employee_id, employee_name, start_time
+             FROM active_sessions
+             WHERE store_id = $1
+               AND start_time::date < (NOW() AT TIME ZONE 'Europe/Madrid')::date`,
+            [storeId]
+        );
+
+        if (ghostResult.rows.length === 0) return;
+
+        console.log(`[GhostCleanup] Found ${ghostResult.rows.length} ghost session(s) for store ${storeId}`);
+
+        for (const session of ghostResult.rows) {
+            const startTime = new Date(session.start_time);
+            const sessionDate = startTime.toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
+            
+            // End time = 23:59:59 of the day the session started (Madrid time)
+            const endOfDay = new Date(startTime);
+            endOfDay.setHours(23, 59, 59, 999);
+            
+            const durationSeconds = Math.round((endOfDay - startTime) / 1000);
+            const recordId = Date.now() + Math.floor(Math.random() * 10000);
+
+            // Create a daily record for that past day (only if no record already exists for that employee/date)
+            const existingRecord = await pool.query(
+                'SELECT id FROM daily_records WHERE TRIM(employee_id) = $1 AND date = $2 AND store_id = $3 LIMIT 1',
+                [session.employee_id, sessionDate, storeId]
+            );
+            if (existingRecord.rows.length === 0) {
+                await pool.query(
+                    `INSERT INTO daily_records (id, employee_id, employee_name, start_time, end_time, duration_seconds, date, groups_count, store_id)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+                    [recordId, session.employee_id, session.employee_name, session.start_time, endOfDay.toISOString(), durationSeconds, sessionDate, 0, storeId]
+                );
+            }
+
+            // Delete the ghost session
+            await pool.query(
+                'DELETE FROM active_sessions WHERE TRIM(employee_id) = $1 AND store_id = $2',
+                [session.employee_id, storeId]
+            );
+
+            console.log(`[GhostCleanup] Closed ghost session for ${session.employee_name} (${session.employee_id}), date ${sessionDate}, duration ${Math.round(durationSeconds / 3600)}h`);
+        }
+    } catch (err) {
+        console.error('[GhostCleanup] Error during cleanup:', err.message);
+    }
+}
+
 // --- SYNC ENDPOINT (Performance Optimization) ---
 router.get('/sync/productivity', async (req, res) => {
     const storeId = req.headers['x-store-id'] || 'store_1';
     try {
+        // Auto-cleanup ghost sessions (sessions from previous days) before returning data
+        await cleanupGhostSessions(storeId);
+
         const [sessions, records, groups, closed, incidents, families, logs] = await Promise.all([
             pool.query('SELECT TRIM(employee_id) as "employeeId", employee_name as "employeeName", start_time as "startTime", client_start_time as "clientStartTime" FROM active_sessions WHERE store_id = $1', [storeId]),
             pool.query("SELECT id, employee_id as \"employeeId\", employee_name as \"employeeName\", start_time as \"startTime\", end_time as \"endTime\", duration_seconds as \"durationSeconds\", date, groups_count as \"groups\" FROM daily_records WHERE store_id = $1 AND (date >= to_char(NOW() - INTERVAL '30 days', 'YYYY-MM-DD') OR date IS NULL) ORDER BY start_time DESC", [storeId]),

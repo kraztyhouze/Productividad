@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useKeepAlive } from '../hooks/useKeepAlive';
 import { useStore } from './StoreContext';
 
 export const AuthContext = createContext(null);
@@ -15,6 +16,9 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const { currentStore } = useStore(); // Access current store context
+
+    // Keep-alive: mantiene el servidor Render despierto mientras hay sesion activa
+    useKeepAlive(!!user);
 
     useEffect(() => {
         // Check local storage for persisted session

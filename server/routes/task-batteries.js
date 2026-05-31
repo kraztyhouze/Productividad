@@ -40,13 +40,17 @@ router.post('/', async (req, res) => {
     const { title, start_date, end_date, items } = req.body;
     const storeId = req.headers['x-store-id'] || 'store_1';
     
+    if (!req.body.zone_id) {
+        return res.status(400).json({ error: 'Debes asignar la batería a una zona.' });
+    }
+    
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
         
         const batteryRes = await client.query(
             'INSERT INTO task_batteries (title, start_date, end_date, store_id, zone_id) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-            [title, start_date, end_date, storeId, req.body.zone_id || null]
+            [title, start_date, end_date, storeId, req.body.zone_id]
         );
         
         const batteryId = batteryRes.rows[0].id;
@@ -99,13 +103,17 @@ router.put('/items/:itemId', async (req, res) => {
 router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const { title, start_date, end_date, items } = req.body;
+    if (!req.body.zone_id) {
+        return res.status(400).json({ error: 'Debes asignar la batería a una zona.' });
+    }
+
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
         
         await client.query(
             'UPDATE task_batteries SET title = $1, start_date = $2, end_date = $3, zone_id = $4 WHERE id = $5',
-            [title, start_date, end_date, req.body.zone_id || null, id]
+            [title, start_date, end_date, req.body.zone_id, id]
         );
         
         if (Array.isArray(items)) {

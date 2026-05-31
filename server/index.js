@@ -183,6 +183,13 @@ initDb().then(async () => {
 })();
 
 // ─── API Routes ───────────────────────────────────────────────────────────────
+
+// ═══ Health / Keep-Alive Ping (anti-sleep Render free tier) ════════════════════
+// Endpoint ultraligero: NO consulta la BD. Solo confirma que el proceso esta vivo.
+// Usado por: self-ping interno, UptimeRobot, o cualquier monitor externo.
+app.get('/api/ping', (req, res) => {
+    res.json({ ok: true, ts: Date.now(), server: 'TikTak 2.1' });
+});
 app.use('/api', authRouter);                        // POST /api/login
 app.use('/api/employees', employeesRouter);          // /api/employees/*
 app.use('/api/gamification', gamificationRouter);    // /api/gamification/*
@@ -271,4 +278,42 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ Port: ${PORT}`);
     console.log(`✅ Environment: ${process.env.NODE_ENV || 'production'}`);
     console.log('==========================================');
+    // ═══ Self-Ping Anti-Sleep (Render Free Tier) ═══════════════════════════════
+    // Render duerme los servicios gratuitos tras 15 min sin peticiones HTTP.
+    // Este self-ping se activa cada 14 minutos SOLO en horario laboral (7h-23h
+    // hora Madrid) para mantener el servidor despierto sin gastar horas del plan
+    // en la madrugada cuando nadie usa la app.
+    // Consumo estimado: ~60 req/dia x ~0.2KB = ~12KB/dia. Impacto minimo.
+    const SELF_PING_MS = 14 * 60 * 1000; // 14 minutos
+    const HOUR_START   = 7;              // 07:00 hora Madrid
+    const HOUR_END     = 23;             // 23:00 hora Madrid
+
+    // Render inyecta RENDER_EXTERNAL_URL en produccion con la URL publica del servicio
+    const selfPingUrl = process.env.RENDER_EXTERNAL_URL
+        ? process.env.RENDER_EXTERNAL_URL.replace(/\/$/, '') + '/api/ping'
+        : 'http://localhost:' + PORT + '/api/ping';
+
+    setInterval(async () => {
+        try {
+            const nowMadrid  = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Madrid' }));
+            const hourMadrid = nowMadrid.getHours();
+            // Fuera de horario laboral: no gastar horas gratuitas del plan
+            if (hourMadrid < HOUR_START || hourMadrid >= HOUR_END) return;
+
+            const proto = selfPingUrl.startsWith('https') ? 'https' : 'http';
+            const mod   = await import(proto);
+            const req   = mod.default.get(selfPingUrl, (res) => {
+                res.resume();
+                const t = new Date().toLocaleTimeString('es-ES', { timeZone: 'Europe/Madrid' });
+                console.log('[Keep-Alive] Ping OK -> ' + res.statusCode + ' @ ' + t + ' (Madrid)');
+            });
+            req.on('error', (e) => console.warn('[Keep-Alive] Ping fallido:', e.message));
+            req.setTimeout(10000, () => { req.destroy(); console.warn('[Keep-Alive] Ping timeout'); });
+        } catch (e) {
+            console.warn('[Keep-Alive] Error en self-ping:', e.message);
+        }
+    }, SELF_PING_MS);
+
+    console.log('[Keep-Alive] Self-ping activado cada 14 min en horario 7h-23h (Madrid)');
+    console.log('[Keep-Alive] URL de ping: ' + selfPingUrl);
 });

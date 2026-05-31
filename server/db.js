@@ -277,7 +277,44 @@ export const initDb = async () => {
             try { await client.query(sql); } catch (e) { /* ignore already exists */ }
         }
 
-        console.log("Database schema synchronized successfully.");
+        const tablesToSecure = [
+            // New tables
+            'meeting_schedules', 'task_batteries', 'battery_items', 
+            'cash_control_logs', 'goldsmith_inventory', 'goldsmith_partners', 
+            'goldsmith_movements', 'goldsmith_orders', 'excel_metrics', 
+            'evaluation_criteria', 'meeting_records', 'store_zones', 
+            'meeting_drafts', 'final_meetings', 'daily_organization',
+            // Old tables with permissive policies
+            'active_sessions', 'closed_days', 'comments', 'daily_groups', 
+            'daily_records', 'day_incidents', 'employees', 'locations', 
+            'market_prices', 'no_deal_details', 'product_families', 'roles', 
+            'store_settings', 'tasks', 'transaction_logs'
+        ];
+        for (const table of tablesToSecure) {
+            try { 
+                await client.query(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY;`); 
+                
+                // Remove older permissive policies if they exist
+                await client.query(`DROP POLICY IF EXISTS "AllowAll" ON ${table};`);
+                await client.query(`DROP POLICY IF EXISTS "allow_all" ON ${table};`);
+
+                // Create a 'Deny All' policy for public access to satisfy Supabase linter.
+                await client.query(`
+                    DO $$ 
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM pg_policies 
+                            WHERE tablename = '${table}' 
+                            AND policyname = 'Restrict Public Access'
+                        ) THEN
+                            CREATE POLICY "Restrict Public Access" ON ${table} FOR ALL TO public USING (false);
+                        END IF;
+                    END $$;
+                `);
+            } catch (e) { /* ignore errors */ }
+        }
+
+        console.log("Database schema synchronized, secured and policies updated.");
     } catch (err) {
         console.error("Critical error during DB initialization:", err);
     } finally {

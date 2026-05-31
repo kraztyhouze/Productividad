@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useProductivity } from '../context/ProductivityContext';
 import { useTeam } from '../context/TeamContext';
 import { useAuth, ROLES } from '../context/AuthContext';
@@ -75,6 +75,9 @@ const Productivity = () => {
     const [settings, setSettings] = useState({ midday: '', night: '', announcement: '' });
     const [showSettings, setShowSettings] = useState(false); // Toggle settings panel
 
+    // Ref to track which close times have already been triggered (to prevent double-triggering within same minute)
+    const lastAutoCloseRef = useRef({ midday: null, night: null });
+
     // Fetch Settings
     useEffect(() => {
         const storeId = currentStore || 'store_1';
@@ -89,6 +92,41 @@ const Productivity = () => {
             }))
             .catch(err => console.error("Error fetching settings", err));
     }, [currentStore]);
+
+    // --- AUTO-CLOSE: Check configured times and end all sessions ---
+    useEffect(() => {
+        if (!isToday) return; // Only run auto-close for today
+        if (activeSessions.length === 0) return; // Nothing to close
+        if (!settings.midday && !settings.night) return; // No times configured
+
+        const checkAutoClose = () => {
+            const now = new Date();
+            // Format current time as "HH:MM" for comparison
+            const currentHHMM = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+            const tryClose = (configuredTime, refKey) => {
+                if (!configuredTime) return;
+                // Trigger if current time >= configured time AND we haven't triggered it today yet for this key
+                const todayKey = `${format(now, 'yyyy-MM-dd')}-${configuredTime}`;
+                if (currentHHMM >= configuredTime && lastAutoCloseRef.current[refKey] !== todayKey) {
+                    lastAutoCloseRef.current[refKey] = todayKey;
+                    console.log(`[AutoClose] Triggering ${refKey} auto-close at ${currentHHMM} (configured: ${configuredTime})`);
+                    // End all active sessions
+                    activeSessions.forEach(session => {
+                        endSession(session.employeeId);
+                    });
+                }
+            };
+
+            tryClose(settings.midday, 'midday');
+            tryClose(settings.night, 'night');
+        };
+
+        // Check immediately and then every 30 seconds
+        checkAutoClose();
+        const autoCloseInterval = setInterval(checkAutoClose, 30000);
+        return () => clearInterval(autoCloseInterval);
+    }, [settings, activeSessions, isToday]);
 
     const handleSaveSettings = async () => {
         try {
@@ -231,8 +269,14 @@ const Productivity = () => {
         if (isToday) {
             activeSessions.forEach(s => {
                 if (!stats[s.employeeId]) stats[s.employeeId] = { totalSeconds: 0, sessions: 0, name: s.employeeName };
-                const currentDuration = (currentTime - new Date(s.startTime)) / 1000;
-                stats[s.employeeId].totalSeconds += currentDuration;
+                const sessionStart = new Date(s.startTime);
+                // Safety: if session started on a different day, use midnight of today as start
+                // to avoid 100+ hour sessions from forgotten open sessions
+                const todayMidnight = new Date();
+                todayMidnight.setHours(0, 0, 0, 0);
+                const effectiveStart = sessionStart < todayMidnight ? todayMidnight : sessionStart;
+                const currentDuration = (currentTime - effectiveStart) / 1000;
+                stats[s.employeeId].totalSeconds += Math.max(0, currentDuration);
             });
         }
 

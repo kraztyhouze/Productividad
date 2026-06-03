@@ -93,6 +93,9 @@ const Productivity = () => {
             .catch(err => console.error("Error fetching settings", err));
     }, [currentStore]);
 
+    // Derived date flags (needed before auto-close effect to avoid temporal dead zone)
+    const isToday = selectedDate === new Date().toISOString().split('T')[0];
+
     // --- AUTO-CLOSE: Check configured times and end all sessions ---
     useEffect(() => {
         if (!isToday) return; // Only run auto-close for today
@@ -194,7 +197,6 @@ const Productivity = () => {
 
     const canEditPanels = [ROLES.MANAGER, ROLES.RESPONSIBLE, ROLES.SUPERVISOR].includes(user?.role);
     const canEditTimes = [ROLES.MANAGER, ROLES.SUPERVISOR, ROLES.RESPONSIBLE].includes(user?.role);
-    const isToday = selectedDate === new Date().toISOString().split('T')[0];
     const isDayClosed = closedDays.includes(selectedDate);
     const unclosedDays = getUnclosedPastDays();
 

@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBag, Clock, UserPlus, Zap, Skull, Crown, Star, Flame, X, Gift, Music, Binary, Sparkles, Trash2 } from 'lucide-react';
+import { ShoppingBag, Clock, UserPlus, Zap, Skull, Crown, Star, Flame, X, Gift, Music, Binary, Sparkles, Trash2, ExternalLink } from 'lucide-react';
 
 const EffectRenderer = ({ effectId, onComplete }) => {
     useEffect(() => {
@@ -118,7 +118,8 @@ const GamifiedCard = ({
     onOpenRewards,
     onResetGamification,
     isManagerial,
-    user
+    user,
+    onOpenWidget
 }) => {
     // 1. Calculate Level & Progress
     const xp = emp.gamification?.xp || 0;
@@ -244,6 +245,20 @@ const GamifiedCard = ({
                 >
                     {!isSessionActive ? 'Iniciar Turno' : isClientActive ? 'Finalizar Compra' : 'Finalizar Turno'}
                 </button>
+
+                {isSessionActive && onOpenWidget && (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            onOpenWidget(emp);
+                        }}
+                        className="w-full py-2 bg-slate-850 hover:bg-slate-800 text-slate-200 rounded-xl text-[10px] font-black uppercase tracking-wider active:scale-95 transition-all flex items-center justify-center gap-1.5 border border-slate-750 shadow-sm"
+                    >
+                        <ExternalLink size={12} />
+                        Widget Flotante
+                    </button>
+                )}
             </div>
             
             {isManagerial && (

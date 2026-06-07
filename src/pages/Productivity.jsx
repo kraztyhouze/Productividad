@@ -16,6 +16,8 @@ import ProductivityTimeline from '../components/Productivity/ProductivityTimelin
 import AnomalyPanel from '../components/Productivity/AnomalyPanel';
 import GamifiedCard from '../components/Productivity/GamifiedCard';
 import KioskoModal from '../components/Productivity/KioskoModal';
+import ReactDOM from 'react-dom/client';
+import { ProductivityWidget } from '../components/Productivity/ProductivityWidget';
 
 
 // REJECTION_REASONS removed as per request to simplify flow
@@ -68,6 +70,88 @@ const Productivity = () => {
 
     // Editing State
     const [editingRecord, setEditingRecord] = useState(null);
+
+    // Floating Widget Refs & Handlers (Document PiP API)
+    const pipWindowRef = useRef(null);
+    const pipEmployeeIdRef = useRef(null);
+
+    // Close floating widget on component unmount
+    useEffect(() => {
+        return () => {
+            if (pipWindowRef.current) {
+                pipWindowRef.current.close();
+            }
+        };
+    }, []);
+
+    const handleOpenWidget = async (employee) => {
+        if (!('documentPictureInPicture' in window)) {
+            alert("Tu navegador no soporta el Widget Flotante (requiere Chrome, Edge u Opera 116+).");
+            return;
+        }
+
+        // Si ya hay una ventana abierta, la cerramos
+        if (pipWindowRef.current) {
+            pipWindowRef.current.close();
+        }
+
+        try {
+            const pipWindow = await window.documentPictureInPicture.requestWindow({
+                width: 240,
+                height: 350,
+            });
+
+            pipWindowRef.current = pipWindow;
+            pipEmployeeIdRef.current = String(employee.id).trim();
+
+            // Copiar hojas de estilos para aplicar Tailwind
+            const allStyles = document.querySelectorAll('style, link[rel="stylesheet"]');
+            allStyles.forEach((style) => {
+                pipWindow.document.head.appendChild(style.cloneNode(true));
+            });
+
+            pipWindow.document.body.style.margin = '0';
+            pipWindow.document.body.style.backgroundColor = '#020617'; // bg-slate-950
+
+            const container = pipWindow.document.createElement('div');
+            container.id = 'pip-root';
+            pipWindow.document.body.appendChild(container);
+
+            const root = ReactDOM.createRoot(container);
+            root.render(
+                <ProductivityWidget 
+                    employee={employee} 
+                    onClose={() => pipWindow.close()} 
+                />
+            );
+
+            // Desmontar el widget al cerrar la ventana PiP
+            pipWindow.addEventListener('pagehide', () => {
+                root.unmount();
+                pipWindowRef.current = null;
+                pipEmployeeIdRef.current = null;
+            });
+
+        } catch (err) {
+            console.error('Error al abrir el widget flotante:', err);
+        }
+    };
+
+    const handleEndSession = (empId) => {
+        const idStr = String(empId).trim();
+        if (pipEmployeeIdRef.current === idStr && pipWindowRef.current) {
+            pipWindowRef.current.close();
+        }
+        endSession(empId);
+    };
+
+    const handleCancelSession = (empId) => {
+        const idStr = String(empId).trim();
+        if (pipEmployeeIdRef.current === idStr && pipWindowRef.current) {
+            pipWindowRef.current.close();
+        }
+        cancelSession(empId);
+    };
     const [editingShiftTime, setEditingShiftTime] = useState(null);
     const [editingStats, setEditingStats] = useState(null);
 
@@ -557,11 +641,12 @@ const Productivity = () => {
                                                     startClient(emp.id);
                                                 }
                                             }}
-                                            onEndSession={(id) => endSession(id)}
+                                            onEndSession={(id) => handleEndSession(id)}
                                             onOpenRewards={(id) => setRewardModalEmployeeId(id)}
                                             onResetGamification={handleResetGamification}
                                             isManagerial={isManagerial}
                                             user={user}
+                                            onOpenWidget={handleOpenWidget}
                                         />
                                     );
                                 })
@@ -802,7 +887,7 @@ const Productivity = () => {
                                                     <button
                                                         onClick={() => {
                                                             if (confirm(`¿Cancelar el turno actual de ${displayName} sin guardar?`)) {
-                                                                cancelSession(empId);
+                                                                handleCancelSession(empId);
                                                             }
                                                         }}
                                                         className="p-1 hover:bg-orange-500/20 text-slate-500 hover:text-orange-400 rounded transition-colors" title="Cancelar Turno Actual"

@@ -74,6 +74,7 @@ const Productivity = () => {
     // Floating Widget Refs & Handlers (Document PiP API)
     const pipWindowRef = useRef(null);
     const pipEmployeeIdRef = useRef(null);
+    const pipRootRef = useRef(null);
 
     // Close floating widget on component unmount
     useEffect(() => {
@@ -83,6 +84,26 @@ const Productivity = () => {
             }
         };
     }, []);
+
+    // Sincronizar dinámicamente el contenido del Widget Flotante al actualizarse el estado del componente padre
+    useEffect(() => {
+        if (pipRootRef.current && pipEmployeeIdRef.current && pipWindowRef.current) {
+            const emp = employees.find(e => String(e.id).trim() === pipEmployeeIdRef.current);
+            if (emp) {
+                pipRootRef.current.render(
+                    <ProductivityWidget 
+                        employee={emp} 
+                        onClose={() => pipWindowRef.current.close()} 
+                        startClient={startClient}
+                        endClient={endClient}
+                        clientSessions={clientSessions}
+                        activeSessions={activeSessions}
+                        logTransaction={logTransaction}
+                    />
+                );
+            }
+        }
+    }, [clientSessions, activeSessions, employees, startClient, endClient, logTransaction]);
 
     const handleOpenWidget = async (employee) => {
         if (!('documentPictureInPicture' in window)) {
@@ -118,6 +139,8 @@ const Productivity = () => {
             pipWindow.document.body.appendChild(container);
 
             const root = ReactDOM.createRoot(container);
+            pipRootRef.current = root;
+            
             root.render(
                 <ProductivityWidget 
                     employee={employee} 
@@ -135,6 +158,7 @@ const Productivity = () => {
                 root.unmount();
                 pipWindowRef.current = null;
                 pipEmployeeIdRef.current = null;
+                pipRootRef.current = null;
             });
 
         } catch (err) {
@@ -393,9 +417,11 @@ const Productivity = () => {
     const dailyStats = getDailyStats();
 
     // Client Interaction Logic
-    const startClient = async (empId) => {
+    const startClient = async (empId, showModal = true) => {
         await toggleClientSession(empId, true);
-        setActiveClientModal(empId);
+        if (showModal) {
+            setActiveClientModal(empId);
+        }
     };
 
     const endClient = async (empId, type, reason = null) => {

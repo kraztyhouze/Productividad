@@ -597,7 +597,11 @@ export const ProductivityProvider = ({ children }) => {
                         headers: getHeaders(),
                         body: JSON.stringify({ employeeId, startTime, endTime, type, details })
                     });
-                    if (res.ok) return await res.json();
+                    if (res.ok) {
+                        const logged = await res.json();
+                        fetchData(); // Refresh UI state immediately
+                        return logged;
+                    }
                 } catch (err) { console.error('Error logging transaction:', err); }
             },
             

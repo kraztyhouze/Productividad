@@ -9,6 +9,45 @@ const ProductivityTimeline = ({
     activeSessions,
     employees
 }) => {
+    // Helpers to classify widget blocks
+    const getBlockStyle = (log, anomaly) => {
+        if (log.type === 'idle_time') return 'bg-slate-650/40 border-slate-500/30 text-slate-400';
+        if (log.type === 'call_time') return 'bg-blue-500/30 border-blue-400/20 text-blue-200';
+        if (anomaly) return anomaly.color + ' border-transparent text-white';
+        return 'bg-emerald-500/80 border-emerald-400/50 text-white/80';
+    };
+
+    const getBlockTitle = (log, anomaly) => {
+        const start = format(new Date(log.start_time), 'HH:mm:ss');
+        const end = log.end_time ? format(new Date(log.end_time), 'HH:mm:ss') : 'Activo';
+        
+        let diffSec = 0;
+        if (log.details) {
+            try {
+                const parsed = JSON.parse(log.details);
+                diffSec = parsed.durationSeconds || 0;
+            } catch (e) {
+                if (log.end_time) {
+                    diffSec = Math.round((new Date(log.end_time) - new Date(log.start_time)) / 1000);
+                }
+            }
+        } else if (log.end_time) {
+            diffSec = Math.round((new Date(log.end_time) - new Date(log.start_time)) / 1000);
+        }
+
+        const durText = diffSec >= 60 ? `${Math.floor(diffSec / 60)}m ${diffSec % 60}s` : `${diffSec}s`;
+        
+        let typeName = log.type;
+        if (log.type === 'idle_time') typeName = 'Tiempo Muerto (Widget)';
+        else if (log.type === 'call_time') typeName = 'Tiempo de Llamada (Widget)';
+        else if (log.type === 'standard') typeName = 'Compra Estándar';
+        else if (log.type === 'jewelry') typeName = 'Compra Joyas';
+        else if (log.type === 'recoverable') typeName = 'Compra Recuperable';
+        else if (log.type === 'noDeal') typeName = 'Sin Trato';
+
+        return `${typeName} | ${start} - ${end} (${durText}) ${anomaly ? '- ' + anomaly.text : ''}`;
+    };
+
     // 1. Filter Data for Selected Date
     const dateRecords = useMemo(() => {
         return dailyRecords.filter(r => r.date === selectedDate);
@@ -209,27 +248,22 @@ const ProductivityTimeline = ({
                                             </div>
                                         )}
 
-                                        {/* 2. TRANSACTIONS (Green Overlay) */}
+                                        {/* 2. TRANSACTIONS (Green Overlay / Widget Overlays) */}
                                         {logs.map((log, idx) => {
                                             const anomaly = getAnomaly(log);
-                                            const isClientActive = activeSession && String(activeSession.employeeId) === String(emp.id) && activeSession.clientStartTime && String(log.start_time) === String(activeSession.clientStartTime); // Complex match?
-
-                                            // Actually active session is NOT in logs yet usually, unless we fake it?
-                                            // The log is created ON END.
-                                            // So live session needs to be drawn separately or merged.
+                                            const blockStyle = getBlockStyle(log, anomaly);
+                                            const blockTitle = getBlockTitle(log, anomaly);
 
                                             return (
                                                 <div
                                                     key={idx}
-                                                    className={`absolute top-3 bottom-3 rounded-md border border-white/10 shadow-sm cursor-help hover:z-20 hover:scale-[1.03] transition-all flex items-center justify-center text-[10px] font-bold text-white/80
-                                                        ${anomaly ? anomaly.color + ' border-transparent' : 'bg-emerald-500/80 border-emerald-400/50'}
-                                                    `}
+                                                    className={`absolute top-3 bottom-3 rounded-md border border-white/10 shadow-sm cursor-help hover:z-20 hover:scale-[1.03] transition-all flex items-center justify-center text-[10px] font-bold ${blockStyle}`}
                                                     style={{
                                                         left: `${getPosition(log.start_time)}%`,
                                                         width: `${getWidth(log.start_time, log.end_time)}%`,
                                                         minWidth: '8px'
                                                     }}
-                                                    title={`${log.type} | ${format(new Date(log.start_time), 'HH:mm')} (${Math.round((new Date(log.end_time) - new Date(log.start_time)) / 60000)}m) ${anomaly ? '- ' + anomaly.text : ''}`}
+                                                    title={blockTitle}
                                                 >
                                                     {anomaly && <div className="text-white drop-shadow-md pb-4">{anomaly.icon}</div>}
                                                 </div>
@@ -257,10 +291,12 @@ const ProductivityTimeline = ({
                     </div>
 
                     {/* Legend */}
-                    <div className="mt-8 flex gap-6 justify-center text-xs text-slate-400 border-t border-white/5 pt-4">
+                    <div className="mt-8 flex flex-wrap gap-6 justify-center text-xs text-slate-400 border-t border-white/5 pt-4">
                         <div className="flex items-center gap-2"><div className="w-4 h-4 bg-blue-500/20 border border-blue-500/30 rounded"></div> Turno Activo</div>
                         <div className="flex items-center gap-2"><div className="w-4 h-4 bg-emerald-500/80 rounded"></div> Compra Normal</div>
                         <div className="flex items-center gap-2"><div className="w-4 h-4 bg-amber-500 rounded border border-amber-400"></div> En Curso</div>
+                        <div className="flex items-center gap-2"><div className="w-4 h-4 bg-slate-650/40 border border-slate-500/30 rounded"></div> T. Muerto (Widget)</div>
+                        <div className="flex items-center gap-2"><div className="w-4 h-4 bg-blue-500/30 border border-blue-400/20 rounded"></div> T. Llamada (Widget)</div>
                         <div className="flex items-center gap-2"><div className="w-4 h-4 bg-indigo-500 rounded flex items-center justify-center text-white"><Skull size={10} /></div> &gt;90min</div>
                         <div className="flex items-center gap-2"><div className="w-4 h-4 bg-yellow-500 rounded flex items-center justify-center text-white"><Zap size={10} /></div> &lt;3min</div>
                     </div>

@@ -326,6 +326,49 @@ const Productivity = () => {
     };
     const dailyStats = getDailyStats();
 
+    const getWidgetAverages = (empId, date) => {
+        const empLogs = transactionLogs.filter(log => {
+            if (String(log.employee_id).trim() !== String(empId).trim()) return false;
+            if (!log.start_time) return false;
+            const logDate = new Date(log.start_time).toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
+            return logDate === date;
+        });
+
+        let totalIdleSeconds = 0;
+        let idleCount = 0;
+        let totalCallSeconds = 0;
+        let callCount = 0;
+
+        empLogs.forEach(log => {
+            let duration = 0;
+            if (log.details) {
+                try {
+                    const parsed = JSON.parse(log.details);
+                    duration = parsed.durationSeconds || 0;
+                } catch (e) {
+                    if (log.end_time) {
+                        duration = Math.round((new Date(log.end_time) - new Date(log.start_time)) / 1000);
+                    }
+                }
+            } else if (log.end_time) {
+                duration = Math.round((new Date(log.end_time) - new Date(log.start_time)) / 1000);
+            }
+
+            if (log.type === 'idle_time') {
+                totalIdleSeconds += duration;
+                idleCount++;
+            } else if (log.type === 'call_time') {
+                totalCallSeconds += duration;
+                callCount++;
+            }
+        });
+
+        return {
+            avgIdle: idleCount > 0 ? Math.round(totalIdleSeconds / idleCount) : null,
+            avgCall: callCount > 0 ? Math.round(totalCallSeconds / callCount) : null
+        };
+    };
+
     // Client Interaction Logic
     const startClient = async (empId, showModal = true) => {
         await toggleClientSession(empId, true);
@@ -823,6 +866,8 @@ const Productivity = () => {
                                     <>
                                         <th className="pb-3 text-right text-[#ECC94B]">Gr/h</th>
                                         <th className="pb-3 text-right">Hit Rate</th>
+                                        <th className="pb-3 text-right text-[#48BB78]">T. Muerto Prom.</th>
+                                        <th className="pb-3 text-right text-[#4299E1]">T. Llamada Prom.</th>
                                         <th className="pb-3 text-right">T. Medio/Cli</th>
                                     </>
                                 )}
@@ -912,17 +957,31 @@ const Productivity = () => {
 
                                         <td className="py-3 text-right font-bold text-lg" style={{ color: '#FF8C9D' }}>{data.totalSold}</td>
 
-                                        {canSeeDeepStats && (
-                                            <>
-                                                <td className="py-3 text-right font-mono font-bold text-[#ECC94B]">{groupsPerHour}</td>
-                                                <td className="py-3 text-right font-mono">
-                                                    <span className={`${hitRate < 50 ? 'text-red-500' : hitRate > 80 ? 'text-[#48BB78]' : 'text-[#ECC94B]'}`}>{hitRate}%</span>
-                                                </td>
-                                                <td className="py-3 text-right font-mono text-[#718096]">
-                                                    {avgTimeMin}m {avgTimeSec}s
-                                                </td>
-                                            </>
-                                        )}
+                                        {canSeeDeepStats && (() => {
+                                            const wStats = getWidgetAverages(empId, selectedDate);
+                                            const wIdleMin = wStats.avgIdle !== null ? Math.floor(wStats.avgIdle / 60) : 0;
+                                            const wIdleSec = wStats.avgIdle !== null ? wStats.avgIdle % 60 : 0;
+                                            const wCallMin = wStats.avgCall !== null ? Math.floor(wStats.avgCall / 60) : 0;
+                                            const wCallSec = wStats.avgCall !== null ? wStats.avgCall % 60 : 0;
+
+                                            return (
+                                                <>
+                                                    <td className="py-3 text-right font-mono font-bold text-[#ECC94B]">{groupsPerHour}</td>
+                                                    <td className="py-3 text-right font-mono">
+                                                        <span className={`${hitRate < 50 ? 'text-red-500' : hitRate > 80 ? 'text-[#48BB78]' : 'text-[#ECC94B]'}`}>{hitRate}%</span>
+                                                    </td>
+                                                    <td className="py-3 text-right font-mono text-[#48BB78]">
+                                                        {wStats.avgIdle !== null ? `${wIdleMin}m ${wIdleSec}s` : '---'}
+                                                    </td>
+                                                    <td className="py-3 text-right font-mono text-[#4299E1]">
+                                                        {wStats.avgCall !== null ? `${wCallMin}m ${wCallSec}s` : '---'}
+                                                    </td>
+                                                    <td className="py-3 text-right font-mono text-[#718096]">
+                                                        {avgTimeMin}m {avgTimeSec}s
+                                                    </td>
+                                                </>
+                                            );
+                                        })()}
                                         {isManagerial && (
                                             <td className="py-2.5 text-right flex justify-end gap-2">
                                                 {activeSessions.find(s => String(s.employeeId) === empId) && (

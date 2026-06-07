@@ -36,10 +36,12 @@ const Productivity = () => {
     const { currentStore } = useStore();
 
     const [currentTime, setCurrentTime] = useState(new Date());
-    // Fix: Use local date instead of UTC to avoid "yesterday" issues late at night
     const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+    const isToday = selectedDate === format(new Date(), 'yyyy-MM-dd');
+
     const [showCloseModal, setShowCloseModal] = useState(false);
     const [showManualModal, setShowManualModal] = useState(false);
+    const [isClientMode, setIsClientMode] = useState(false);
     const [needInput, setNeedInput] = useState("");
     const [overstockInput, setOverstockInput] = useState("");
     const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'timeline'
@@ -92,9 +94,6 @@ const Productivity = () => {
             }))
             .catch(err => console.error("Error fetching settings", err));
     }, [currentStore]);
-
-    // Derived date flags (needed before auto-close effect to avoid temporal dead zone)
-    const isToday = selectedDate === new Date().toISOString().split('T')[0];
 
     // --- AUTO-CLOSE: Check configured times and end all sessions ---
     useEffect(() => {
@@ -204,8 +203,8 @@ const Productivity = () => {
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
         return () => clearInterval(timer);
-    }, []);
-
+    }, [])
+    
     // Shop Active Timer & Max Concurrent Logic
     useEffect(() => {
         const interval = setInterval(() => {
@@ -213,33 +212,34 @@ const Productivity = () => {
             if (activeBuyingCount > maxConcurrent) {
                 setMaxConcurrent(activeBuyingCount);
             }
+
+            // Recalculate shop active time
+            const intervals = [];
+            dailyRecords.filter(r => r.date === selectedDate).forEach(r => {
+                if (r.startTime && r.endTime) intervals.push({ start: new Date(r.startTime).getTime(), end: new Date(r.endTime).getTime() });
+            });
+            if (isToday) {
+                activeSessions.forEach(s => {
+                    if (s.startTime) intervals.push({ start: new Date(s.startTime).getTime(), end: Date.now() });
+                });
+            }
+            intervals.sort((a, b) => a.start - b.start);
+            const merged = [];
+            if (intervals.length > 0) {
+                let current = intervals[0];
+                for (let i = 1; i < intervals.length; i++) {
+                    if (intervals[i].start <= current.end) current.end = Math.max(current.end, intervals[i].end);
+                    else { merged.push(current); current = intervals[i]; }
+                }
+                merged.push(current);
+            }
+            const totalMs = merged.reduce((acc, curr) => acc + (curr.end - curr.start), 0);
+            setShopActiveSeconds(totalMs / 1000);
+
         }, 1000);
 
-        // ... (Merged intervals logic remains same as it depends on activeSessions/dailyRecords) ...
-        const intervals = [];
-        dailyRecords.filter(r => r.date === selectedDate).forEach(r => {
-            if (r.startTime && r.endTime) intervals.push({ start: new Date(r.startTime).getTime(), end: new Date(r.endTime).getTime() });
-        });
-        if (isToday) {
-            activeSessions.forEach(s => {
-                if (s.startTime) intervals.push({ start: new Date(s.startTime).getTime(), end: Date.now() });
-            });
-        }
-        intervals.sort((a, b) => a.start - b.start);
-        const merged = [];
-        if (intervals.length > 0) {
-            let current = intervals[0];
-            for (let i = 1; i < intervals.length; i++) {
-                if (intervals[i].start <= current.end) current.end = Math.max(current.end, intervals[i].end);
-                else { merged.push(current); current = intervals[i]; }
-            }
-            merged.push(current);
-        }
-        const totalMs = merged.reduce((acc, curr) => acc + (curr.end - curr.start), 0);
-        setShopActiveSeconds(totalMs / 1000);
-
         return () => clearInterval(interval);
-    }, [activeSessions, dailyRecords, selectedDate, isToday, maxConcurrent]); // Removed clientSessions from dependency as it is derived 
+    }, [activeSessions, dailyRecords, selectedDate, isToday, maxConcurrent]); // removed clientSessions dependency so it ticks smoothly
 
     const formatDuration = (ms) => {
         const seconds = Math.floor(ms / 1000);

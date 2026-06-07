@@ -71,100 +71,7 @@ const Productivity = () => {
     // Editing State
     const [editingRecord, setEditingRecord] = useState(null);
 
-    // Floating Widget Refs & Handlers (Document PiP API)
-    const pipWindowRef = useRef(null);
-    const pipEmployeeIdRef = useRef(null);
-    const pipRootRef = useRef(null);
 
-    // Close floating widget on component unmount
-    useEffect(() => {
-        return () => {
-            if (pipWindowRef.current) {
-                pipWindowRef.current.close();
-            }
-        };
-    }, []);
-
-    // Sincronizar dinámicamente el contenido del Widget Flotante al actualizarse el estado del componente padre
-    useEffect(() => {
-        if (pipRootRef.current && pipEmployeeIdRef.current && pipWindowRef.current) {
-            const emp = employees.find(e => String(e.id).trim() === pipEmployeeIdRef.current);
-            if (emp) {
-                pipRootRef.current.render(
-                    <ProductivityWidget 
-                        employee={emp} 
-                        onClose={() => pipWindowRef.current.close()} 
-                        startClient={startClient}
-                        endClient={endClient}
-                        clientSessions={clientSessions}
-                        activeSessions={activeSessions}
-                        logTransaction={logTransaction}
-                    />
-                );
-            }
-        }
-    }, [clientSessions, activeSessions, employees, startClient, endClient, logTransaction]);
-
-    const handleOpenWidget = async (employee) => {
-        if (!('documentPictureInPicture' in window)) {
-            alert("Tu navegador no soporta el Widget Flotante (requiere Chrome, Edge u Opera 116+).");
-            return;
-        }
-
-        // Si ya hay una ventana abierta, la cerramos
-        if (pipWindowRef.current) {
-            pipWindowRef.current.close();
-        }
-
-        try {
-            const pipWindow = await window.documentPictureInPicture.requestWindow({
-                width: 240,
-                height: 350,
-            });
-
-            pipWindowRef.current = pipWindow;
-            pipEmployeeIdRef.current = String(employee.id).trim();
-
-            // Copiar hojas de estilos para aplicar Tailwind
-            const allStyles = document.querySelectorAll('style, link[rel="stylesheet"]');
-            allStyles.forEach((style) => {
-                pipWindow.document.head.appendChild(style.cloneNode(true));
-            });
-
-            pipWindow.document.body.style.margin = '0';
-            pipWindow.document.body.style.backgroundColor = '#020617'; // bg-slate-950
-
-            const container = pipWindow.document.createElement('div');
-            container.id = 'pip-root';
-            pipWindow.document.body.appendChild(container);
-
-            const root = ReactDOM.createRoot(container);
-            pipRootRef.current = root;
-            
-            root.render(
-                <ProductivityWidget 
-                    employee={employee} 
-                    onClose={() => pipWindow.close()} 
-                    startClient={startClient}
-                    endClient={endClient}
-                    clientSessions={clientSessions}
-                    activeSessions={activeSessions}
-                    logTransaction={logTransaction}
-                />
-            );
-
-            // Desmontar el widget al cerrar la ventana PiP
-            pipWindow.addEventListener('pagehide', () => {
-                root.unmount();
-                pipWindowRef.current = null;
-                pipEmployeeIdRef.current = null;
-                pipRootRef.current = null;
-            });
-
-        } catch (err) {
-            console.error('Error al abrir el widget flotante:', err);
-        }
-    };
 
     const handleEndSession = (empId) => {
         const idStr = String(empId).trim();
@@ -478,6 +385,101 @@ const Productivity = () => {
 
         await toggleClientSession(empId, false); // End in DB
         setActiveClientModal(null);
+    };
+
+    // Floating Widget Refs & Handlers (Document PiP API)
+    const pipWindowRef = useRef(null);
+    const pipEmployeeIdRef = useRef(null);
+    const pipRootRef = useRef(null);
+
+    // Close floating widget on component unmount
+    useEffect(() => {
+        return () => {
+            if (pipWindowRef.current) {
+                pipWindowRef.current.close();
+            }
+        };
+    }, []);
+
+    // Sincronizar dinámicamente el contenido del Widget Flotante al actualizarse el estado del componente padre
+    useEffect(() => {
+        if (pipRootRef.current && pipEmployeeIdRef.current && pipWindowRef.current) {
+            const emp = employees.find(e => String(e.id).trim() === pipEmployeeIdRef.current);
+            if (emp) {
+                pipRootRef.current.render(
+                    <ProductivityWidget 
+                        employee={emp} 
+                        onClose={() => pipWindowRef.current.close()} 
+                        startClient={startClient}
+                        endClient={endClient}
+                        clientSessions={clientSessions}
+                        activeSessions={activeSessions}
+                        logTransaction={logTransaction}
+                    />
+                );
+            }
+        }
+    }, [clientSessions, activeSessions, employees, startClient, endClient, logTransaction]);
+
+    const handleOpenWidget = async (employee) => {
+        if (!('documentPictureInPicture' in window)) {
+            alert("Tu navegador no soporta el Widget Flotante (requiere Chrome, Edge u Opera 116+).");
+            return;
+        }
+
+        // Si ya hay una ventana abierta, la cerramos
+        if (pipWindowRef.current) {
+            pipWindowRef.current.close();
+        }
+
+        try {
+            const pipWindow = await window.documentPictureInPicture.requestWindow({
+                width: 240,
+                height: 350,
+            });
+
+            pipWindowRef.current = pipWindow;
+            pipEmployeeIdRef.current = String(employee.id).trim();
+
+            // Copiar hojas de estilos para aplicar Tailwind
+            const allStyles = document.querySelectorAll('style, link[rel="stylesheet"]');
+            allStyles.forEach((style) => {
+                pipWindow.document.head.appendChild(style.cloneNode(true));
+            });
+
+            pipWindow.document.body.style.margin = '0';
+            pipWindow.document.body.style.backgroundColor = '#020617'; // bg-slate-950
+
+            const container = pipWindow.document.createElement('div');
+            container.id = 'pip-root';
+            pipWindow.document.body.appendChild(container);
+
+            const root = ReactDOM.createRoot(container);
+            pipRootRef.current = root;
+            
+            root.render(
+                <ProductivityWidget 
+                    employee={employee} 
+                    onClose={() => pipWindow.close()} 
+                    startClient={startClient}
+                    endClient={endClient}
+                    clientSessions={clientSessions}
+                    activeSessions={activeSessions}
+                    logTransaction={logTransaction}
+                />
+            );
+
+            // Desmontar el widget al cerrar la ventana PiP
+            pipWindow.addEventListener('pagehide', () => {
+                root.unmount();
+                pipWindowRef.current = null;
+                pipEmployeeIdRef.current = null;
+                pipRootRef.current = null;
+            });
+
+        } catch (err) {
+            console.error('Error al abrir el widget flotante:', err);
+        }
     };
 
     // Render Logic

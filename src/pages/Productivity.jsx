@@ -122,6 +122,11 @@ const Productivity = () => {
                 <ProductivityWidget 
                     employee={employee} 
                     onClose={() => pipWindow.close()} 
+                    startClient={startClient}
+                    endClient={endClient}
+                    clientSessions={clientSessions}
+                    activeSessions={activeSessions}
+                    logTransaction={logTransaction}
                 />
             );
 

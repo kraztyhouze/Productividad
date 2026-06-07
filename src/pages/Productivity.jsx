@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useProductivity } from '../context/ProductivityContext';
 import { useTeam } from '../context/TeamContext';
 import { useAuth, ROLES } from '../context/AuthContext';
@@ -60,13 +60,16 @@ const Productivity = () => {
     const [shopActiveSeconds, setShopActiveSeconds] = useState(0);
     const [maxConcurrent, setMaxConcurrent] = useState(0);
 
-    // Helper to map active client sessions for easy lookup
-    const clientSessions = {};
-    activeSessions.forEach(s => {
-        if (s.clientStartTime) {
-            clientSessions[s.employeeId] = new Date(s.clientStartTime).getTime();
-        }
-    });
+    // Helper to map active client sessions for easy lookup (memoized to prevent stale renders on ticks)
+    const clientSessions = useMemo(() => {
+        const map = {};
+        activeSessions.forEach(s => {
+            if (s.clientStartTime) {
+                map[s.employeeId] = new Date(s.clientStartTime).getTime();
+            }
+        });
+        return map;
+    }, [activeSessions]);
 
     // Editing State
     const [editingRecord, setEditingRecord] = useState(null);
@@ -346,6 +349,12 @@ const Productivity = () => {
         if (type === 'noDeal') {
             updates.noDeal = (currentData.noDeal || 0) + 1;
             setNoDealDetail({ empId, reason, date: selectedDate });
+            // Enfocar la ventana principal para que el empleado rellene el formulario de no compra
+            try {
+                window.focus();
+            } catch (e) {
+                console.warn('No se pudo enfocar la ventana principal automáticamente:', e);
+            }
         } else {
             updates[type] = (currentData[type] || 0) + 1;
         }

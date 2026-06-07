@@ -41,10 +41,12 @@ export const useProductivityWidget = ({
     // Sincronizar el estado del widget si cambia en la aplicación principal
     useEffect(() => {
         const active = !!clientSessions[employeeId];
-        if (active) {
+        
+        // Solo actualizar si el estado del widget no coincide con la realidad de la aplicación principal
+        if (active && currentState !== 2) {
             setCurrentState(2);
             setShowTypeSelector(false);
-        } else if (currentState === 2) {
+        } else if (!active && currentState === 2) {
             setCurrentState(0);
             setShowTypeSelector(false);
             setTimestamps(prev => ({
@@ -52,7 +54,7 @@ export const useProductivityWidget = ({
                 horaLibre: Date.now()
             }));
         }
-    }, [clientSessions, employeeId]);
+    }, [clientSessions, employeeId, currentState]);
 
     // Manejar transiciones
     const handleNextState = async () => {

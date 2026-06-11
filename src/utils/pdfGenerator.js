@@ -460,28 +460,60 @@ export const generateTalentMeetingPDF = (employeeName, interviewerName, data, cr
     let currentY = 25;
 
     // Header
+    doc.setFont("helvetica", "bold");
     doc.setFontSize(18);
     doc.setTextColor(31, 41, 55); // Dark text
-    doc.text('ACTA DE REUNIÓN INDIVIDUAL - TIKTAK SUITE', margin, currentY);
-    currentY += 10;
+    doc.text('ACTA DE REUNIÓN INDIVIDUAL', margin, currentY);
+    currentY += 8;
     
-    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
     doc.setTextColor(107, 114, 128); // Gray text
-    doc.text(`Fecha: ${new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`, margin, currentY);
-    currentY += 15;
+    doc.text(`TIKTAK SUITE · GESTIÓN DE TALENTO`, margin, currentY);
+    currentY += 10;
 
-    // Participants
-    doc.setFontSize(11);
+    // Metadata / Participants Box (Perfect alignment & encuadrado)
+    doc.setFillColor(249, 250, 251); // Gray-50
+    doc.setDrawColor(229, 231, 235); // Gray-200
+    doc.roundedRect(margin, currentY, pageWidth - (margin * 2), 25, 2, 2, 'FD');
+
+    // Column 1: Empleado
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(156, 163, 175); // Slate-400
+    doc.text("EMPLEADO", margin + 6, currentY + 8);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
     doc.setTextColor(31, 41, 55);
-    doc.text(`Empleado: ${employeeName}`, margin, currentY);
-    doc.text(`Entrevistador: ${interviewerName}`, pageWidth / 2, currentY);
-    currentY += 10;
-    doc.setDrawColor(229, 231, 235);
-    doc.line(margin, currentY, pageWidth - margin, currentY);
-    currentY += 10;
+    doc.text(employeeName || 'N/A', margin + 6, currentY + 16);
 
-    // Criteria Summary
-    doc.setFontSize(14);
+    // Column 2: Entrevistador
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(156, 163, 175);
+    doc.text("ENTREVISTADOR", margin + 80, currentY + 8);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(31, 41, 55);
+    doc.text(interviewerName || 'N/A', margin + 80, currentY + 16);
+
+    // Column 3: Fecha
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(156, 163, 175);
+    doc.text("FECHA REUNIÓN", margin + 140, currentY + 8);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(31, 41, 55);
+    const meetingDate = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    doc.text(meetingDate, margin + 140, currentY + 16);
+
+    currentY += 35; // Advance past the box
+
+    // Criteria Summary Title
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(31, 41, 55);
     doc.text('Evaluación por Zonas', margin, currentY);
     currentY += 8;
 
@@ -492,29 +524,53 @@ export const generateTalentMeetingPDF = (employeeName, interviewerName, data, cr
             return [c.title, color, data.comments?.[c.id] || ''];
         });
 
+        // Ensure there is enough space on page to start a new zone table (min 40 units)
+        if (currentY + 40 > pageHeight - 20) {
+            doc.addPage();
+            currentY = 25;
+        }
+
         autoTable(doc, {
             startY: currentY,
             head: [[zone, 'Estado', 'Observaciones']],
             body: tableData,
-            theme: 'striped',
-            headStyles: { fillColor: [55, 65, 81], textColor: [255, 255, 255] },
+            theme: 'grid', // 'grid' is perfectly framed/encuadrado
+            headStyles: { fillColor: [55, 65, 81], textColor: [255, 255, 255], fontStyle: 'bold' },
             margin: { left: margin, right: margin },
             columnStyles: {
-                0: { cellWidth: 60 },
-                1: { cellWidth: 30, halign: 'center' },
+                0: { cellWidth: 55, fontStyle: 'bold' },
+                1: { cellWidth: 25, halign: 'center' },
                 2: { cellWidth: 'auto' }
             },
-            didDrawPage: (data) => {
-                currentY = data.cursor.y;
+            styles: { fontSize: 9, cellPadding: 4 },
+            didParseCell: function (cellData) {
+                if (cellData.section === 'body' && cellData.column.index === 1) {
+                    const text = cellData.cell.raw;
+                    if (text === 'CRÍTICO') {
+                        cellData.cell.styles.textColor = [220, 38, 38]; // Red
+                        cellData.cell.styles.fontStyle = 'bold';
+                    } else if (text === 'A MEJORAR') {
+                        cellData.cell.styles.textColor = [217, 119, 6]; // Amber
+                        cellData.cell.styles.fontStyle = 'bold';
+                    } else if (text === 'CORRECTO') {
+                        cellData.cell.styles.textColor = [22, 163, 74]; // Green
+                        cellData.cell.styles.fontStyle = 'bold';
+                    }
+                }
             }
         });
-        currentY += 5;
+        currentY = doc.lastAutoTable.finalY + 8;
     });
 
-    // Final Summary
-    if (currentY + 60 > pageHeight) doc.addPage();
-    currentY += 10;
-    doc.setFontSize(14);
+    // Final Summary Title
+    if (currentY + 40 > pageHeight - 20) {
+        doc.addPage();
+        currentY = 25;
+    }
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(31, 41, 55);
     doc.text('Compromisos y Acuerdos', margin, currentY);
     currentY += 10;
 
@@ -525,30 +581,63 @@ export const generateTalentMeetingPDF = (employeeName, interviewerName, data, cr
     ];
 
     sections.forEach(sec => {
+        const labelHeight = 8;
+        const lineHeight = 6;
+        
+        // Check if there is enough space for label and at least 1 line of text
+        if (currentY + labelHeight + lineHeight + 10 > pageHeight - 20) {
+            doc.addPage();
+            currentY = 25;
+        }
+
+        // Draw section label
         doc.setFontSize(11);
         doc.setFont("helvetica", "bold");
         doc.text(`${sec.label}:`, margin, currentY);
-        currentY += 6;
+        currentY += labelHeight;
+
+        // Draw section text line by line to prevent overflow and loss of information
         doc.setFont("helvetica", "normal");
         const splitText = doc.splitTextToSize(sec.value || 'No se han definido puntos específicos en esta sección.', pageWidth - (margin * 2));
-        doc.text(splitText, margin, currentY);
-        currentY += (splitText.length * 6) + 6;
+        
+        splitText.forEach(line => {
+            if (currentY + lineHeight > pageHeight - 25) { // Leave room for footer
+                doc.addPage();
+                currentY = 25;
+            }
+            doc.text(line, margin, currentY);
+            currentY += lineHeight;
+        });
+        
+        currentY += 6; // Space after section
     });
 
     // Signatures
+    const signaturesHeight = 35;
+    if (currentY + signaturesHeight > pageHeight - 15) {
+        doc.addPage();
+        currentY = 25;
+    }
+
     currentY = Math.max(currentY, pageHeight - 40);
     doc.setDrawColor(31, 41, 55);
     doc.line(margin, currentY, margin + 70, currentY);
     doc.line(pageWidth - margin - 70, currentY, pageWidth - margin, currentY);
     
     doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
     doc.text('Firma Empleado', margin + 35, currentY + 5, { align: "center" });
     doc.text('Firma Entrevistador', pageWidth - margin - 35, currentY + 5, { align: "center" });
 
-    // Footer
-    doc.setFontSize(8);
-    doc.setTextColor(156, 163, 175);
-    doc.text(`Documento generado por TikTak Suite 2.1 - Página 1 de 1`, pageWidth / 2, pageHeight - 10, { align: "center" });
+    // Dynamic Footers on all pages
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(156, 163, 175);
+        doc.text(`Documento generado por TikTak Suite 2.1 - Página ${i} de ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: "center" });
+    }
 
     // Download
     const fileName = `Acta_Talento_${employeeName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;

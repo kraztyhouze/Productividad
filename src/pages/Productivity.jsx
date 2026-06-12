@@ -212,6 +212,10 @@ const Productivity = () => {
     };
 
     const isManagerial = [ROLES.MANAGER, ROLES.SUPERVISOR, ROLES.RESPONSIBLE].includes(user?.role);
+    const showAllEmployees = isManagerial || user?.role === ROLES.KIOSK;
+    const visibleEmployees = showAllEmployees
+        ? employees.filter(e => e.isBuyer)
+        : employees.filter(e => e.id === user?.id);
     // Responsible can edit panels but NOT necessarily see deep stats? Let's check request.
     // Request: "estadisticas completas solo las pueda ver el gerente y el supervisor".
     // So Responsible/Employee/Kiosk get simplified view.
@@ -694,45 +698,46 @@ const Productivity = () => {
                             </div>
                         </div>
 
-                        <div className={`${viewMode === 'timeline' ? 'flex flex-col' : 'grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5'} gap-6 overflow-y-auto custom-scrollbar flex-1 content-start p-2 -mx-2`}>
+                        <div className={`${viewMode === 'timeline' ? 'flex flex-col' : visibleEmployees.length === 1 ? 'flex justify-center items-center h-full' : 'grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 content-start'} gap-6 overflow-y-auto custom-scrollbar flex-1 p-2 -mx-2`}>
                             {viewMode === 'timeline' ? (
                                 <ProductivityTimeline
                                     selectedDate={selectedDate}
                                     dailyRecords={dailyRecords}
                                     transactionLogs={transactionLogs}
                                     activeSessions={activeSessions}
-                                    employees={employees.filter(e => e.isBuyer)}
+                                    employees={visibleEmployees}
                                 />
                             ) : (
-                                employees.filter(e => e.isBuyer).map(emp => {
+                                visibleEmployees.map(emp => {
                                     const session = activeSessions.find(s => String(s.employeeId) === String(emp.id));
                                     const isClientActive = !!clientSessions[emp.id];
                                     const isSessionActive = !!session || isClientActive;
                                     const stats = getGroupCounts(emp.id, selectedDate);
 
                                     return (
-                                        <GamifiedCard
-                                            key={emp.id}
-                                            emp={emp}
-                                            session={session}
-                                            isClientActive={isClientActive}
-                                            stats={stats}
-                                            onClick={() => {
-                                                if (!isToday) return;
-                                                if (isClientActive) { setActiveClientModal(emp.id); return; }
-                                                if (!isSessionActive) { 
-                                                    startSession(emp.id, `${emp.firstName} ${emp.lastName}`); 
-                                                } else {
-                                                    startClient(emp.id);
-                                                }
-                                            }}
-                                            onEndSession={(id) => handleEndSession(id)}
-                                            onOpenRewards={(id) => setRewardModalEmployeeId(id)}
-                                            onResetGamification={handleResetGamification}
-                                            isManagerial={isManagerial}
-                                            user={user}
-                                            onOpenWidget={handleOpenWidget}
-                                        />
+                                        <div key={emp.id} className={visibleEmployees.length === 1 ? "w-full max-w-sm" : ""}>
+                                            <GamifiedCard
+                                                emp={emp}
+                                                session={session}
+                                                isClientActive={isClientActive}
+                                                stats={stats}
+                                                onClick={() => {
+                                                    if (!isToday) return;
+                                                    if (isClientActive) { setActiveClientModal(emp.id); return; }
+                                                    if (!isSessionActive) { 
+                                                        startSession(emp.id, `${emp.firstName} ${emp.lastName}`); 
+                                                    } else {
+                                                        startClient(emp.id);
+                                                    }
+                                                }}
+                                                onEndSession={(id) => handleEndSession(id)}
+                                                onOpenRewards={(id) => setRewardModalEmployeeId(id)}
+                                                onResetGamification={handleResetGamification}
+                                                isManagerial={isManagerial}
+                                                user={user}
+                                                onOpenWidget={handleOpenWidget}
+                                            />
+                                        </div>
                                     );
                                 })
                             )}
@@ -875,11 +880,13 @@ const Productivity = () => {
                             </tr>
                         </thead>
                         <tbody className="text-sm divide-y divide-[#E2E8F0]">
-                            {Object.keys(dailyStats).sort((a, b) => {
-                                const nA = employees.find(e => e.id == a)?.firstName || '';
-                                const nB = employees.find(e => e.id == b)?.firstName || '';
-                                return nA.localeCompare(nB);
-                            }).map(empId => {
+                            {Object.keys(dailyStats)
+                                .filter(empId => showAllEmployees || parseInt(empId) === user?.id)
+                                .sort((a, b) => {
+                                    const nA = employees.find(e => e.id == a)?.firstName || '';
+                                    const nB = employees.find(e => e.id == b)?.firstName || '';
+                                    return nA.localeCompare(nB);
+                                }).map(empId => {
                                 const stat = dailyStats[empId];
 
                                 const data = getGroupCounts(empId, selectedDate);

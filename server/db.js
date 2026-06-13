@@ -271,7 +271,11 @@ export const initDb = async () => {
             "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS time TEXT;",
             "ALTER TABLE goldsmith_movements ADD COLUMN IF NOT EXISTS inventory_category TEXT;",
             "ALTER TABLE goldsmith_inventory ADD COLUMN IF NOT EXISTS restock_threshold NUMERIC DEFAULT 100;",
-            "ALTER TABLE employees ADD COLUMN IF NOT EXISTS is_interviewer BOOLEAN DEFAULT FALSE;"
+            "ALTER TABLE employees ADD COLUMN IF NOT EXISTS is_interviewer BOOLEAN DEFAULT FALSE;",
+            // Migrations para reuniones 1:1 — garantizan que las rutas alias funcionen en producción
+            "ALTER TABLE final_meetings ADD COLUMN IF NOT EXISTS store_id TEXT;",
+            "ALTER TABLE meeting_schedules ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'Pendiente';",
+            "ALTER TABLE meeting_drafts ADD COLUMN IF NOT EXISTS store_id TEXT;"
         ];
         for (const sql of alters) {
             try { await client.query(sql); } catch (e) { /* ignore already exists */ }

@@ -1039,4 +1039,177 @@ router.delete('/meeting-schedules/:id', isManager, async (req, res) => {
     }
 });
 
+
+// ─── ALIAS ROUTES — Frontend URL compatibility layer ─────────────────────────
+// El frontend llama a estas URLs. El backend las implementa con nombres distintos.
+// Estos alias redirigen internamente sin romper las rutas originales.
+
+// Schedules: el frontend usa /meetings/schedules*, el backend tiene /meeting-schedules*
+router.get('/meetings/schedules', isManager, async (req, res) => {
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    try {
+        const result = await pool.query(
+            'SELECT * FROM meeting_schedules WHERE store_id = $1 ORDER BY scheduled_date ASC',
+            [storeId]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        logError(err, 'GET /meetings/schedules (alias)');
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/meetings/schedule', isManager, async (req, res) => {
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    const { employee_id, scheduled_date } = req.body;
+    try {
+        const result = await pool.query(
+            "INSERT INTO meeting_schedules (employee_id, scheduled_date, store_id, status) VALUES ($1, $2, $3, 'Pendiente') RETURNING *",
+            [employee_id, scheduled_date, storeId]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        logError(err, 'POST /meetings/schedule (alias)');
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.delete('/meetings/schedules/:id', isManager, async (req, res) => {
+    try {
+        await pool.query('DELETE FROM meeting_schedules WHERE id = $1', [req.params.id]);
+        res.json({ success: true });
+    } catch (err) {
+        logError(err, 'DELETE /meetings/schedules/:id (alias)');
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Criteria: el frontend usa /meetings/criteria*, el backend tiene /evaluation-criteria*
+router.get('/meetings/criteria', isManager, async (req, res) => {
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    try {
+        const result = await pool.query(
+            'SELECT * FROM evaluation_criteria WHERE store_id = $1 ORDER BY category ASC, order_index ASC',
+            [storeId]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        logError(err, 'GET /meetings/criteria (alias)');
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/meetings/criteria', isManager, async (req, res) => {
+    const { category, title, description, order_index } = req.body;
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    try {
+        const result = await pool.query(
+            'INSERT INTO evaluation_criteria (category, title, description, order_index, store_id) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+            [category, title, description, order_index || 0, storeId]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        logError(err, 'POST /meetings/criteria (alias)');
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.put('/meetings/criteria/:id', isManager, async (req, res) => {
+    const { id } = req.params;
+    const { category, title, description, order_index } = req.body;
+    try {
+        const result = await pool.query(
+            'UPDATE evaluation_criteria SET category = $1, title = $2, description = $3, order_index = $4 WHERE id = $5 RETURNING *',
+            [category, title, description, order_index, id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        logError(err, 'PUT /meetings/criteria/:id (alias)');
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.delete('/meetings/criteria/:id', isManager, async (req, res) => {
+    try {
+        await pool.query('DELETE FROM evaluation_criteria WHERE id = $1', [req.params.id]);
+        res.json({ success: true });
+    } catch (err) {
+        logError(err, 'DELETE /meetings/criteria/:id (alias)');
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Draft: el frontend usa /meetings/save-draft, el backend tiene /meetings/draft
+router.post('/meetings/save-draft', isManager, async (req, res) => {
+    const { employeeId, draftData } = req.body;
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    // Extraer interviewer_id si viene en draftData, o usar un fallback
+    const interviewer_id = draftData?.interviewer?.id || 'gerente';
+    try {
+        const result = await pool.query(
+            `INSERT INTO meeting_drafts (employee_id, interviewer_id, data, last_saved) 
+             VALUES ($1, $2, $3, NOW()) 
+             ON CONFLICT (employee_id) DO UPDATE SET 
+             interviewer_id = EXCLUDED.interviewer_id, 
+             data = EXCLUDED.data, 
+             last_saved = EXCLUDED.last_saved 
+             RETURNING *`,
+            [employeeId, interviewer_id, JSON.stringify(draftData)]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        logError(err, 'POST /meetings/save-draft (alias)');
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Finish: el frontend usa /meetings/finish, el backend tiene /meetings/finalize
+router.post('/meetings/finish', isManager, async (req, res) => {
+    const { employeeId } = req.body;
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // Recuperar el borrador para finalizar con los datos guardados
+        const draftRes = await client.query(
+            'SELECT * FROM meeting_drafts WHERE employee_id = $1',
+            [employeeId]
+        );
+        const draft = draftRes.rows[0];
+        const now = new Date().toISOString();
+
+        // Insertar en final_meetings
+        const finalRes = await client.query(
+            `INSERT INTO final_meetings (employee_id, interviewer_id, date, summary, store_id)
+             VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+            [
+                employeeId,
+                draft?.interviewer_id || 'gerente',
+                now,
+                draft?.data ? JSON.stringify(draft.data) : '{}',
+                storeId
+            ]
+        );
+
+        // Eliminar borrador
+        await client.query('DELETE FROM meeting_drafts WHERE employee_id = $1', [employeeId]);
+
+        // Marcar cita programada como completada si existe
+        await client.query(
+            "UPDATE meeting_schedules SET status = 'Completado' WHERE employee_id = $1 AND status = 'Pendiente' AND scheduled_date <= $2",
+            [employeeId, now]
+        );
+
+        await client.query('COMMIT');
+        res.json({ success: true, id: finalRes.rows[0].id });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        logError(err, 'POST /meetings/finish (alias)');
+        res.status(500).json({ error: err.message });
+    } finally {
+        client.release();
+    }
+});
+
 export default router;

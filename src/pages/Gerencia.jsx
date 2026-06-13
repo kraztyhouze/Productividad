@@ -383,7 +383,11 @@ const Gerencia = () => {
             const url = criteriaData.id ? `/api/gerencia/meetings/criteria/${criteriaData.id}` : '/api/gerencia/meetings/criteria';
             const res = await fetch(url, {
                 method,
-                headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore },
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'x-store-id': currentStore,
+                    'x-user-role': user?.role === ROLES.MANAGER ? 'Gerente' : (user?.role || 'Gerente')
+                },
                 body: JSON.stringify(criteriaData)
             });
             if (res.ok) meetings.refresh();
@@ -395,7 +399,10 @@ const Gerencia = () => {
         try {
             const res = await fetch(`/api/gerencia/meetings/criteria/${id}`, { 
                 method: 'DELETE',
-                headers: { 'x-store-id': currentStore }
+                headers: { 
+                    'x-store-id': currentStore,
+                    'x-user-role': user?.role === ROLES.MANAGER ? 'Gerente' : (user?.role || 'Gerente')
+                }
             });
             if (res.ok) meetings.refresh();
         } catch (e) { console.error(e); }
@@ -405,12 +412,19 @@ const Gerencia = () => {
         try {
             const res = await fetch('/api/gerencia/meetings/schedule', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-store-id': currentStore },
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'x-store-id': currentStore,
+                    'x-user-role': user?.role === ROLES.MANAGER ? 'Gerente' : (user?.role || 'Gerente')
+                },
                 body: JSON.stringify(scheduleData)
             });
             if (res.ok) {
                 meetings.refresh();
                 closeModal();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                console.error('Error programando reunión:', res.status, err);
             }
         } catch (e) { console.error(e); }
     };
@@ -420,7 +434,10 @@ const Gerencia = () => {
         try {
             const res = await fetch(`/api/gerencia/meetings/schedules/${id}`, { 
                 method: 'DELETE',
-                headers: { 'x-store-id': currentStore }
+                headers: { 
+                    'x-store-id': currentStore,
+                    'x-user-role': user?.role === ROLES.MANAGER ? 'Gerente' : (user?.role || 'Gerente')
+                }
             });
             if (res.ok) meetings.refresh();
         } catch (e) { console.error(e); }

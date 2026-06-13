@@ -38,8 +38,14 @@ export const useProductivityWidget = ({
         tiempoAtencion: null
     });
 
+    // Flag para evitar que el useEffect interfiera durante una transición manual en curso
+    const [isTransitioning, setIsTransitioning] = useState(false);
+
     // Sincronizar el estado del widget si cambia en la aplicación principal
+    // Solo actúa cuando NO hay una transición manual en progreso
     useEffect(() => {
+        if (isTransitioning) return;
+
         const active = !!clientSessions[employeeId];
         
         // Solo actualizar si el estado del widget no coincide con la realidad de la aplicación principal
@@ -54,7 +60,7 @@ export const useProductivityWidget = ({
                 horaLibre: Date.now()
             }));
         }
-    }, [clientSessions, employeeId, currentState]);
+    }, [clientSessions, employeeId, currentState, isTransitioning]);
 
     // Manejar transiciones
     const handleNextState = async () => {
@@ -141,19 +147,23 @@ export const useProductivityWidget = ({
         const startClientTime = clientSessions[employeeId] || timestamps.horaInicioCompra || now;
         const tiempoAtencionSec = Math.max(0, Math.floor((now - startClientTime) / 1000));
 
+        // Bloquear el useEffect de sincronización para que no interfiera
+        setIsTransitioning(true);
+
+        // Resetear estado visualmente a 0 ANTES de la llamada async
+        // Esto garantiza que el widget vuelva a estado "Libre" inmediatamente
+        setShowTypeSelector(false);
+        setCurrentState(0);
         setTimestamps({
             horaLibre: now,
             horaLlamada: null,
             horaInicioCompra: null,
             horaFinCompra: now
         });
-
         setLastDurations(prev => ({
             ...prev,
             tiempoAtencion: tiempoAtencionSec
         }));
-
-        setShowTypeSelector(false);
 
         // REGISTRO REAL EN LA BASE DE DATOS: Llamamos a endClient de la aplicación principal.
         // Esto automáticamente:
@@ -171,7 +181,8 @@ export const useProductivityWidget = ({
             }
         }
 
-        setCurrentState(0);
+        // Liberar el flag de transición — ahora el useEffect puede sincronizar normalmente
+        setIsTransitioning(false);
     };
 
     return {

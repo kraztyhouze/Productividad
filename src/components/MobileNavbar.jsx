@@ -15,7 +15,7 @@ const MobileNavbar = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const { logout, user } = useAuth();
-    const { activeModule, switchModule } = useModule();
+    const { activeModule, switchModule, isPathEnabled } = useModule();
 
     const isGerencia = activeModule === MODULES.GERENCIA;
 
@@ -48,7 +48,7 @@ const MobileNavbar = () => {
 
     return (
         <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-2xl border-t border-slate-100 z-50 h-20 px-4 flex items-center justify-around pb-2">
-            {navItems.map((item, i) => {
+            {navItems.filter(item => isPathEnabled(item.to)).map((item, i) => {
                 const Icon = item.icon;
                 const isActive = item.active;
 

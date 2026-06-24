@@ -20,13 +20,14 @@ import {
     BarChart3,
     ArrowLeftRight,
     UserCheck,
-    Activity
+    Activity,
+    Shield
 } from 'lucide-react';
 
 const Sidebar = ({ expanded, setExpanded }) => {
     const { user, logout } = useAuth();
     const { getDisplayName } = useTeam();
-    const { activeModule, switchModule } = useModule();
+    const { activeModule, switchModule, isPathEnabled } = useModule();
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -170,7 +171,7 @@ const Sidebar = ({ expanded, setExpanded }) => {
                         )}
                         {group.section && !expanded && <div className="my-3 mx-3 border-t border-[#E2E8F0]" />}
 
-                        {group.items.filter(item => canSee(item.roles)).map(item => {
+                        {group.items.filter(item => canSee(item.roles) && isPathEnabled(item.to)).map(item => {
                             const active = isItemActive(item.to);
                             return (
                                 <NavLink
@@ -222,6 +223,25 @@ const Sidebar = ({ expanded, setExpanded }) => {
                                 </span>
                             )}
                         </button>
+                    </div>
+                )}
+
+                {/* Admin Panel Link — Master Admins only */}
+                {user?.isMaster && (
+                    <div className="pt-2">
+                        <NavLink
+                            to="/admin"
+                            id="nav-admin"
+                            className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 group ${!expanded ? 'justify-center' : ''}`}
+                            title="Panel Administrador"
+                        >
+                            <Shield size={20} className="shrink-0 text-indigo-500 group-hover:text-indigo-700" />
+                            {expanded && (
+                                <span className="text-sm font-bold uppercase tracking-tight">
+                                    Administración
+                                </span>
+                            )}
+                        </NavLink>
                     </div>
                 )}
             </nav>

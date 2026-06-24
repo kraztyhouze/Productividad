@@ -14,6 +14,53 @@ export const initDb = async () => {
     const client = await pool.connect();
     try {
         console.log("Initializing database tables...");
+
+        // Stores
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS stores (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                color TEXT DEFAULT 'from-blue-600 to-blue-800',
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
+        // Populate initial stores
+        await client.query(`
+            INSERT INTO stores (id, name, color, is_active)
+            VALUES 
+            ('store_1', 'Sevilla 2', 'from-blue-600 to-blue-800', true),
+            ('store_2', 'Sevilla 1', 'from-emerald-600 to-emerald-800', true)
+            ON CONFLICT (id) DO NOTHING;
+        `);
+
+        // Store Modules Visibility Settings
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS store_modules (
+                id SERIAL PRIMARY KEY,
+                store_id TEXT REFERENCES stores(id) ON DELETE CASCADE,
+                module_key TEXT NOT NULL,
+                is_enabled BOOLEAN DEFAULT TRUE,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(store_id, module_key)
+            );
+        `);
+
+        // Populate initial modules for existing stores
+        await client.query(`
+            INSERT INTO store_modules (store_id, module_key, is_enabled)
+            SELECT s.id, m.key, true
+            FROM stores s
+            CROSS JOIN (
+                VALUES 
+                ('dashboard'), ('productivity'), ('market'), ('reports'),
+                ('gerencia_summary'), ('gerencia_tasks'), ('gerencia_team'), 
+                ('gerencia_tracking'), ('gerencia_jewelry'), ('gerencia_meetings'), 
+                ('gerencia_cash')
+            ) AS m(key)
+            ON CONFLICT (store_id, module_key) DO NOTHING;
+        `);
         
         // Employees & Auth
         await client.query(`
@@ -275,7 +322,9 @@ export const initDb = async () => {
             // Migrations para reuniones 1:1 — garantizan que las rutas alias funcionen en producción
             "ALTER TABLE final_meetings ADD COLUMN IF NOT EXISTS store_id TEXT;",
             "ALTER TABLE meeting_schedules ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'Pendiente';",
-            "ALTER TABLE meeting_drafts ADD COLUMN IF NOT EXISTS store_id TEXT;"
+            "ALTER TABLE meeting_drafts ADD COLUMN IF NOT EXISTS store_id TEXT;",
+            "ALTER TABLE employees ADD COLUMN IF NOT EXISTS is_master BOOLEAN DEFAULT FALSE;",
+            "ALTER TABLE employees ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;"
         ];
         for (const sql of alters) {
             try { await client.query(sql); } catch (e) { /* ignore already exists */ }
@@ -283,6 +332,7 @@ export const initDb = async () => {
 
         const tablesToSecure = [
             // New tables
+            'stores', 'store_modules',
             'meeting_schedules', 'task_batteries', 'battery_items', 
             'cash_control_logs', 'goldsmith_inventory', 'goldsmith_partners', 
             'goldsmith_movements', 'goldsmith_orders', 'excel_metrics', 

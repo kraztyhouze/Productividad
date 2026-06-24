@@ -29,6 +29,11 @@ router.post('/login', loginLimiter, async (req, res) => {
 
         if (result.rows.length > 0) {
             const emp = result.rows[0];
+
+            if (emp.is_active === false) {
+                return res.status(403).json({ success: false, message: 'Cuenta desactivada. Contacta al administrador.' });
+            }
+
             const match = await bcrypt.compare(password, emp.password);
 
             if (match) {
@@ -39,7 +44,7 @@ router.post('/login', loginLimiter, async (req, res) => {
                     avatar: emp.alias || `${emp.first_name[0]}${emp.last_name[0]}`,
                     username: emp.username,
                     email: emp.email,
-                    isMaster: false,
+                    isMaster: emp.is_master || false,
                     isBuyer: emp.is_buyer,
                     storeId: emp.store_id
                 };

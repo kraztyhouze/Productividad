@@ -7,10 +7,38 @@ export const useStore = () => {
 };
 
 export const StoreProvider = ({ children }) => {
+    const [stores, setStores] = useState([]);
+    const [loadingStores, setLoadingStores] = useState(true);
     const [currentStore, setCurrentStore] = useState(() => {
         // Intentar recuperar la selección guardada al iniciar
         return localStorage.getItem('tiktak_current_store');
     });
+
+    useEffect(() => {
+        const fetchStores = async () => {
+            try {
+                const res = await fetch('/api/stores');
+                if (res.ok) {
+                    const data = await res.json();
+                    setStores(data);
+                } else {
+                    setStores([
+                        { id: 'store_2', name: 'Sevilla 1', color: 'from-emerald-600 to-emerald-800' },
+                        { id: 'store_1', name: 'Sevilla 2', color: 'from-blue-600 to-blue-800' }
+                    ]);
+                }
+            } catch (e) {
+                console.error("Error loading stores:", e);
+                setStores([
+                    { id: 'store_2', name: 'Sevilla 1', color: 'from-emerald-600 to-emerald-800' },
+                    { id: 'store_1', name: 'Sevilla 2', color: 'from-blue-600 to-blue-800' }
+                ]);
+            } finally {
+                setLoadingStores(false);
+            }
+        };
+        fetchStores();
+    }, []);
 
     const selectStore = (storeId) => {
         setCurrentStore(storeId);
@@ -22,17 +50,12 @@ export const StoreProvider = ({ children }) => {
         localStorage.removeItem('tiktak_current_store');
     };
 
-    // Lista de tiendas disponibles (esto podría venir de una config o ENV en el futuro)
-    const stores = [
-        { id: 'store_2', name: 'Sevilla 1', color: 'from-emerald-600 to-emerald-800' },
-        { id: 'store_1', name: 'Sevilla 2', color: 'from-blue-600 to-blue-800' }
-    ];
-
     const value = {
         currentStore,
         selectStore,
         clearStore,
         stores,
+        loadingStores,
         selectedStoreData: stores.find(s => s.id === currentStore)
     };
 

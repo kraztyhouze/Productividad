@@ -60,7 +60,6 @@ const MovementForm = ({ type: movType, partners, onSave, onCancel }) => {
         onSave({
             ...data, 
             type: movType, 
-            weight: totalW, 
             cost: totalC, 
             karats_data: lines, 
             status: movType === 'Fundición' ? 'Pendiente' : 'Completado', 

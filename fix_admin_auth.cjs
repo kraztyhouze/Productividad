@@ -39,14 +39,14 @@ async function fixAdmin() {
         const check = await pool.query("SELECT * FROM employees WHERE username_bindex = $1", [bindex]);
         if (check.rows.length > 0) {
             await pool.query(
-                "UPDATE employees SET username = $1, password = $2 WHERE username_bindex = $3",
+                "UPDATE employees SET username = $1, password = $2, is_master = true, is_active = true WHERE username_bindex = $3",
                 [encryptedUsername, hashedPassword, bindex]
             );
             console.log("Admin updated successfully.");
         } else {
              // Create it if it doesn't exist (assuming store_1)
              await pool.query(
-                 "INSERT INTO employees (username, username_bindex, password, store_id, role, first_name, last_name) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+                 "INSERT INTO employees (username, username_bindex, password, store_id, role, first_name, last_name, is_master, is_active) VALUES ($1, $2, $3, $4, $5, $6, $7, true, true)",
                  [encryptedUsername, bindex, hashedPassword, 'store_1', 'Gerente', 'Admin', 'TikTak']
              );
              console.log("Admin created successfully.");

@@ -19,6 +19,7 @@ import LaptopDiagnostics from './pages/LaptopDiagnostics';
 import LaptopRemoteTest from './pages/LaptopRemoteTest';
 import Gerencia from './pages/Gerencia';
 import MobileTasks from './pages/MobileTasks';
+import AdminDashboard from './pages/Admin/AdminDashboard';
 
 // Componente para proteger rutas que requieren Tienda seleccionada
 const RequireStore = () => {
@@ -35,6 +36,14 @@ const ProtectedRoute = () => {
     const { user } = useAuth();
     if (!user) {
         return <Navigate to="/login" replace />;
+    }
+    return <Outlet />;
+};
+
+const AdminRoute = () => {
+    const { user } = useAuth();
+    if (!user || !user.isMaster) {
+        return <Navigate to="/" replace />;
     }
     return <Outlet />;
 };
@@ -68,6 +77,9 @@ function App() {
                                                 <Route path="reports" element={<Reports />} />
                                                 <Route path="market" element={<Market />} />
                                                 <Route path="gerencia" element={<Gerencia />} />
+                                            </Route>
+                                            <Route element={<AdminRoute />}>
+                                                <Route path="/admin" element={<AdminDashboard />} />
                                             </Route>
                                             <Route path="/mobile/tasks" element={<MobileTasks />} />
                                         </Route>

@@ -24,6 +24,7 @@ import operationalRouter from './routes/operational.js';
 import gerenciaRouter from './routes/gerencia.js';
 import taskBatteriesRouter from './routes/task-batteries.js';
 import dailyOrganizerRouter from './routes/daily-organizer.js';
+import adminRouter from './routes/admin.js';
 
 // --- Cryptographic Shielding (Fail-Fast) ---
 import './utils/crypto.js'; 
@@ -205,6 +206,31 @@ app.use('/api', operationalRouter);                  // /api/day-incidents, /api
 app.use('/api/gerencia', gerenciaRouter);
 app.use('/api/task-batteries', taskBatteriesRouter);
 app.use('/api/daily-organizer', dailyOrganizerRouter);
+app.use('/api/admin', adminRouter);
+
+// Public dynamic stores list
+app.get('/api/stores', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT id, name, color, is_active FROM stores WHERE is_active = true ORDER BY id ASC');
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Public store modules list for layout filtering
+app.get('/api/store-modules', async (req, res) => {
+    const storeId = req.headers['x-store-id'] || 'store_1';
+    try {
+        const result = await pool.query(
+            'SELECT module_key as "moduleKey", is_enabled as "isEnabled" FROM store_modules WHERE store_id = $1',
+            [storeId]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 // ─── Auto-Close Shifts Cron (every 60s) ───────────────────────────────────────
 setInterval(async () => {
